@@ -1,0 +1,223 @@
+# SupCom Defense: plan
+
+Ett single player-tower defense-spel i webbläsaren, med Supreme Commander: Forged Alliance-stil på grafik och enheter.
+
+## Spelidé
+
+- Du börjar med en **Commander (ACU)**, en **kärnbyggnad** (t.ex. en Quantum Gate) och ett startkapital i **mass** och **energi**.
+- Du bygger en bas: ekonomibyggnader och försvarstorn.
+- Du startar själv nästa **våg**. Fiender kommer från en eller flera kanter av kartan och försöker förstöra kärnan.
+- Ekonomibyggnaderna (Mass Extractors på fyndigheter och Power Generators) ger löpande inkomst. Den används till fler torn, uppgraderingar och **reparationer**.
+- Du förlorar om kärnan förstörs. Du vinner om du klarar sista vågen.
+
+### Designval (kan ändras)
+
+| Fråga | Förslag | Alternativ |
+|---|---|---|
+| Hur byggs saker? | ACU och ingenjörer bygger som i SupCom (byggkraft, tar tid) | Placera direkt, allt blir klart direkt |
+| Hur går fiender? | Mot kärnan via flödesfält. Byggnader blockerar, och fiender skjuter sig igenom om de är instängda | Fast väg som i klassisk TD |
+| Vad händer om ACU:n dör? | Den återuppstår vid kärnan efter X sekunder | Förlust |
+| Vågor | Spelaren startar nästa våg, med en paus för att bygga mellan vågorna | Timer |
+| Ekonomi | Flödesbaserad som i SupCom (kostnaden dras under bygget) | Engångskostnad vid placering |
+
+## Grundprinciper
+
+1. **Små steg.** Varje steg tar ungefär 30 minuter till 2 timmar och slutar med något du kan **se eller testa**.
+2. **Simulering och rendering hålls isär.** Spellogiken (`sim/`) körs i fasta tick (10 per sekund) och vet ingenting om Three.js. Renderingen (`render/`) läser bara simuleringens tillstånd och interpolerar mellan tick.
+3. **Simuleringen är deterministisk.** Den använder en seedad slumpgenerator och aldrig `Math.random()` i `sim/`.
+4. **Varje steg har ett test.** Det är antingen ett automatiskt test (Vitest) eller en manuell kontroll i webbläsaren.
+5. **Börja fult.** Använd boxar och cylindrar i stället för modeller. Snygga grafiken sist.
+6. **All balans ligger i data.** Enheter, torn och vågor definieras i `data/` så att du kan finjustera utan att ändra logiken.
+
+## Teknikval
+
+| Område | Val |
+|---|---|
+| Språk | JavaScript (ES-moduler) |
+| Byggverktyg | Vite |
+| 3D | Three.js (`InstancedMesh` för många fiender) |
+| Tester | Vitest |
+| UI | HTML och CSS ovanpå canvas |
+
+## Mappstruktur (målbild)
+
+```
+src/
+  main.js
+  sim/               // ren spellogik
+    world.js
+    rng.js
+    systems/         // economy, build, movement, targeting, combat, waves, repair
+  render/            // Three.js
+  input/             // mus, tangentbord, markering
+  ui/                // resurspanel, byggmeny, vågpanel
+  data/
+    units.js         // fiendetyper
+    structures.js    // torn och ekonomibyggnader
+    waves.js         // vågdefinitioner
+tests/
+```
+
+---
+
+## Fas 0: Grund
+
+- [x] **0.1 Projektskelett.** Vite, `three` och `vitest`.
+  *Test:* `npm run dev` och `npm test` fungerar.
+- [x] **0.2 Three.js-scen.** En canvas som fyller fönstret, med en roterande kub.
+  *Test:* kuben syns och canvasen skalas om när fönstret ändrar storlek.
+- [x] **0.3 Spelloop med fast tick.** 10 tick per sekund, rendering med requestAnimationFrame. Visa tick-räknare och FPS.
+  *Test:* tick-räknaren ökar med cirka 10 per sekund.
+- [x] **0.4 Seedad slumpgenerator.**
+  *Test (Vitest):* samma seed ger samma sekvens.
+
+## Fas 1: Karta och kamera
+
+- [ ] **1.1 Mark med byggrutnät.** Ett plan på 128×128 med synligt rutnät (1 ruta = 1 byggenhet).
+  *Test:* rutnätet syns.
+- [ ] **1.2 Höjdkarta.** Låga kullar och en platå i mitten för basen.
+  *Test (Vitest):* `getHeight(x, z)` returnerar rätt värde.
+- [ ] **1.3 Panorering.** WASD/piltangenter och musen mot skärmkanten.
+- [ ] **1.4 Zoom mot muspekaren**, som i SupCom.
+  *Test:* punkten under pekaren står still medan du zoomar.
+- [ ] **1.5 Strategisk zoom.** Långt utzoomat visas ikoner i stället för meshes.
+  *Test:* zooma ut och in.
+- [ ] **1.6 Kartobjekt.** Kärnans position, fiendernas spawnpunkter och massfyndigheter, alla definierade i en kartfil.
+  *Test:* markörerna syns på rätt plats.
+
+## Fas 2: Kärna och ekonomi
+
+- [ ] **2.1 Kärnbyggnad.** Placeras vid start och har HP.
+  *Test:* den syns, och en HP-stapel visas när du håller muspekaren över den.
+- [ ] **2.2 Resurslager.** Mass och energi, med startkapital från konfigurationen (t.ex. 500 mass och 2000 energi).
+  *Test (Vitest):* ny spelare får rätt startkapital.
+- [ ] **2.3 Resurspanel i UI.** Visar lager, maxkapacitet och +/- per sekund.
+  *Test:* värdena syns.
+- [ ] **2.4 Inkomst.** Kärnan ger en liten basinkomst.
+  *Test (Vitest):* inkomst 10 per sekund ger +1 per tick.
+- [ ] **2.5 Strömavbrott (stall).** När utgiften är större än inkomsten och lagret är tomt sätts effektiviteten till inkomst/utgift.
+  *Test (Vitest):* inkomst 5 och utgift 10 ger effektiviteten 0,5.
+
+## Fas 3: Markering och ACU
+
+- [ ] **3.1 Entiteter i sim.** `world.add({type, x, z, owner})`.
+  *Test (Vitest):* lägg till och ta bort.
+- [ ] **3.2 ACU.** Startar vid kärnan och renderas som en box i spelarens färg.
+- [ ] **3.3 Klickmarkering och lådmarkering.** Den markerade enheten får en ring.
+  *Test:* manuellt.
+- [ ] **3.4 Flyttorder.** Högerklick på marken, rak linje.
+  *Test (Vitest):* enheten är på förväntad position efter N tick.
+- [ ] **3.5 Ordrekö med Shift.** Visa linjer mellan waypoints.
+
+## Fas 4: Byggande
+
+- [ ] **4.1 Byggmeny.** Visas när ACU:n är markerad: Mass Extractor, Power Generator, Wall och Point Defense (T1-torn).
+  *Test:* knapparna syns bara när ACU:n är markerad.
+- [ ] **4.2 Placeringsförhandsvisning.** Fäster mot rutnätet och blir röd vid krock, för brant mark eller fel underlag (utvinnare kräver fyndighet).
+  *Test (Vitest):* `canPlace()` för olika fall.
+- [ ] **4.3 Byggprocess.** ACU:n går dit och bygger. Framsteget beror på byggkraft och effektivitet, och resurserna dras löpande.
+  *Test (Vitest):* med kostnad 100 mass, byggtid 10 s och full ekonomi blir byggnaden klar efter 100 tick.
+- [ ] **4.4 Ekonomibyggnader producerar.**
+  *Test:* inkomsten ökar i panelen.
+- [ ] **4.5 Avbryt och sälj.** Riv en byggnad och få tillbaka en del av massan.
+  *Test (Vitest):* rätt återbetalning.
+- [ ] **4.6 Byggkö med Shift.**
+- [ ] **4.7 Ingenjörer.** Kan byggas från kärnan eller en fabrik och hjälpa till att bygga (assist). Byggkraften läggs ihop.
+  *Test (Vitest):* två byggare halverar tiden.
+
+## Fas 5: Fiender och vägar
+
+- [ ] **5.1 Passerbarhetsrutnät.** Branta rutor och byggnader blockerar. Lägg till ett felsökningsläge som visar dem.
+  *Test (Vitest):* en ruta med byggnad blir blockerad.
+- [ ] **5.2 Flödesfält mot kärnan.** En BFS/Dijkstra från kärnan över hela rutnätet. Räknas om när en byggnad placeras eller förstörs.
+  *Test (Vitest):* varje fri ruta pekar mot en granne närmare kärnan.
+- [ ] **5.3 Visualisera flödesfältet.** Felsökningsläge med pilar.
+  *Test:* pilarna går runt en mur du bygger.
+- [ ] **5.4 Spawna en fiende.** En T1-stridsvagn som följer flödesfältet till kärnan.
+  *Test:* den kör till kärnan och svänger runt hinder.
+- [ ] **5.5 Placeringsregel: aldrig helt instängd.** Förbjud en placering om den gör att någon spawnpunkt saknar väg till kärnan. Det här är alternativ A. Alternativ B är att fiender skjuter sig igenom.
+  *Test (Vitest):* en placering som stänger vägen nekas.
+- [ ] **5.6 Separation.** Fiender knuffar varandra lätt så att de inte överlappar.
+- [ ] **5.7 Rendera med `InstancedMesh`.**
+  *Test:* 300 fiender ger fortfarande 60 FPS.
+
+## Fas 6: Strid
+
+- [ ] **6.1 HP och död.** HP-stapel. Vid 0 HP tas enheten bort och lämnar ett vrak.
+  *Test (Vitest):* skada som överstiger HP ger en död enhet.
+- [ ] **6.2 Fiender skadar kärnan.** Fiender som når kärnan stannar och skjuter på den.
+  *Test:* kärnans HP sjunker.
+- [ ] **6.3 Rumsligt rutnät (spatial hash)** för snabba avståndsfrågor.
+  *Test (Vitest):* `queryRadius` returnerar rätt enheter.
+- [ ] **6.4 Tornens målsökning.** Närmaste fiende inom räckvidd, eller den som är närmast kärnan.
+  *Test (Vitest):* rätt mål väljs.
+- [ ] **6.5 Point Defense skjuter.** Projektiler med hastighet, skada och eldhastighet. Tornet vrider sitt torn mot målet.
+  *Test:* tornet dödar en fiende.
+- [ ] **6.6 Fiender skjuter på byggnader.** De angriper torn och murar inom räckvidd på vägen.
+  *Test:* ett torn tar skada.
+- [ ] **6.7 Byggnader kan förstöras.** Flödesfältet räknas om.
+  *Test:* en förstörd mur öppnar en väg.
+- [ ] **6.8 Muzzle flash och explosionseffekt.** En enkel partikelboll.
+
+## Fas 7: Vågor
+
+- [ ] **7.1 Vågdata.** `waves.js` innehåller en lista med `{ enemies: [{type, count, interval, spawn}] }`.
+  *Test (Vitest):* våg 1 ger rätt antal spawns över tid.
+- [ ] **7.2 Vågpanel.** Visar "Våg 3/20", en knapp för nästa våg och förhandsinformation om vad som kommer.
+- [ ] **7.3 Våg klar.** När alla fiender i vågen är döda startar byggfasen och du får en eventuell bonus i mass.
+  *Test (Vitest):* tillståndet växlar korrekt.
+- [ ] **7.4 Belöning per fiende.** Mass i vrak som kan återvinnas, eller som tilldelas direkt.
+- [ ] **7.5 Fler fiendetyper.** Snabb lätt enhet (scout), tung långsam enhet och artilleri med lång räckvidd som beskjuter tornen.
+  *Test:* varje typ syns i en egen testvåg.
+
+## Fas 8: Reparation och återvinning
+
+- [ ] **8.1 Reparera.** ACU:n eller en ingenjör högerklickar på en skadad byggnad. Reparationen drar mass och energi i proportion till HP-förlusten.
+  *Test (Vitest):* att reparera 50 % HP kostar 50 % × reparationsfaktor × byggkostnaden.
+- [ ] **8.2 Reparera kärnan.** Samma mekanik.
+- [ ] **8.3 Återvinna vrak** för att få mass.
+  *Test:* mass-lagret ökar.
+- [ ] **8.4 Patrull/auto-assist.** Ingenjörer reparerar automatiskt det som är skadat i närheten.
+
+## Fas 9: Spelbar match
+
+- [ ] **9.1 Förlust.** Kärnan förstörs och skärmen visar att spelet är över.
+- [ ] **9.2 Vinst.** Sista vågen är klarad.
+- [ ] **9.3 ACU-död.** Den återuppstår efter X sekunder (eller förlust, se designvalen).
+- [ ] **9.4 Startmeny.** Välj karta och svårighetsgrad (HP-multiplikator för fiender).
+- [ ] **9.5 Paus och spelhastighet.**
+- [ ] **9.6 10 balanserade vågor** på en karta.
+
+**🎯 Milstolpe: ett komplett, spelbart tower defense-spel.**
+
+## Fas 10: Fler torn och djup
+
+- [ ] Wall-segment som fäster ihop med varandra
+- [ ] Artilleritorn (ballistiskt, områdesskada)
+- [ ] Luftvärn och flygande fiender som ignorerar flödesfältet och flyger rakt
+- [ ] Sköldgenerator (en bubbla som absorberar skada och drar energi)
+- [ ] Radar som visar inkommande vågor på minimapen
+- [ ] Uppgraderingar från T1 till T2 till T3
+- [ ] Mass Fabricator (gör om energi till mass)
+- [ ] Adjacency-bonus (lagringsbyggnader intill extractors)
+- [ ] Taktisk missilavskjutare med TMD-försvar
+- [ ] Bossvågor med experimentella enheter (t.ex. en Monkeylord-liknande spindel)
+- [ ] Fiender i flera fraktioner med olika stil
+
+## Fas 11: Utseende
+
+- [ ] SupCom-färgpalett, glödande lagfärg och strategiska ikoner
+- [ ] Byggeffekt (nanostrålar från byggaren och en "wireframe" som fylls i)
+- [ ] glTF-modeller i stället för boxar
+- [ ] Ljud: skott, explosioner och "Construction complete"
+- [ ] Minimap
+
+---
+
+## Arbetsflöde per steg
+
+1. Välj nästa oavbockade steg.
+2. Skriv testet först om steget gäller sim-logik.
+3. Implementera det minsta som får steget att fungera.
+4. Verifiera manuellt i webbläsaren.
+5. Bocka av steget och gör en commit (`git commit -m "5.2 flödesfält"`).
