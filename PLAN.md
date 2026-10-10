@@ -87,15 +87,15 @@ tests/
 
 ## Fas 2: Kärna och ekonomi
 
-- [ ] **2.1 Kärnbyggnad.** Placeras vid start och har HP.
+- [x] **2.1 Kärnbyggnad.** Placeras vid start och har HP.
   *Test:* den syns, och en HP-stapel visas när du håller muspekaren över den.
-- [ ] **2.2 Resurslager.** Mass och energi, med startkapital från konfigurationen (t.ex. 500 mass och 2000 energi).
+- [x] **2.2 Resurslager.** Mass och energi, med startkapital från konfigurationen (t.ex. 500 mass och 2000 energi).
   *Test (Vitest):* ny spelare får rätt startkapital.
-- [ ] **2.3 Resurspanel i UI.** Visar lager, maxkapacitet och +/- per sekund.
+- [x] **2.3 Resurspanel i UI.** Visar lager, maxkapacitet och +/- per sekund.
   *Test:* värdena syns.
-- [ ] **2.4 Inkomst.** Kärnan ger en liten basinkomst.
+- [x] **2.4 Inkomst.** Kärnan ger en liten basinkomst.
   *Test (Vitest):* inkomst 10 per sekund ger +1 per tick.
-- [ ] **2.5 Strömavbrott (stall).** När utgiften är större än inkomsten och lagret är tomt sätts effektiviteten till inkomst/utgift.
+- [x] **2.5 Strömavbrott (stall).** När utgiften är större än inkomsten och lagret är tomt sätts effektiviteten till inkomst/utgift.
   *Test (Vitest):* inkomst 5 och utgift 10 ger effektiviteten 0,5.
 
 ## Fas 3: Markering och ACU

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createCameraRig } from './cameraRig.js';
 import { createTerrainMesh } from './terrainMesh.js';
 import { createMapMarkers } from './mapMarkers.js';
+import { createEntityView } from './entityView.js';
 import { raycastTerrain, isInsideMap } from '../sim/terrain.js';
 
 /** Över detta kameraavstånd visas strategiska ikoner i stället för meshes. */
@@ -34,6 +35,8 @@ export function createRenderer(canvas, world) {
   scene.add(createTerrainMesh(terrain, renderer));
   const markers = createMapMarkers(map, terrain);
   scene.add(markers.meshes, markers.icons);
+  const entities = createEntityView(terrain);
+  scene.add(entities.meshes, entities.icons);
 
   function resize() {
     const w = canvas.clientWidth;
@@ -50,6 +53,9 @@ export function createRenderer(canvas, world) {
     return p && isInsideMap(terrain, p.x, p.z) ? p : null;
   };
 
+  const raycaster = new THREE.Raycaster();
+  const ndcVec = new THREE.Vector2();
+
   return {
     rig,
     pickGround,
@@ -57,11 +63,27 @@ export function createRenderer(canvas, world) {
     pickAtNdc(ndcX, ndcY) {
       return pickGround(rig.rayAt(ndcX, ndcY));
     },
+    /** Entitets-id under en skärmpunkt i NDC, eller null. */
+    pickEntityAtNdc(ndcX, ndcY) {
+      raycaster.setFromCamera(ndcVec.set(ndcX, ndcY), camera);
+      return entities.pick(raycaster);
+    },
+    /** Skärmposition i pixlar för punkten ovanför en entitet. */
+    entityLabelScreenPos(entity) {
+      const p = entities.labelAnchor(entity).project(camera);
+      return {
+        x: (p.x + 1) / 2 * canvas.clientWidth,
+        y: (1 - p.y) / 2 * canvas.clientHeight,
+      };
+    },
     isStrategic() {
       return rig.distance > STRATEGIC_DISTANCE;
     },
-    render(_alpha, _frameSeconds) {
-      markers.setStrategic(rig.distance > STRATEGIC_DISTANCE);
+    render(world, _alpha) {
+      const strategic = rig.distance > STRATEGIC_DISTANCE;
+      entities.sync(world);
+      markers.setStrategic(strategic);
+      entities.setStrategic(strategic);
       renderer.render(scene, camera);
     },
   };
