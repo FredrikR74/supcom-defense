@@ -21,6 +21,9 @@ const HANDLERS = {
   setRepeat: applySetRepeat,
   setDifficulty: (world, { value }) => setDifficulty(world, value),
   attack: applyAttack,
+  repair: (world, cmd) => applyWork(world, cmd, 'repair'),
+  reclaim: (world, cmd) => applyWork(world, cmd, 'reclaim'),
+  patrol: applyPatrol,
 };
 
 export function applyCommands(world) {
@@ -58,6 +61,32 @@ function applyAttack(world, { owner, ids, targetId, queue }) {
   if (!target || target.owner === owner || target.owner === 0) return;
   for (const e of ownUnits(world, ids, owner, (u) => Boolean(units[u.type].weapon))) {
     giveOrder(e, { type: 'attack', targetId }, queue);
+  }
+}
+
+/** `{ type: 'repair'|'reclaim', owner, ids, targetId, queue }`: byggare reparerar eller återvinner. */
+function applyWork(world, { owner, ids, targetId, queue }, type) {
+  const target = getEntity(world, targetId);
+  if (!target) return;
+  if (type === 'repair' && target.owner !== owner) return;
+  if (type === 'reclaim' && target.kind !== 'wreck') return;
+  for (const e of ownUnits(world, ids, owner, isBuilder)) {
+    if (e.id !== targetId) giveOrder(e, { type, targetId }, queue);
+  }
+}
+
+/**
+ * `{ type: 'patrol', owner, ids, x, z, queue }`: patrullera mellan där enheten
+ * står (eller sin förra patrullpunkt vid Shift) och (x, z).
+ */
+function applyPatrol(world, { owner, ids, x, z, queue }) {
+  for (const e of ownUnits(world, ids, owner)) {
+    const last = e.orders[e.orders.length - 1];
+    if (queue && last?.type === 'patrol') {
+      last.points.push({ x, z });
+      continue;
+    }
+    giveOrder(e, { type: 'patrol', points: [{ x: e.x, z: e.z }, { x, z }], index: 1 }, queue);
   }
 }
 
@@ -114,7 +143,7 @@ function applySell(world, { owner, ids }) {
     const e = getEntity(world, id);
     if (!e || e.kind !== 'structure' || e.owner !== owner) continue;
     const def = structures[e.type];
-    if (!def.cost) continue; // t.ex. kärnan går inte att sälja
+    if (!def.cost || def.unsellable) continue; // t.ex. kärnan går inte att sälja
     if (economy) {
       const refund = def.cost.mass * e.progress * world.config.sellRefund;
       economy.mass.stored = Math.min(economy.mass.max, economy.mass.stored + refund);

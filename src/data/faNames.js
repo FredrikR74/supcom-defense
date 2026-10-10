@@ -16,7 +16,7 @@ export default [
   { name: 'Power Generator', faction: 'UEF', tech: 1, verified: true },
   { name: 'Wall Section', faction: 'UEF', tech: 1, verified: true },
   { name: 'Point Defense', unitName: 'DM1 Plasma Cannon', faction: 'UEF', tech: 1, verified: true },
-  { name: 'Quantum Gate', faction: 'UEF', tech: 3, verified: true },
+  { name: 'Quantum Gateway', faction: 'UEF', tech: 3, verified: true },
 
   // Cybran (fienderna)
   { name: 'Assault Bot', unitName: 'Mantis', faction: 'Cybran', tech: 1, verified: true },

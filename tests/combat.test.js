@@ -30,7 +30,8 @@ describe('HP och död', () => {
     expect(getEntity(w, m.id)).toBeNull();
     const wreck = w.entities.find((e) => e.kind === 'wreck');
     expect(wreck).toMatchObject({ type: 'mantis', x: 30, z: 30 });
-    expect(wreck.mass).toBeCloseTo(units.mantis.cost.mass * w.config.wreckMassFraction);
+    // FA: kostnad × 0,9 (MassMult) × 0,9 (T1) = 81 %.
+    expect(wreck.mass).toBeCloseTo(units.mantis.cost.mass * 0.81);
     expect(w.events.some((e) => e.type === 'death')).toBe(true);
   });
 

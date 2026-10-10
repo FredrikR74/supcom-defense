@@ -2,7 +2,17 @@ import { TICK_SECONDS } from '../constants.js';
 import { guardDestination } from '../guard.js';
 import { flowTarget } from '../pathing.js';
 import { steer } from '../unitPath.js';
-import { getEntity, getDef } from '../entities.js';
+import { getEntity, getDef, needsRepair } from '../entities.js';
+import units from '../../data/units.js';
+
+/** Gå till inom byggräckvidd för att reparera/återvinna; null när det inte behövs längre. */
+function workDestination(world, e, order) {
+  const target = getEntity(world, order.targetId);
+  if (!target) return null;
+  if (order.type === 'repair' && !needsRepair(target)) return null;
+  if (order.type === 'reclaim' && target.kind !== 'wreck') return null;
+  return { x: target.x, z: target.z, reach: (units[e.type].buildRange ?? 0) + target.radius };
+}
 
 /** Gå mot målet tills det är inom vapnets räckvidd; null om målet är borta. */
 function attackDestination(world, e, order) {
@@ -19,6 +29,12 @@ function destination(world, e, order) {
     case 'build': return { x: order.x, z: order.z, reach: order.reach };
     case 'guard': return guardDestination(world, e, order);
     case 'attack': return attackDestination(world, e, order);
+    case 'repair':
+    case 'reclaim': return workDestination(world, e, order);
+    case 'patrol': {
+      const p = order.points[order.index];
+      return { x: p.x, z: p.z, reach: 0 };
+    }
     case 'attackCore': {
       const p = flowTarget(world, e.x, e.z);
       return p && { x: p.x, z: p.z, reach: 0 };
@@ -39,7 +55,9 @@ export function movementSystem(world) {
     if (e.kind !== 'unit') continue;
     e.prevX = e.x;
     e.prevZ = e.z;
-    if (e.orders[0]?.type === 'attackCore' && e.targetId) continue; // står och skjuter
+    // Fiender på väg mot kärnan och beväpnade patrullerare stannar och skjuter.
+    const first = e.orders[0]?.type;
+    if ((first === 'attackCore' || first === 'patrol') && e.targetId) continue;
 
     let budget = e.speed * TICK_SECONDS;
     for (let steps = 0; budget > 0 && e.orders.length > 0 && steps < 8; steps++) {
@@ -47,7 +65,7 @@ export function movementSystem(world) {
       const dest = destination(world, e, order);
       if (!dest) {
         // Den assisterade eller målet är borta: nästa order (t.ex. tillbaka mot kärnan).
-        if (order.type === 'guard' || order.type === 'attack') {
+        if (['guard', 'attack', 'repair', 'reclaim'].includes(order.type)) {
           e.orders.shift();
           continue;
         }
@@ -76,6 +94,13 @@ export function movementSystem(world) {
           e.x = goal.x;
           e.z = goal.z;
           continue; // nästa vägpunkt / nästa ruta i flödesfältet
+        }
+        if (order.type === 'patrol') {
+          e.x = goal.x;
+          e.z = goal.z;
+          order.index = (order.index + 1) % order.points.length; // vänd och gå tillbaka
+          order.path = null;
+          continue;
         }
         if (order.type !== 'move') break; // inom räckhåll, byggsystemet tar över
         e.x = order.x;

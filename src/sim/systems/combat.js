@@ -227,7 +227,8 @@ export function deathSystem(world) {
     if (e.orders) e.orders.length = 0;
     const def = getDef(e.type);
     const progress = e.kind === 'structure' ? e.progress : 1;
-    const mass = (def.cost?.mass ?? 0) * progress * world.config.wreckMassFraction;
+    const techMult = world.config.wreckTechMult[def.techCategory] ?? 0.9;
+    const mass = (def.cost?.mass ?? 0) * world.config.wreckMassMult * techMult * progress;
     removeEntity(world, e.id);
     if (mass > 0) {
       addWreck(world, { type: e.type, x: e.x, z: e.z, heading: e.heading ?? 0, radius: e.radius, mass });

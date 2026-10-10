@@ -107,3 +107,10 @@ export function isIdleBuilder(e) {
   return e.kind === 'unit' && (units[e.type]?.buildPower ?? 0) > 0 && e.orders.length === 0 &&
     !e.buildJob && !e.targetId;
 }
+
+/** Kan entiteten repareras just nu (skadad, färdig och med en kostnad att räkna på)? */
+export function needsRepair(e) {
+  const def = getDef(e.type);
+  const ready = e.kind === 'unit' || (e.kind === 'structure' && e.built);
+  return ready && e.hp > 0 && e.hp < e.maxHp - 1e-6 && Boolean(def?.cost && def?.buildTime);
+}

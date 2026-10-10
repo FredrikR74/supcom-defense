@@ -12,12 +12,19 @@
  * - `benign`: skjuts inte på automatiskt (FA-kategorin BENIGN, t.ex. murar)
  */
 export default {
-  /** Kärnan som ska försvaras (tower defense-avsteg från FA: den producerar inget). */
+  /**
+   * Kärnan som ska försvaras: UEF Quantum Gateway (UEB0304). Kostnad och byggtid
+   * används bara för att räkna ut vad en reparation kostar.
+   */
   core: {
-    name: 'Quantum Gate',
+    name: 'Quantum Gateway',
     techCategory: 'TECH3',
     size: 4,
-    maxHp: 5000,
+    maxHp: 10000,
+    cost: { mass: 3000, energy: 30000 },
+    buildTime: 4097,
+    /** Går inte att sälja (tower defense: den ska försvaras). */
+    unsellable: true,
   },
   /** UEB0101. */
   landFactory: {

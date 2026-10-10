@@ -10,7 +10,7 @@ const costText = (cost) => `${cost.mass} M · ${cost.energy} E`;
  * och repetering för markerade fabriker, och Sell för markerade byggnader.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
-export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell }) {
+export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell, onPatrol }) {
   let signature = '';
   /** Enhetstyp -> framstegsstapel i dess produktionsknapp; uppdateras varje frame. */
   let progressBars = new Map();
@@ -40,7 +40,7 @@ export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell })
       const queued = (type) => factories.reduce(
         (n, e) => n + e.productionQueue.filter((t) => t === type).length, 0);
       const repeat = factories.length > 0 && factories.every((f) => f.repeat);
-      const sellable = selected.filter((e) => e.kind === 'structure' && getDef(e.type).cost);
+      const sellable = selected.filter((e) => e.kind === 'structure' && getDef(e.type).cost && !getDef(e.type).unsellable);
 
       // Framsteget ändras varje frame, så det uppdateras utan att panelen byggs om.
       const updateProgress = () => {
@@ -51,7 +51,9 @@ export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell })
         }
       };
 
+      const hasUnits = selected.some((e) => e.kind === 'unit');
       const sig = JSON.stringify([
+        hasUnits, ui.mode,
         [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat,
         sellable.length, ui.placing?.type,
       ]);
@@ -81,6 +83,9 @@ export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell })
       }
       if (factories.length) {
         el.appendChild(button('Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
+      }
+      if (hasUnits) {
+        el.appendChild(button('Patrol', 'P', () => onPatrol(), { active: ui.mode === 'patrol' }));
       }
       if (sellable.length) {
         el.appendChild(button('Sell', 'Delete', () => onSell()));

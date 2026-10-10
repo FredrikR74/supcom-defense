@@ -130,11 +130,18 @@ export function createEntityView(terrain) {
     views.set(entity.id, { mesh, icon, ring, top, idleIcon, turret: mesh.getObjectByName('turret') });
   }
 
-  /** Punkten en order pekar på; guard-order pekar på den assisterade enheten. */
+  /** Var en entitet ritas just nu (vanlig mesh eller instansierad). */
+  function drawnPos(id) {
+    const v = views.get(id);
+    if (v) return { x: v.mesh.position.x, y: v.mesh.position.y, z: v.mesh.position.z, top: v.top };
+    return instancedPos.get(id) ?? null;
+  }
+
+  /** Punkten en order pekar på: mål-entiteten för guard/attack/reparation/återvinning. */
   function orderPoint(o) {
-    if (o.type !== 'guard') return o;
-    const v = views.get(o.targetId);
-    return v ? { x: v.mesh.position.x, z: v.mesh.position.z } : null;
+    if (o.targetId != null && o.type !== 'build') return drawnPos(o.targetId);
+    if (o.type === 'patrol') return o.points[o.index];
+    return o;
   }
 
   function updateOrderLines(world, selection, alpha) {
@@ -154,6 +161,14 @@ export function createEntityView(terrain) {
           p.x, groundY(p.x, p.z) + lift, p.z,
         );
         from = p;
+        // Patrull: rita hela slingan mellan patrullpunkterna.
+        if (o.type === 'patrol') {
+          for (let i = 0; i < o.points.length; i++) {
+            const a = o.points[i];
+            const b = o.points[(i + 1) % o.points.length];
+            orderLines.add(a.x, groundY(a.x, a.z) + lift, a.z, b.x, groundY(b.x, b.z) + lift, b.z);
+          }
+        }
       }
     }
     orderLines.end();
@@ -185,11 +200,10 @@ export function createEntityView(terrain) {
     for (const e of world.entities) {
       if (e.kind !== 'unit' || !e.buildJob) continue;
       const v = views.get(e.id);
-      const target = views.get(e.buildJob.targetId);
-      if (!v || !target) continue;
+      const to = drawnPos(e.buildJob.targetId);
+      if (!v || !to) continue;
       const from = v.mesh.position;
-      const to = target.mesh.position;
-      beams.add(from.x, from.y + v.top * 0.8, from.z, to.x, to.y + target.top * 0.5, to.z);
+      beams.add(from.x, from.y + v.top * 0.8, from.z, to.x, to.y + to.top * 0.5, to.z);
     }
     beams.end();
   }

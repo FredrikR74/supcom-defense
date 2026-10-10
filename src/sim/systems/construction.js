@@ -1,5 +1,5 @@
 import { TICK_SECONDS } from '../constants.js';
-import { addStructure, addUnit, getEntity } from '../entities.js';
+import { addStructure, addUnit, getEntity, removeEntity, needsRepair, getDef } from '../entities.js';
 import { canPlace, footprint } from '../placement.js';
 import { isBlockedCell } from '../pathing.js';
 import { guardDestination } from '../guard.js';
@@ -132,12 +132,77 @@ export function constructionDemand(world) {
   for (const e of [...world.entities]) {
     e.buildJob = null;
     e.demand = null;
-    if (e.kind === 'structure') startProductionJob(e);
-    else if (e.kind !== 'unit') continue;
-    else if (e.orders[0]?.type === 'build') startBuildOrder(world, e, e.orders[0]);
-    else if (e.orders[0]?.type === 'guard') guards.push(e);
+    if (e.kind === 'structure') {
+      startProductionJob(e);
+      continue;
+    }
+    if (e.kind !== 'unit') continue;
+    if (e.orders[0]?.type === 'patrol') patrolScan(world, e);
+    const order = e.orders[0];
+    if (order?.type === 'build') startBuildOrder(world, e, order);
+    else if (order?.type === 'guard') guards.push(e);
+    else if (order?.type === 'repair') startRepairOrder(world, e, order);
+    else if (order?.type === 'reclaim') startReclaimOrder(world, e, order);
   }
   for (const e of guards) startGuardOrder(world, e, e.orders[0]);
+}
+
+/** Räckvidd för att reparera/återvinna `target` (byggräckvidd + målets radie). */
+export function workReach(e, target) {
+  return (units[e.type].buildRange ?? 0) + target.radius;
+}
+
+/**
+ * Reparation som i FA-motorn: HP återställs i samma takt som byggnaden byggs
+ * (byggkraft / byggtid av max-HP per sekund) och kostar som att bygga den delen.
+ */
+function startRepairOrder(world, e, order) {
+  const target = getEntity(world, order.targetId);
+  if (!target || !needsRepair(target)) {
+    e.orders.shift();
+    return;
+  }
+  if (!inReach(e, target.x, target.z, workReach(e, target))) return;
+  setJob(e, { kind: 'repair', targetId: target.id }, getDef(target.type), units[e.type].buildPower);
+  const mult = world.config.repairCostMult;
+  e.demand = { mass: e.demand.mass * mult, energy: e.demand.energy * mult };
+}
+
+/**
+ * Återvinning som i FAF (Prop.GetReclaimCosts): tiden är massan / (byggkraft × 10)
+ * sekunder, alltså byggkraft × 10 mass per sekund. Kostar inget.
+ */
+function startReclaimOrder(world, e, order) {
+  const wreck = getEntity(world, order.targetId);
+  if (!wreck || wreck.kind !== 'wreck') {
+    e.orders.shift();
+    return;
+  }
+  if (!inReach(e, wreck.x, wreck.z, workReach(e, wreck))) return;
+  e.buildJob = { kind: 'reclaim', targetId: wreck.id };
+  e.buildRate = units[e.type].buildPower * 10;
+}
+
+/** Hur långt en patrullerande byggare letar efter något att reparera eller återvinna. */
+const PATROL_SCAN_EXTRA = 8;
+
+/** Patrullerande byggare tar närmaste skadade egna sak eller vrak på vägen. */
+function patrolScan(world, e) {
+  if (!(units[e.type].buildPower > 0)) return;
+  const radius = units[e.type].buildRange + PATROL_SCAN_EXTRA;
+  let best = null;
+  let bestDist = radius;
+  for (const t of world.entities) {
+    if (t === e) continue;
+    const repair = t.owner === e.owner && needsRepair(t);
+    if (!repair && t.kind !== 'wreck') continue;
+    const d = Math.hypot(t.x - e.x, t.z - e.z) - t.radius;
+    if (d < bestDist) {
+      best = { type: repair ? 'repair' : 'reclaim', targetId: t.id };
+      bestDist = d;
+    }
+  }
+  if (best) e.orders.unshift(best);
 }
 
 function spawnProduced(world, factory, type) {
@@ -162,9 +227,23 @@ function spawnProduced(world, factory, type) {
 export function constructionProgress(world) {
   for (const e of world.entities) {
     if (!e.buildJob) continue;
-    const delta = e.buildRate * TICK_SECONDS * (e.efficiency ?? 1);
     const target = getEntity(world, e.buildJob.targetId);
     if (!target) continue;
+
+    if (e.buildJob.kind === 'reclaim') {
+      const amount = Math.min(e.buildRate * TICK_SECONDS, target.mass);
+      target.mass -= amount;
+      const economy = world.players[e.owner]?.economy;
+      if (economy) economy.mass.stored = Math.min(economy.mass.max, economy.mass.stored + amount);
+      if (target.mass <= 1e-6) removeEntity(world, target.id);
+      continue;
+    }
+
+    const delta = e.buildRate * TICK_SECONDS * (e.efficiency ?? 1);
+    if (e.buildJob.kind === 'repair') {
+      target.hp = Math.min(target.maxHp, target.hp + target.maxHp * delta);
+      continue;
+    }
 
     if (e.buildJob.kind === 'structure') {
       if (target.built) continue;

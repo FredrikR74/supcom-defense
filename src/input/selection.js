@@ -1,5 +1,6 @@
 import { queueCommand } from '../sim/commands.js';
 import { PLAYER_ID } from '../sim/constants.js';
+import { needsRepair } from '../sim/entities.js';
 
 /** Hur långt musen måste dras (pixlar) innan det räknas som lådmarkering. */
 const DRAG_THRESHOLD = 5;
@@ -26,7 +27,7 @@ export function selectInRect(entities, toScreen, rect, owner) {
  * Vänsterklick/dra markerar. Högerklick ger flyttorder, fabrikswaypoint eller assist (Shift köar).
  * `selection` är ett Set med entitets-id:n.
  */
-export function createSelectionInput(canvas, boxEl, view, world, selection) {
+export function createSelectionInput(canvas, boxEl, view, world, selection, ui = {}) {
   let drag = null; // { x0, y0, x1, y1, shift, active }
 
   const local = (e) => {
@@ -51,6 +52,18 @@ export function createSelectionInput(canvas, boxEl, view, world, selection) {
 
   canvas.addEventListener('mousedown', (e) => {
     const p = local(e);
+    // Patrullläge (P): nästa klick på marken blir en patrullpunkt.
+    if (ui.mode === 'patrol' && (e.button === 0 || e.button === 2)) {
+      const ndc = toNdc(p);
+      const ground = view.pickAtNdc(ndc.x, ndc.y);
+      if (ground) {
+        queueCommand(world, {
+          type: 'patrol', owner: PLAYER_ID, ids: [...selection], x: ground.x, z: ground.z, queue: e.shiftKey,
+        });
+      }
+      if (!e.shiftKey) ui.mode = null;
+      return;
+    }
     if (e.button === 0) {
       drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, shift: e.shiftKey, active: false };
     } else if (e.button === 2) {
@@ -67,6 +80,15 @@ export function createSelectionInput(canvas, boxEl, view, world, selection) {
       // Högerklick på en fiende: anfall.
       if (target && target.owner !== PLAYER_ID && target.owner !== 0) {
         queueCommand(world, { type: 'attack', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
+        return;
+      }
+      // Högerklick på ett vrak: återvinn. På något eget skadat: reparera.
+      if (target?.kind === 'wreck') {
+        queueCommand(world, { type: 'reclaim', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
+        return;
+      }
+      if (target?.owner === PLAYER_ID && needsRepair(target) && ids.some((id) => id !== targetId)) {
+        queueCommand(world, { type: 'repair', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
         return;
       }
       const helpers = ids.filter((id) => id !== targetId);
@@ -104,12 +126,22 @@ export function createSelectionInput(canvas, boxEl, view, world, selection) {
     if (e.button !== 0 || !drag) return;
     if (drag.active) {
       select(selectInRect(world.entities, (ent) => view.entityScreenPos(ent), drag, PLAYER_ID), drag.shift);
+      ui.inspectId = null;
     } else {
       const ndc = toNdc({ x: drag.x0, y: drag.y0 });
       const id = view.pickEntityAtNdc(ndc.x, ndc.y);
-      const own = world.entities.find((ent) => ent.id === id && ent.owner === PLAYER_ID);
-      if (own) select([own.id], drag.shift);
-      else if (!drag.shift) selection.clear();
+      const picked = world.entities.find((ent) => ent.id === id);
+      if (picked?.owner === PLAYER_ID) {
+        select([picked.id], drag.shift);
+        ui.inspectId = null;
+      } else if (picked) {
+        // Fiende eller vrak: visa den i infopanelen, men markera den inte.
+        selection.clear();
+        ui.inspectId = picked.id;
+      } else if (!drag.shift) {
+        selection.clear();
+        ui.inspectId = null;
+      }
     }
     boxEl.hidden = true;
     drag = null;

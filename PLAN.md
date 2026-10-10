@@ -217,12 +217,13 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 
 ## Fas 8: Reparation och återvinning
 
-- [ ] **8.1 Reparera.** ACU:n eller en ingenjör högerklickar på en skadad byggnad. Reparationen drar mass och energi i proportion till HP-förlusten.
+- [x] **8.1 Reparera.** Högerklick på en skadad egen byggnad eller enhet. Som i FA-motorn återställs HP i byggtakt och kostar som att bygga den saknade delen (`repairCostMult` = 1).
   *Test (Vitest):* att reparera 50 % HP kostar 50 % × reparationsfaktor × byggkostnaden.
-- [ ] **8.2 Reparera kärnan.** Samma mekanik.
-- [ ] **8.3 Återvinna vrak** för att få mass.
+- [x] **8.2 Reparera kärnan.** Quantum Gateway (UEB0304, rätt FA-namn): 10000 HP, 3000 mass och 30000 energi, BuildTime 4097.
+- [x] **8.3 Återvinna vrak** med högerklick. Som i FAF: tiden är massan / (BuildRate × 10) s, och vraket innehåller kostnad × 0,9 × tech-faktor (T1 0,9), alltså 81 %.
   *Test:* mass-lagret ökar.
-- [ ] **8.4 Patrull/auto-assist.** Ingenjörer reparerar automatiskt det som är skadat i närheten.
+- [x] **8.4 Patrull (P).** Fram och tillbaka mellan punkter; Shift lägger till fler. Byggare reparerar och återvinner automatiskt på vägen, och beväpnade enheter stannar och slåss. Felsökningsvyerna har flyttat till F8 (blockerade rutor) och F9 (flödesfält).
+- [x] **8.5 Granska fiender.** Vänsterklick på en fiende eller ett vrak visar den i infopanelen (utan att markera den): namn, fraktion, HP, veterancy, vapen (skada, DPS, räckvidd), kills, fart och massvärde. Samma stridsvärden visas för egna enheter.
 
 ## Fas 9: Spelbar match
 

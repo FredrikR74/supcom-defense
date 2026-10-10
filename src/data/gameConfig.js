@@ -8,8 +8,14 @@ export default {
   baseStorage: { mass: 650, energy: 3900 },
   /** Andel av den förbrukade massan man får tillbaka när man säljer en byggnad. */
   sellRefund: 0.5,
-  /** Andel av en enhets/byggnads massa som blir kvar i vraket. */
-  wreckMassFraction: 0.5,
+  /**
+   * Vrakets mass som i FAF (Unit.CreateWreckageProp): kostnad × MassMult (0,9)
+   * × tech-faktor (T1 0,9, T2 0,8, T3 0,7, experimentell 0,6) × byggnadsgrad.
+   */
+  wreckMassMult: 0.9,
+  wreckTechMult: { TECH1: 0.9, TECH2: 0.8, TECH3: 0.7, EXPERIMENTAL: 0.6 },
+  /** Reparation kostar som att bygga den saknade delen (FA-motorn), gånger denna faktor. */
+  repairCostMult: 1,
 
   /**
    * Fiendens strömmande tryck (se sim/director.js). Inkomst i mass per sekund:

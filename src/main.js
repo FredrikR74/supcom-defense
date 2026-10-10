@@ -37,7 +37,13 @@ const selectionInput = createSelectionInput(
   view,
   world,
   selection,
+  ui,
 );
+
+/** Patrullläge: nästa klick på marken blir en patrullpunkt (som P i FA). */
+const startPatrol = () => {
+  if (selection.size > 0) ui.mode = 'patrol';
+};
 
 const selectedIds = () => [...selection];
 const sellSelected = () => queueCommand(world, { type: 'sell', owner: PLAYER_ID, ids: selectedIds() });
@@ -48,6 +54,7 @@ const commandPanel = createCommandPanel(document.getElementById('commands'), {
     for (const id of selectedIds()) queueCommand(world, { type: 'produce', owner: PLAYER_ID, id, unit });
   },
   onRepeat: (value) => queueCommand(world, { type: 'setRepeat', owner: PLAYER_ID, ids: selectedIds(), value }),
+  onPatrol: startPatrol,
   onSell: sellSelected,
 });
 
@@ -65,6 +72,7 @@ function showGameOver(elapsed) {
   el.hidden = false;
 }
 
+const modeHint = document.getElementById('mode-hint');
 const selectionInfo = createSelectionInfo(document.getElementById('info'));
 const idlePanel = createIdlePanel(document.getElementById('idle'), {
   onSelect: (unit) => {
@@ -76,9 +84,17 @@ const idlePanel = createIdlePanel(document.getElementById('idle'), {
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Delete') sellSelected();
-  // Felsökning: P = blockerade rutor, O = flödesfältet.
-  if (e.code === 'KeyP') view.toggleBlockedCells();
-  if (e.code === 'KeyO') view.toggleFlowField();
+  if (e.code === 'KeyP') startPatrol();
+  if (e.code === 'Escape') ui.mode = null;
+  // Felsökning: F8 = blockerade rutor, F9 = flödesfältet.
+  if (e.code === 'F8') {
+    e.preventDefault();
+    view.toggleBlockedCells();
+  }
+  if (e.code === 'F9') {
+    e.preventDefault();
+    view.toggleFlowField();
+  }
   // Bara i dev tills vågorna finns (fas 7): N = en Mantis vid varje spawnpunkt.
   if (import.meta.env.DEV && e.code === 'KeyN') {
     world.map.spawns.forEach((_, i) => spawnEnemy(world, 'mantis', i));
@@ -128,8 +144,9 @@ function frame(now) {
   hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));
   resources.update(world.players[PLAYER_ID].economy);
   commandPanel.update(world, selection, ui);
+  modeHint.hidden = ui.mode !== 'patrol';
   threatPanel.update(world);
-  selectionInfo.update(world, selection);
+  selectionInfo.update(world, selection, ui);
   idlePanel.update(world);
 
   const cursor = ndc && view.pickAtNdc(ndc.x, ndc.y);
