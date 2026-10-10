@@ -60,6 +60,12 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
 
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+  // Patrullpunkter med Shift: när Shift släpps är patrullen klar och nästa
+  // klick är ett vanligt klick igen (annars blir en dragmarkering en ny punkt).
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'Shift' && ui.mode === 'patrol' && ui.patrolPlaced) ui.mode = null;
+  });
+
   canvas.addEventListener('mousedown', (e) => {
     const p = local(e);
     // Patrullläge (P): nästa klick på marken blir en patrullpunkt.
@@ -71,7 +77,8 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
           type: 'patrol', owner: PLAYER_ID, ids: [...selection], x: ground.x, z: ground.z, queue: e.shiftKey,
         });
       }
-      if (!e.shiftKey) ui.mode = null;
+      if (e.shiftKey) ui.patrolPlaced = true;
+      else ui.mode = null;
       return;
     }
     if (e.button === 0) {

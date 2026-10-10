@@ -76,18 +76,27 @@ function applyWork(world, { owner, ids, targetId, queue }, type) {
   }
 }
 
+/** Var enheten står när ordern är klar: målpunkten, eller målets position. */
+function orderEnd(world, e, order) {
+  if (order.x !== undefined) return { x: order.x, z: order.z };
+  const target = order.targetId != null ? getEntity(world, order.targetId) : null;
+  return target ? { x: target.x, z: target.z } : { x: e.x, z: e.z };
+}
+
 /**
  * `{ type: 'patrol', owner, ids, x, z, queue }`: patrullera mellan där enheten
- * står (eller sin förra patrullpunkt vid Shift) och (x, z).
+ * står och (x, z). Vid Shift läggs punkten till en köad patrull, och annars
+ * börjar patrullen där den förra ordern i kön slutar (som i FA).
  */
 function applyPatrol(world, { owner, ids, x, z, queue }) {
   for (const e of ownUnits(world, ids, owner)) {
-    const last = e.orders[e.orders.length - 1];
-    if (queue && last?.type === 'patrol') {
+    const last = queue ? e.orders[e.orders.length - 1] : null;
+    if (last?.type === 'patrol') {
       last.points.push({ x, z });
       continue;
     }
-    giveOrder(e, { type: 'patrol', points: [{ x: e.x, z: e.z }, { x, z }], index: 1 }, queue);
+    const start = last ? orderEnd(world, e, last) : { x: e.x, z: e.z };
+    giveOrder(e, { type: 'patrol', points: [start, { x, z }], index: 1 }, queue);
   }
 }
 

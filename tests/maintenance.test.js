@@ -139,6 +139,21 @@ describe('patrull', () => {
     expect(tank.orders[0].points).toHaveLength(3);
   });
 
+  it('en köad patrull börjar där förra ordern slutar, inte där enheten står', () => {
+    const { world } = setup();
+    const tank = addUnit(world, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
+    cmd(world, { type: 'move', ids: [tank.id], x: 50, z: 40 });
+    cmd(world, { type: 'patrol', ids: [tank.id], x: 50, z: 50, queue: true });
+    cmd(world, { type: 'patrol', ids: [tank.id], x: 40, z: 50, queue: true });
+    tickWorld(world);
+    expect(tank.orders.map((o) => o.type)).toEqual(['move', 'patrol']);
+    expect(tank.orders[1].points).toEqual([{ x: 50, z: 40 }, { x: 50, z: 50 }, { x: 40, z: 50 }]);
+    ticks(world, 300);
+    // Patrullen går aldrig tillbaka till startplatsen (40, 40).
+    expect(tank.orders[0].type).toBe('patrol');
+    expect(Math.hypot(tank.x - 40, tank.z - 40)).toBeGreaterThan(1);
+  });
+
   it('beväpnade patrullerare stannar och skjuter', () => {
     const { world } = setup();
     const tank = addUnit(world, 'striker', { x: 40, z: 40, owner: PLAYER_ID });

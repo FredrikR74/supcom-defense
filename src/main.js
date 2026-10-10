@@ -51,7 +51,9 @@ function startGame({ map, difficulty }) {
 
   /** Patrullläge: nästa klick på marken blir en patrullpunkt (som P i FA). */
   const startPatrol = () => {
-    if (selection.size > 0) ui.mode = 'patrol';
+    if (selection.size === 0) return;
+    ui.mode = 'patrol';
+    ui.patrolPlaced = false;
   };
 
   const selectedIds = () => [...selection];
