@@ -8,6 +8,7 @@ import { constructionDemand, constructionProgress } from './systems/construction
 import { separationSystem } from './systems/separation.js';
 import { targetingSystem, weaponsSystem, projectileSystem, retaliationSystem, deathSystem } from './systems/combat.js';
 import { regenSystem } from './veterancy.js';
+import { spawnAcu, acuSystem } from './acu.js';
 import { computeSteepCells, updatePathing } from './pathing.js';
 import { TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 import gameConfig from '../data/gameConfig.js';
@@ -58,7 +59,7 @@ export function createWorld({ seed = 1, map = null, config = {} } = {}) {
   if (map) {
     world.coreId = addStructure(world, 'core', { ...map.core, owner: PLAYER_ID }).id;
     // ACU:n startar strax söder om kärnan, vänd mot söder (mot kameran).
-    world.acuId = addUnit(world, 'acu', { x: map.core.x, z: map.core.z + 5, owner: PLAYER_ID }).id;
+    spawnAcu(world);
     updatePathing(world);
   }
   return world;
@@ -122,5 +123,6 @@ export function tickWorld(world) {
   retaliationSystem(world);
   deathSystem(world);
   regenSystem(world);
+  acuSystem(world);
   world.tick++;
 }

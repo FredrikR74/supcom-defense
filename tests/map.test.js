@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import firstDefense from '../src/data/maps/firstDefense.js';
-import { createTerrainForMap } from '../src/sim/world.js';
+import maps from '../src/data/maps/index.js';
+import { createTerrainForMap, createWorld } from '../src/sim/world.js';
 import { getHeight } from '../src/sim/terrain.js';
+import { cellIndex, isBlockedCell } from '../src/sim/pathing.js';
 
-describe('kartan Första försvaret', () => {
-  const map = firstDefense;
+describe.each(maps.map((m) => [m.name, m]))('kartan %s', (_name, map) => {
   const terrain = createTerrainForMap(map);
   const points = [map.core, ...map.spawns, ...map.massDeposits];
+
+  it('har id, namn och beskrivning', () => {
+    expect(map.id).toBeTruthy();
+    expect(map.name).toBeTruthy();
+    expect(map.description).toBeTruthy();
+  });
 
   it('har alla objekt inom kartan', () => {
     for (const p of points) {
@@ -25,4 +31,17 @@ describe('kartan Första försvaret', () => {
   it('har kärnan mitt på platån', () => {
     expect(getHeight(terrain, map.core.x, map.core.z)).toBe(map.terrain.plateau.height);
   });
+
+  it('alla spawnpunkter når kärnan och står på körbar mark', () => {
+    const w = createWorld({ map });
+    for (const s of map.spawns) {
+      const i = cellIndex(w, s.x, s.z);
+      expect(isBlockedCell(w, i)).toBe(false);
+      expect(Number.isFinite(w.flow.dist[i])).toBe(true);
+    }
+  });
+});
+
+it('kart-id:n är unika', () => {
+  expect(new Set(maps.map((m) => m.id)).size).toBe(maps.length);
 });

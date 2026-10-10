@@ -40,6 +40,8 @@ export default {
       { type: 'medusa', weight: 2, fromMinute: 4 },
     ],
   },
+  /** ACU:n återuppstår vid kärnan efter så här många sekunder (tower defense-avsteg från FA). */
+  acuRespawnSeconds: 30,
   /** Svårighetsgrad 0–100 vid start (kan ändras under spelet). */
   difficulty: 50,
 };

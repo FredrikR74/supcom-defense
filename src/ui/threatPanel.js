@@ -12,6 +12,7 @@ export function createThreatPanel(el, toastEl, { onDifficulty }) {
     <div class="threat-title"></div>
     <div class="threat-status"></div>
     <div class="threat-enemies"></div>
+    <div class="threat-acu" hidden></div>
     <label class="threat-difficulty">
       <span class="threat-difficulty-label"></span>
       <input type="range" min="0" max="100" step="1" />
@@ -19,6 +20,7 @@ export function createThreatPanel(el, toastEl, { onDifficulty }) {
   const title = el.querySelector('.threat-title');
   const status = el.querySelector('.threat-status');
   const enemies = el.querySelector('.threat-enemies');
+  const acuLine = el.querySelector('.threat-acu');
   const label = el.querySelector('.threat-difficulty-label');
   const slider = el.querySelector('input');
   slider.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -33,7 +35,8 @@ export function createThreatPanel(el, toastEl, { onDifficulty }) {
   let sliderInitialized = false;
 
   return {
-    update(world) {
+    /** `respawnIn`: sekunder tills ACU:n återuppstår, eller null om den lever. */
+    update(world, { respawnIn = null } = {}) {
       const info = directorInfo(world);
       if (!sliderInitialized) {
         slider.value = info.difficulty;
@@ -53,6 +56,8 @@ export function createThreatPanel(el, toastEl, { onDifficulty }) {
         status.textContent = `Enemy income ${info.rate.toFixed(1)} mass/s (+${(inAMinute - info.rate).toFixed(1)}/min)`;
       }
       enemies.textContent = `${info.enemies} ${info.enemies === 1 ? 'enemy' : 'enemies'} on the field`;
+      acuLine.hidden = respawnIn == null;
+      if (respawnIn != null) acuLine.textContent = `ACU respawns in ${clock(Math.ceil(respawnIn))}`;
     },
 
     /** Visar en kort notis mitt på skärmen. */

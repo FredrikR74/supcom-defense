@@ -212,6 +212,7 @@ function spawnProduced(world, factory, type) {
   const n = factory.producedCount % 5;
   const exitZ = factory.z + def.size / 2 + 1;
   const unit = addUnit(world, type, { x: factory.x, z: exitZ, owner: factory.owner });
+  world.events.push({ type: 'unitReady', owner: factory.owner, unit: type, x: unit.x, z: unit.z });
   if (factory.rallyPoints.length > 0) {
     for (const p of factory.rallyPoints) unit.orders.push({ type: 'move', x: p.x, z: p.z });
   } else {
@@ -252,6 +253,7 @@ export function constructionProgress(world) {
       if (target.progress >= DONE) {
         target.progress = 1;
         target.built = true;
+        world.events.push({ type: 'built', owner: target.owner, structure: target.type, x: target.x, z: target.z });
       }
     } else {
       target.productionProgress += delta;

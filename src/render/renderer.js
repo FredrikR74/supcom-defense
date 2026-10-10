@@ -128,6 +128,17 @@ export function createRenderer(canvas, world) {
         setGhostState(pool[i], ok ? 'ok' : 'bad');
       });
     },
+    /** Markpunkterna (på platåns höjd) i skärmens fyra hörn, för minikartan. */
+    viewFootprint() {
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -map.terrain.plateau.height);
+      const out = [];
+      for (const [x, y] of [[-1, 1], [1, 1], [1, -1], [-1, -1]]) {
+        const p = rig.rayAt(x, y).intersectPlane(plane, new THREE.Vector3());
+        if (!p) return null;
+        out.push({ x: p.x, z: p.z });
+      }
+      return out;
+    },
     /** Flyttar kameran så att den tittar på (x, z). */
     centerOn(x, z) {
       rig.target.x = x;
@@ -142,7 +153,7 @@ export function createRenderer(canvas, world) {
     },
     render(world, alpha, selection, frameSeconds = 0) {
       const strategic = rig.distance > STRATEGIC_DISTANCE;
-      entities.sync(world, alpha, selection, PLAYER_ID);
+      entities.sync(world, alpha, selection, PLAYER_ID, frameSeconds);
       pathDebug.update(world);
       markers.setStrategic(strategic);
       entities.setStrategic(strategic);

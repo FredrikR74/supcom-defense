@@ -7,11 +7,15 @@ const MATERIALS = {
   metal: new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.4 }),
   dark: new THREE.MeshStandardMaterial({ color: 0x4b5563, metalness: 0.5, roughness: 0.6 }),
   concrete: new THREE.MeshStandardMaterial({ color: 0x8b8f94, roughness: 0.9 }),
-  team: new THREE.MeshStandardMaterial({ color: PLAYER_COLOR, metalness: 0.4, roughness: 0.5 }),
+  team: new THREE.MeshStandardMaterial({
+    color: PLAYER_COLOR, metalness: 0.4, roughness: 0.5, emissive: 0x1d4ed8, emissiveIntensity: 0.35,
+  }),
   glow: new THREE.MeshStandardMaterial({ color: 0x7dd3fc, emissive: 0x38bdf8, emissiveIntensity: 1.2 }),
   massGlow: new THREE.MeshStandardMaterial({ color: 0xbef264, emissive: 0x84cc16, emissiveIntensity: 1 }),
   energyGlow: new THREE.MeshStandardMaterial({ color: 0xfde047, emissive: 0xeab308, emissiveIntensity: 1.2 }),
-  enemy: new THREE.MeshStandardMaterial({ color: ENEMY_COLOR, metalness: 0.4, roughness: 0.5 }),
+  enemy: new THREE.MeshStandardMaterial({
+    color: ENEMY_COLOR, metalness: 0.4, roughness: 0.5, emissive: 0x7f1d1d, emissiveIntensity: 0.4,
+  }),
   enemyGlow: new THREE.MeshStandardMaterial({ color: 0xfca5a5, emissive: 0xef4444, emissiveIntensity: 1.4 }),
 };
 
@@ -191,6 +195,11 @@ const MODELS = {
     return [cylinder(0.45, 0.5, metal, 0, 0.25, 0), turret];
   },
 };
+
+/** Trådmodell för byggnader under uppbyggnad (FA:s "wireframe" som fylls i). */
+export const BUILD_WIRE_MATERIAL = new THREE.MeshBasicMaterial({
+  color: 0x67e8f9, wireframe: true, transparent: true, opacity: 0.35, depthWrite: false,
+});
 
 /** Mörkt, matt material för vrak. */
 export const WRECK_MATERIAL = new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 1, metalness: 0.2 });

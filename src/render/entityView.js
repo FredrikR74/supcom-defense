@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { createIcon } from './icons.js';
 import { isIdleBuilder } from '../sim/entities.js';
-import { createModel, createGhost, WRECK_MATERIAL } from './models.js';
+import { createModel, createGhost, WRECK_MATERIAL, BUILD_WIRE_MATERIAL } from './models.js';
 import { createInstancedBatch } from './instancedUnits.js';
 
 /** Markeringsring, platt på marken. */
@@ -103,9 +103,21 @@ export function createEntityView(terrain) {
     color: 0x4ade80, transparent: true, opacity: 0.7, depthTest: false,
   }));
   const beams = createLineBuffer(256, new THREE.LineBasicMaterial({
-    color: 0x67e8f9, transparent: true, opacity: 0.9,
+    color: 0x67e8f9, transparent: true, opacity: 0.45,
   }));
   overlay.add(orderLines.object, beams.object);
+
+  // Nanopartiklar som strömmar längs byggstrålarna från byggaren till bygget.
+  const NANO_PER_BEAM = 6;
+  const nanoPositions = new Float32Array(256 * NANO_PER_BEAM * 3);
+  const nanoGeometry = new THREE.BufferGeometry();
+  nanoGeometry.setAttribute('position', new THREE.BufferAttribute(nanoPositions, 3));
+  const nano = new THREE.Points(nanoGeometry, new THREE.PointsMaterial({
+    color: 0xa5f3fc, size: 4, sizeAttenuation: false, transparent: true, opacity: 0.9, depthWrite: false,
+  }));
+  nano.frustumCulled = false;
+  overlay.add(nano);
+  let nanoTime = 0;
 
   const groundY = (x, z) => getHeight(terrain, x, z);
 
@@ -122,12 +134,19 @@ export function createEntityView(terrain) {
     icons.add(icon);
     overlay.add(ring);
     const top = new THREE.Box3().setFromObject(mesh).max.y;
+    // Ofärdiga byggnader: en trådmodell i full storlek som den växande modellen fyller i.
+    let wire = null;
+    if (entity.kind === 'structure' && !entity.built) {
+      wire = createModel(entity.type);
+      wire.traverse((o) => { if (o.isMesh) o.material = BUILD_WIRE_MATERIAL; });
+      overlay.add(wire);
+    }
     // Markering för sysslolösa byggare (syns även utzoomat).
     const idleIcon = createIcon('idle');
     idleIcon.scale.multiplyScalar(0.7);
     idleIcon.visible = false;
     overlay.add(idleIcon);
-    views.set(entity.id, { mesh, icon, ring, top, idleIcon, turret: mesh.getObjectByName('turret') });
+    views.set(entity.id, { mesh, icon, ring, top, idleIcon, wire, turret: mesh.getObjectByName('turret') });
   }
 
   /** Var en entitet ritas just nu (vanlig mesh eller instansierad). */
@@ -195,17 +214,34 @@ export function createEntityView(terrain) {
     }
   }
 
-  function updateBeams(world) {
+  function updateBeams(world, frameSeconds) {
     beams.begin();
+    nanoTime += frameSeconds;
+    let p = 0;
     for (const e of world.entities) {
       if (e.kind !== 'unit' || !e.buildJob) continue;
       const v = views.get(e.id);
       const to = drawnPos(e.buildJob.targetId);
       if (!v || !to) continue;
       const from = v.mesh.position;
-      beams.add(from.x, from.y + v.top * 0.8, from.z, to.x, to.y + to.top * 0.5, to.z);
+      const x0 = from.x;
+      const y0 = from.y + v.top * 0.8;
+      const z0 = from.z;
+      const x1 = to.x;
+      const y1 = to.y + to.top * 0.5;
+      const z1 = to.z;
+      beams.add(x0, y0, z0, x1, y1, z1);
+      // Återvinning strömmar åt andra hållet: från vraket till byggaren.
+      const reverse = e.buildJob.kind === 'reclaim';
+      for (let k = 0; k < NANO_PER_BEAM && p < nanoPositions.length / 3; k++, p++) {
+        let t = (nanoTime * 1.5 + k / NANO_PER_BEAM + e.id * 0.13) % 1;
+        if (reverse) t = 1 - t;
+        nanoPositions.set([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, z0 + (z1 - z0) * t], p * 3);
+      }
     }
     beams.end();
+    nanoGeometry.setDrawRange(0, p);
+    nanoGeometry.attributes.position.needsUpdate = true;
   }
 
   function updateQueuedGhosts(world, owner) {
@@ -235,7 +271,7 @@ export function createEntityView(terrain) {
     icons,
     overlay,
 
-    sync(world, alpha, selection, owner) {
+    sync(world, alpha, selection, owner, frameSeconds = 0) {
       const alive = new Set();
       for (const b of batches.values()) b.begin();
       for (const b of wreckBatches.values()) b.begin();
@@ -264,6 +300,14 @@ export function createEntityView(terrain) {
         v.mesh.position.set(x, y, z);
         if (e.heading !== undefined) v.mesh.rotation.y = e.heading;
         // Tornets vinkel är i världen; på en enhet är tornet ett barn till den roterade kroppen.
+        if (v.wire) {
+          v.wire.visible = !e.built;
+          v.wire.position.copy(v.mesh.position);
+          if (e.built) {
+            overlay.remove(v.wire);
+            v.wire = null;
+          }
+        }
         if (v.turret) v.turret.rotation.y = (e.turretHeading ?? e.heading ?? 0) - (e.kind === 'unit' ? e.heading ?? 0 : 0);
         // Ofärdiga byggnader växer upp ur marken.
         v.mesh.scale.y = e.kind === 'structure' && !e.built ? 0.1 + 0.9 * e.progress : 1;
@@ -279,13 +323,14 @@ export function createEntityView(terrain) {
         icons.remove(v.icon);
         overlay.remove(v.ring);
         overlay.remove(v.idleIcon);
+        if (v.wire) overlay.remove(v.wire);
         views.delete(id);
       }
       for (const b of batches.values()) b.end();
       for (const b of wreckBatches.values()) b.end();
       updateOrderLines(world, selection, alpha);
       updateRallyFlags(world, selection);
-      updateBeams(world);
+      updateBeams(world, frameSeconds);
       updateQueuedGhosts(world, owner);
     },
 

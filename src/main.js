@@ -2,6 +2,7 @@ import { createWorld, tickWorld, TICK_SECONDS, PLAYER_ID } from './sim/world.js'
 import { getEntity } from './sim/entities.js';
 import { queueCommand } from './sim/commands.js';
 import { spawnEnemy } from './sim/enemies.js';
+import { acuRespawnIn } from './sim/acu.js';
 import { createFixedStep } from './loop.js';
 import { createRenderer } from './render/renderer.js';
 import { createCameraInput } from './input/cameraInput.js';
@@ -14,151 +15,198 @@ import { createCommandPanel } from './ui/commandPanel.js';
 import { createThreatPanel } from './ui/threatPanel.js';
 import { createSelectionInfo } from './ui/selectionInfo.js';
 import { createIdlePanel } from './ui/idlePanel.js';
-import firstDefense from './data/maps/firstDefense.js';
+import { createMinimap } from './ui/minimap.js';
+import { createSound } from './ui/sound.js';
+import { showStartMenu } from './ui/startMenu.js';
+import maps from './data/maps/index.js';
+import gameConfig from './data/gameConfig.js';
 
-const canvas = document.getElementById('game');
-const world = createWorld({ seed: 1, map: firstDefense });
-const step = createFixedStep(TICK_SECONDS);
-const view = createRenderer(canvas, world);
-const cameraInput = createCameraInput(canvas, view.rig, view.pickGround);
-const debug = createDebugOverlay(document.getElementById('debug'));
-const resources = createResourcePanel(document.getElementById('resources'));
-const hoverInfo = createHoverInfo(document.getElementById('hover'));
+/** Spelhastigheter man stegar mellan med +/− (1× är normal). */
+const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
 
-const selection = new Set();
-/** Delat UI-tillstånd. `placing`: { type } när spelaren placerar en byggnad. */
-const ui = { placing: null };
+const $ = (id) => document.getElementById(id);
+const sound = createSound();
 
-// Byggläget skapas före markeringen så att det får klicken först.
-const buildInput = createBuildInput(canvas, view, world, selection, ui);
-const selectionInput = createSelectionInput(
-  canvas,
-  document.getElementById('selection-box'),
-  view,
-  world,
-  selection,
-  ui,
-);
+/** Startar ett spel på `map` med svårighetsgraden `difficulty` (0–100). */
+function startGame({ map, difficulty }) {
+  const canvas = $('game');
+  const world = createWorld({ seed: 1, map, config: { difficulty } });
+  // Tillåt längre frames vid hög spelhastighet, annars hinner simuleringen inte med.
+  const step = createFixedStep(TICK_SECONDS, { maxFrameSeconds: 1 });
+  const view = createRenderer(canvas, world);
+  const cameraInput = createCameraInput(canvas, view.rig, view.pickGround);
+  const debug = createDebugOverlay($('debug'));
+  const resources = createResourcePanel($('resources'));
+  const hoverInfo = createHoverInfo($('hover'));
 
-/** Patrullläge: nästa klick på marken blir en patrullpunkt (som P i FA). */
-const startPatrol = () => {
-  if (selection.size > 0) ui.mode = 'patrol';
-};
+  const selection = new Set();
+  /** Delat UI-tillstånd. `placing`: { type } när spelaren placerar en byggnad. */
+  const ui = { placing: null };
+  /** Paus och spelhastighet (index i SPEEDS). */
+  const time = { paused: false, speed: SPEEDS.indexOf(1) };
 
-const selectedIds = () => [...selection];
-const sellSelected = () => queueCommand(world, { type: 'sell', owner: PLAYER_ID, ids: selectedIds() });
+  // Byggläget skapas före markeringen så att det får klicken först.
+  const buildInput = createBuildInput(canvas, view, world, selection, ui);
+  const selectionInput = createSelectionInput(canvas, $('selection-box'), view, world, selection, ui);
 
-const commandPanel = createCommandPanel(document.getElementById('commands'), {
-  onBuild: (type) => { ui.placing = { type }; },
-  onProduce: (unit, count = 1) => {
-    for (const id of selectedIds()) queueCommand(world, { type: 'produce', owner: PLAYER_ID, id, unit, count });
-  },
-  onCancelProduce: (id, index, count = 1) =>
-    queueCommand(world, { type: 'cancelProduce', owner: PLAYER_ID, id, index, count }),
-  onRepeat: (value) => queueCommand(world, { type: 'setRepeat', owner: PLAYER_ID, ids: selectedIds(), value }),
-  onPatrol: startPatrol,
-  onSell: sellSelected,
-});
-
-const threatPanel = createThreatPanel(document.getElementById('threat'), document.getElementById('toast'), {
-  onDifficulty: (value) => queueCommand(world, { type: 'setDifficulty', owner: PLAYER_ID, value }),
-});
-
-/** Kärnan föll: visa hur länge man höll ut och en knapp för att börja om. */
-function showGameOver(elapsed) {
-  const el = document.getElementById('gameover');
-  const m = Math.floor(elapsed / 60);
-  const s = String(Math.floor(elapsed % 60)).padStart(2, '0');
-  el.querySelector('.gameover-time').textContent = `You held out for ${m}:${s}`;
-  el.querySelector('.gameover-restart').onclick = () => location.reload();
-  el.hidden = false;
-}
-
-const modeHint = document.getElementById('mode-hint');
-const selectionInfo = createSelectionInfo(document.getElementById('info'));
-const idlePanel = createIdlePanel(document.getElementById('idle'), {
-  onSelect: (unit) => {
-    selection.clear();
-    selection.add(unit.id);
-    view.centerOn(unit.x, unit.z);
-  },
-});
-
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Delete') sellSelected();
-  if (e.code === 'KeyP') startPatrol();
-  if (e.code === 'Escape') ui.mode = null;
-  // Felsökning: F8 = blockerade rutor, F9 = flödesfältet.
-  if (e.code === 'F8') {
-    e.preventDefault();
-    view.toggleBlockedCells();
-  }
-  if (e.code === 'F9') {
-    e.preventDefault();
-    view.toggleFlowField();
-  }
-  // Bara i dev tills vågorna finns (fas 7): N = en Mantis vid varje spawnpunkt.
-  if (import.meta.env.DEV && e.code === 'KeyN') {
-    world.map.spawns.forEach((_, i) => spawnEnemy(world, 'mantis', i));
-  }
-});
-
-// Felsökning i webbläsarkonsolen (bara i dev): game.world, game.tick(100).
-if (import.meta.env.DEV) {
-  window.game = {
-    world,
-    selection,
-    view,
-    ui,
-    /** Skapar `n` fiender av `type`, fördelade över spawnpunkterna. */
-    spawn(n = 1, type = 'mantis') {
-      for (let i = 0; i < n; i++) spawnEnemy(world, type, i);
-      return world.entities.length;
-    },
-    tick(n = 1) {
-      for (let i = 0; i < n; i++) tickWorld(world);
-      return world.tick;
-    },
+  /** Patrullläge: nästa klick på marken blir en patrullpunkt (som P i FA). */
+  const startPatrol = () => {
+    if (selection.size > 0) ui.mode = 'patrol';
   };
-}
 
-let last = performance.now();
+  const selectedIds = () => [...selection];
+  const sellSelected = () => queueCommand(world, { type: 'sell', owner: PLAYER_ID, ids: selectedIds() });
 
-function frame(now) {
-  const frameSeconds = (now - last) / 1000;
-  last = now;
+  const commandPanel = createCommandPanel($('commands'), {
+    onBuild: (type) => { ui.placing = { type }; },
+    onProduce: (unit, count = 1) => {
+      for (const id of selectedIds()) queueCommand(world, { type: 'produce', owner: PLAYER_ID, id, unit, count });
+    },
+    onCancelProduce: (id, index, count = 1) =>
+      queueCommand(world, { type: 'cancelProduce', owner: PLAYER_ID, id, index, count }),
+    onRepeat: (value) => queueCommand(world, { type: 'setRepeat', owner: PLAYER_ID, ids: selectedIds(), value }),
+    onPatrol: startPatrol,
+    onSell: sellSelected,
+  });
 
-  const { ticks, alpha } = step.advance(frameSeconds);
-  for (let i = 0; i < ticks; i++) tickWorld(world);
+  const threatPanel = createThreatPanel($('threat'), $('toast'), {
+    onDifficulty: (value) => queueCommand(world, { type: 'setDifficulty', owner: PLAYER_ID, value }),
+  });
 
-  // Begränsa så att en lång frame (t.ex. efter en bakgrundsflik) inte ger ett jättehopp.
-  cameraInput.update(Math.min(frameSeconds, 0.1));
-  selectionInput.prune();
-
-  const ndc = cameraInput.mouseNdc();
-  buildInput.update(ndc);
-  for (const ev of world.events) {
-    if (ev.type === 'defeat') showGameOver(ev.elapsed);
+  /** Kärnan föll: visa hur länge man höll ut och en knapp för att börja om. */
+  function showGameOver(elapsed) {
+    const el = $('gameover');
+    const m = Math.floor(elapsed / 60);
+    const s = String(Math.floor(elapsed % 60)).padStart(2, '0');
+    el.querySelector('.gameover-time').textContent = `You held out for ${m}:${s}`;
+    el.querySelector('.gameover-restart').onclick = () => location.reload();
+    el.hidden = false;
   }
-  view.render(world, alpha, selection, frameSeconds);
 
-  const hovered = ndc && !ui.placing && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y));
-  hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));
-  resources.update(world.players[PLAYER_ID].economy);
-  commandPanel.update(world, selection, ui);
-  modeHint.hidden = ui.mode !== 'patrol';
-  threatPanel.update(world);
-  selectionInfo.update(world, selection, ui);
-  idlePanel.update(world);
+  const modeHint = $('mode-hint');
+  const speedHint = $('speed');
+  const selectionInfo = createSelectionInfo($('info'));
+  const minimap = createMinimap($('minimap'), world, view);
+  const idlePanel = createIdlePanel($('idle'), {
+    onSelect: (unit) => {
+      selection.clear();
+      selection.add(unit.id);
+      view.centerOn(unit.x, unit.z);
+    },
+  });
 
-  const cursor = ndc && view.pickAtNdc(ndc.x, ndc.y);
-  debug.update(world, frameSeconds, [
-    `zoom ${view.rig.distance.toFixed(0)}${view.isStrategic() ? ' (strategic)' : ''}`,
-    cursor
-      ? `mouse ${cursor.x.toFixed(1)}, ${cursor.z.toFixed(1)}  h ${cursor.y.toFixed(2)}`
-      : 'mouse -',
-  ]);
+  window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement) return;
+    if (e.code === 'Delete') sellSelected();
+    if (e.code === 'KeyP') startPatrol();
+    if (e.code === 'Escape') ui.mode = null;
+    if (e.code === 'Space' || e.code === 'Pause') {
+      e.preventDefault();
+      time.paused = !time.paused;
+    }
+    // Tecknet (`key`), inte tangentens plats: på svenskt tangentbord ligger + där US har −.
+    if (e.key === '+' || e.code === 'NumpadAdd') time.speed = Math.min(SPEEDS.length - 1, time.speed + 1);
+    if (e.key === '-' || e.code === 'NumpadSubtract') time.speed = Math.max(0, time.speed - 1);
+    if (e.code === 'KeyM') threatPanel.toast(sound.toggleMute() ? 'Sound off' : 'Sound on');
+    // Felsökning: F7 = debugruta, F8 = blockerade rutor, F9 = flödesfältet.
+    if (e.code === 'F7') {
+      e.preventDefault();
+      $('debug').hidden = !$('debug').hidden;
+    }
+    if (e.code === 'F8') {
+      e.preventDefault();
+      view.toggleBlockedCells();
+    }
+    if (e.code === 'F9') {
+      e.preventDefault();
+      view.toggleFlowField();
+    }
+    // Bara i dev: N = en Mantis vid varje spawnpunkt.
+    if (import.meta.env.DEV && e.code === 'KeyN') {
+      world.map.spawns.forEach((_, i) => spawnEnemy(world, 'mantis', i));
+    }
+  });
+
+  // Felsökning i webbläsarkonsolen (bara i dev): game.world, game.tick(100).
+  if (import.meta.env.DEV) {
+    window.game = {
+      world,
+      selection,
+      view,
+      ui,
+      time,
+      /** Skapar `n` fiender av `type`, fördelade över spawnpunkterna. */
+      spawn(n = 1, type = 'mantis') {
+        for (let i = 0; i < n; i++) spawnEnemy(world, type, i);
+        return world.entities.length;
+      },
+      tick(n = 1) {
+        for (let i = 0; i < n; i++) tickWorld(world);
+        return world.tick;
+      },
+    };
+  }
+
+  let last = performance.now();
+
+  function frame(now) {
+    const frameSeconds = (now - last) / 1000;
+    last = now;
+
+    const gameSeconds = time.paused ? 0 : frameSeconds * SPEEDS[time.speed];
+    const { ticks, alpha } = step.advance(gameSeconds);
+    for (let i = 0; i < ticks; i++) tickWorld(world);
+
+    // Begränsa så att en lång frame (t.ex. efter en bakgrundsflik) inte ger ett jättehopp.
+    cameraInput.update(Math.min(frameSeconds, 0.1));
+    selectionInput.prune();
+
+    const ndc = cameraInput.mouseNdc();
+    buildInput.update(ndc);
+    for (const ev of world.events) {
+      if (ev.type === 'defeat') showGameOver(ev.elapsed);
+      if (ev.type === 'acuDeath') threatPanel.toast(`ACU destroyed! Respawning in ${ev.seconds} s`);
+      if (ev.type === 'acuRespawn') threatPanel.toast('ACU respawned at the Quantum Gateway');
+    }
+    sound.handleEvents(world.events, view.rig.target, PLAYER_ID);
+    view.render(world, alpha, selection, time.paused ? 0 : frameSeconds);
+
+    const hovered = ndc && !ui.placing && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y));
+    hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));
+    resources.update(world.players[PLAYER_ID].economy);
+    commandPanel.update(world, selection, ui);
+    modeHint.hidden = ui.mode !== 'patrol';
+    threatPanel.update(world, { respawnIn: acuRespawnIn(world) });
+    selectionInfo.update(world, selection, ui);
+    idlePanel.update(world);
+    minimap.update();
+
+    const speed = SPEEDS[time.speed];
+    speedHint.hidden = !time.paused && speed === 1;
+    speedHint.textContent = time.paused ? 'PAUSED' : `Speed ${speed}×`;
+
+    if (!$('debug').hidden) {
+      const cursor = ndc && view.pickAtNdc(ndc.x, ndc.y);
+      debug.update(world, frameSeconds, [
+        `zoom ${view.rig.distance.toFixed(0)}${view.isStrategic() ? ' (strategic)' : ''}`,
+        cursor
+          ? `mouse ${cursor.x.toFixed(1)}, ${cursor.z.toFixed(1)}  h ${cursor.y.toFixed(2)}`
+          : 'mouse -',
+      ]);
+    }
+    requestAnimationFrame(frame);
+  }
+
   requestAnimationFrame(frame);
 }
 
-requestAnimationFrame(frame);
+// Startmeny först; i dev kan `?quick` hoppa direkt in i första kartan.
+const params = new URLSearchParams(location.search);
+if (import.meta.env.DEV && params.has('quick')) {
+  startGame({ map: maps[0], difficulty: gameConfig.difficulty });
+} else {
+  showStartMenu($('menu'), maps, { difficulty: gameConfig.difficulty }).then((settings) => {
+    sound.init(); // Start-klicket är en användarhandling, så ljud får spelas
+    startGame(settings);
+  });
+}
