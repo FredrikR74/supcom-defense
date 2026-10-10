@@ -23,7 +23,7 @@ export function selectInRect(entities, toScreen, rect, owner) {
 }
 
 /**
- * Vänsterklick/dra markerar, högerklick ger flyttorder (Shift köar).
+ * Vänsterklick/dra markerar, högerklick ger flyttorder eller assist (Shift köar).
  * `selection` är ett Set med entitets-id:n.
  */
 export function createSelectionInput(canvas, boxEl, view, world, selection) {
@@ -57,6 +57,13 @@ export function createSelectionInput(canvas, boxEl, view, world, selection) {
       const ids = [...selection];
       if (ids.length === 0) return;
       const ndc = toNdc(p);
+      // Högerklick på en egen ofärdig byggnad: hjälp till att bygga den.
+      const targetId = view.pickEntityAtNdc(ndc.x, ndc.y);
+      const target = world.entities.find((ent) => ent.id === targetId);
+      if (target?.kind === 'structure' && target.owner === PLAYER_ID && !target.built) {
+        queueCommand(world, { type: 'assist', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
+        return;
+      }
       const ground = view.pickAtNdc(ndc.x, ndc.y);
       if (!ground) return;
       queueCommand(world, {

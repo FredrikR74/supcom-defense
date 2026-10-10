@@ -3,7 +3,9 @@ import { createCameraRig } from './cameraRig.js';
 import { createTerrainMesh } from './terrainMesh.js';
 import { createMapMarkers } from './mapMarkers.js';
 import { createEntityView } from './entityView.js';
-import { raycastTerrain, isInsideMap } from '../sim/terrain.js';
+import { createGhost, setGhostState } from './models.js';
+import { PLAYER_ID } from '../sim/constants.js';
+import { raycastTerrain, isInsideMap, getHeight } from '../sim/terrain.js';
 
 /** Över detta kameraavstånd visas strategiska ikoner i stället för meshes. */
 export const STRATEGIC_DISTANCE = 110;
@@ -37,6 +39,10 @@ export function createRenderer(canvas, world) {
   scene.add(markers.meshes, markers.icons);
   const entities = createEntityView(terrain);
   scene.add(entities.meshes, entities.icons, entities.overlay);
+
+  // Förhandsvisning av byggnaden man håller på att placera, en per typ.
+  const placementGhosts = {};
+  let activeGhost = null;
 
   function resize() {
     const w = canvas.clientWidth;
@@ -84,12 +90,26 @@ export function createRenderer(canvas, world) {
     entityLabelScreenPos(entity) {
       return toScreen(entities.labelAnchor(entity));
     },
+    /** Visar förhandsvisningen för `type` vid `pos`, grön om `ok`, annars röd. `type` null döljer. */
+    setPlacementGhost(type, pos, ok) {
+      if (activeGhost) activeGhost.visible = false;
+      activeGhost = null;
+      if (!type) return;
+      if (!placementGhosts[type]) {
+        placementGhosts[type] = createGhost(type);
+        scene.add(placementGhosts[type]);
+      }
+      activeGhost = placementGhosts[type];
+      activeGhost.visible = true;
+      activeGhost.position.set(pos.x, getHeight(terrain, pos.x, pos.z), pos.z);
+      setGhostState(activeGhost, ok ? 'ok' : 'bad');
+    },
     isStrategic() {
       return rig.distance > STRATEGIC_DISTANCE;
     },
     render(world, alpha, selection) {
       const strategic = rig.distance > STRATEGIC_DISTANCE;
-      entities.sync(world, alpha, selection);
+      entities.sync(world, alpha, selection, PLAYER_ID);
       markers.setStrategic(strategic);
       entities.setStrategic(strategic);
       renderer.render(scene, camera);

@@ -111,18 +111,18 @@ tests/
 
 ## Fas 4: Byggande
 
-- [ ] **4.1 Byggmeny.** Visas när ACU:n är markerad: Mass Extractor, Power Generator, Wall och Point Defense (T1-torn).
+- [x] **4.1 Byggmeny.** Visas när ACU:n är markerad: Mass Extractor, Power Generator, Wall och Point Defense (T1-torn).
   *Test:* knapparna syns bara när ACU:n är markerad.
-- [ ] **4.2 Placeringsförhandsvisning.** Fäster mot rutnätet och blir röd vid krock, för brant mark eller fel underlag (utvinnare kräver fyndighet).
+- [x] **4.2 Placeringsförhandsvisning.** Fäster mot rutnätet och blir röd vid krock, för brant mark eller fel underlag (utvinnare kräver fyndighet).
   *Test (Vitest):* `canPlace()` för olika fall.
-- [ ] **4.3 Byggprocess.** ACU:n går dit och bygger. Framsteget beror på byggkraft och effektivitet, och resurserna dras löpande.
+- [x] **4.3 Byggprocess.** ACU:n går dit och bygger. Framsteget beror på byggkraft och effektivitet, och resurserna dras löpande.
   *Test (Vitest):* med kostnad 100 mass, byggtid 10 s och full ekonomi blir byggnaden klar efter 100 tick.
-- [ ] **4.4 Ekonomibyggnader producerar.**
+- [x] **4.4 Ekonomibyggnader producerar.**
   *Test:* inkomsten ökar i panelen.
-- [ ] **4.5 Avbryt och sälj.** Riv en byggnad och få tillbaka en del av massan.
+- [x] **4.5 Avbryt och sälj.** Riv en byggnad och få tillbaka en del av massan.
   *Test (Vitest):* rätt återbetalning.
-- [ ] **4.6 Byggkö med Shift.**
-- [ ] **4.7 Ingenjörer.** Kan byggas från kärnan eller en fabrik och hjälpa till att bygga (assist). Byggkraften läggs ihop.
+- [x] **4.6 Byggkö med Shift.**
+- [x] **4.7 Ingenjörer.** Kan byggas från kärnan eller en fabrik och hjälpa till att bygga (assist). Byggkraften läggs ihop.
   *Test (Vitest):* två byggare halverar tiden.
 
 ## Fas 5: Fiender och vägar

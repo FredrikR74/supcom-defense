@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 /** Strategiska ikoner: platta sprites med konstant storlek på skärmen. */
 const ICON_SCALE = 0.035;
+const TEAM = '#3b82f6';
 
 function iconTexture(draw) {
   const size = 64;
@@ -13,16 +14,32 @@ function iconTexture(draw) {
   return tex;
 }
 
-const DRAW = {
-  core: (ctx, s) => {
-    ctx.fillStyle = '#3b82f6';
+/** Fyrkantig byggnadsikon i lagfärg med en färgad prick för typen. */
+function structureIcon(dotColor, scale = 1) {
+  return (ctx, s) => {
+    const pad = 8 + (1 - scale) * 16;
+    ctx.fillStyle = TEAM;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 5;
-    ctx.fillRect(8, 8, s - 16, s - 16);
-    ctx.strokeRect(8, 8, s - 16, s - 16);
-  },
+    ctx.fillRect(pad, pad, s - 2 * pad, s - 2 * pad);
+    ctx.strokeRect(pad, pad, s - 2 * pad, s - 2 * pad);
+    if (dotColor) {
+      ctx.fillStyle = dotColor;
+      ctx.beginPath();
+      ctx.arc(s / 2, s / 2, 8 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+}
+
+const DRAW = {
+  core: structureIcon('#7dd3fc'),
+  massExtractor: structureIcon('#a3e635', 0.8),
+  powerGenerator: structureIcon('#facc15', 0.8),
+  wall: structureIcon(null, 0.5),
+  pointDefense: structureIcon('#ef4444', 0.7),
   acu: (ctx, s) => {
-    ctx.fillStyle = '#3b82f6';
+    ctx.fillStyle = TEAM;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 5;
     ctx.beginPath();
@@ -31,6 +48,15 @@ const DRAW = {
     ctx.lineTo(s / 2, s - 4);
     ctx.lineTo(4, s / 2);
     ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  },
+  engineer: (ctx, s) => {
+    ctx.fillStyle = TEAM;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(s / 2, s / 2, s / 2 - 16, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   },

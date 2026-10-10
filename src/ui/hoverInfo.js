@@ -1,6 +1,6 @@
 import { getDef } from '../sim/entities.js';
 
-/** Namn och HP-stapel ovanför den entitet musen är över. */
+/** Namn och HP-stapel (eller byggframsteg) ovanför den entitet musen är över. */
 export function createHoverInfo(el) {
   el.innerHTML = `
     <div class="hover-name"></div>
@@ -16,11 +16,17 @@ export function createHoverInfo(el) {
     update(entity, screen) {
       el.hidden = !entity;
       if (!entity) return;
-      const frac = entity.hp / entity.maxHp;
       name.textContent = getDef(entity.type)?.name ?? entity.type;
-      fill.style.width = `${frac * 100}%`;
-      fill.style.background = frac > 0.5 ? '#4ade80' : frac > 0.25 ? '#facc15' : '#ef4444';
-      hp.textContent = `${Math.ceil(entity.hp)} / ${entity.maxHp}`;
+      if (entity.kind === 'structure' && !entity.built) {
+        fill.style.width = `${entity.progress * 100}%`;
+        fill.style.background = '#67e8f9';
+        hp.textContent = `Bygger ${Math.floor(entity.progress * 100)} %`;
+      } else {
+        const frac = entity.hp / entity.maxHp;
+        fill.style.width = `${frac * 100}%`;
+        fill.style.background = frac > 0.5 ? '#4ade80' : frac > 0.25 ? '#facc15' : '#ef4444';
+        hp.textContent = `${Math.ceil(entity.hp)} / ${entity.maxHp}`;
+      }
       el.style.transform = `translate(${screen.x}px, ${screen.y}px) translate(-50%, -100%)`;
     },
   };
