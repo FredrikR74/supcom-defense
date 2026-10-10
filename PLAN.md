@@ -187,7 +187,7 @@ tests/
 
 Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.com/FAForever/fa).
 
-- [x] **6.9 FA-värden.** HP, kostnader, byggtider, BuildRate, produktion och vapen från blueprints. Räckvidd och projektilfart är halverade.
+- [x] **6.9 FA-värden.** HP, kostnader, byggtider, BuildRate, produktion och vapen från blueprints. Räckvidd och projektilfart är halverade, eftersom första kartan (128×128) är ungefär hälften så stor som en FA-karta. **Obs:** detta måste justeras när större kartor kommer, se 10.1.
 - [x] **6.10 Startresurser.** 650 mass och 3900 energi (ACU:ns lager, som FA ger vid start). ACU:n ger +1 mass och +20 energi; kärnan ger inget.
 - [x] **6.11 Upkeep.** Mass Extractor drar 2 energi/s och producerar mindre vid energibrist.
 - [x] **6.12 Info om markering.** Panel med namn, HP, regen, veterancy och vad det markerade ger och drar i mass och energi.
@@ -229,6 +229,9 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 **🎯 Milstolpe: ett komplett, spelbart tower defense-spel.**
 
 ## Fas 10: Fler torn och djup
+
+- [ ] **10.1 Kartskala för avstånd.** Räckvidd och projektilfart (och eventuellt enheternas fart) är i dag hårdkodat halverade i `data/units.js` och `data/structures.js`. Inför större kartor: lagra FA:s ohalverade värden i data och låt en skalfaktor per karta (t.ex. `map.distanceScale`) räkna fram dem, så att varje karta får rätt avstånd.
+  *Test (Vitest):* en Mantis räckvidd blir 18 × kartans skalfaktor. Samma enhet får olika räckvidd på kartor med olika skala.
 
 Allt här är FA-byggnader och FA-enheter. De nya namnen läggs till på den godkända listan från 4.11.
 
