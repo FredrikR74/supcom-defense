@@ -12,6 +12,7 @@ const BASIC_STRUCTURES = ['landFactory', 'massExtractor', 'powerGenerator', 'wal
  * - `buildPower`: FA:s BuildRate. Byggtid = buildTime / buildPower.
  * - `regenRate`: HP per sekund (FA:s Defense.RegenRate).
  * - `techCategory`: styr veterancy (TECH1, TECH2, TECH3, COMMAND, ...).
+ * - `selectionPriority`: FA:s General.SelectionPriority (standard 1); se selectInRect.
  * - `weapon`: `damage` per skott, `rateOfFire` skott per sekund, `range`,
  *   `projectileSpeed`, `muzzleHeight`, `ballistic` (båge).
  */
@@ -20,6 +21,8 @@ export default {
   acu: {
     name: 'Armored Command Unit',
     techCategory: 'COMMAND',
+    /** FA: General.SelectionPriority = 3 (som ingenjörer, under stridsenheter). */
+    selectionPriority: 3,
     maxHp: 12000,
     regenRate: 10,
     speed: 3,
@@ -94,6 +97,8 @@ export default {
   engineer: {
     name: 'Engineer',
     techCategory: 'TECH1',
+    /** FA: General.SelectionPriority = 3. */
+    selectionPriority: 3,
     maxHp: 150,
     speed: 3.5,
     radius: 0.6,

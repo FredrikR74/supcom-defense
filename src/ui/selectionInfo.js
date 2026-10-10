@@ -37,8 +37,12 @@ function economyLine(label, { mass, energy }, sign, cls) {
   return `<div class="info-row ${cls}"><span class="info-label">${label}</span> ${parts.join(' ')}</div>`;
 }
 
+/** Enheter som just nu hjälper `factory` med dess produktion. */
+const assistersOf = (world, factory) => world.entities.filter((u) =>
+  u.buildJob?.kind === 'factoryAssist' && u.buildJob.targetId === factory.id);
+
 /** Namn, HP, veterancy, kills och stridsvärden för en entitet. */
-function describe(e, { enemy }) {
+function describe(e, { enemy, world }) {
   const def = getDef(e.type);
   if (e.kind === 'wreck') {
     return `<div class="info-name">Wreckage <span class="info-sub">${def.unitName ?? def.name}</span></div>` +
@@ -59,7 +63,13 @@ function describe(e, { enemy }) {
     html += row('Weapon', '<span class="info-sub">unarmed</span>');
   }
   if (e.kind === 'unit') html += row('Speed', def.speed);
-  if (def.buildPower) html += row('Build rate', def.buildPower);
+  if (def.buildPower) {
+    // En fabrik visar också byggkraften från dem som assisterar den.
+    const assist = e.kind === 'structure' && world
+      ? assistersOf(world, e).reduce((sum, u) => sum + getDef(u.type).buildPower, 0)
+      : 0;
+    html += row('Build rate', assist ? `${def.buildPower} <span class="info-gives">+${assist} assist</span>` : def.buildPower);
+  }
   if (enemy && def.cost) html += row('Mass value', def.cost.mass);
   if (e.kind === 'structure' && !e.built) html += row('Building', `${Math.floor(e.progress * 100)}%`);
   return html;
@@ -81,25 +91,36 @@ export function createSelectionInfo(el) {
       if (el.hidden) return;
 
       if (inspected) {
-        el.innerHTML = describe(inspected, { enemy: inspected.owner !== PLAYER_ID && inspected.owner !== 0 });
+        el.innerHTML = describe(inspected, { enemy: inspected.owner !== PLAYER_ID && inspected.owner !== 0, world });
         return;
       }
 
       const gives = { mass: 0, energy: 0 };
       const takes = { mass: 0, energy: 0 };
-      for (const e of selected) {
+      // En markerad fabrik räknar in det dess assistenter drar (om de inte redan är markerade).
+      const assisters = new Set();
+      for (const f of selected.filter((e) => e.kind === 'structure')) {
+        for (const u of assistersOf(world, f)) if (!selection.has(u.id)) assisters.add(u);
+      }
+      for (const e of [...selected, ...assisters]) {
         const eco = economyOf(e);
         for (const r of ['mass', 'energy']) {
-          gives[r] += eco.gives[r];
+          // Assistenternas egen inkomst (t.ex. ACU:ns) hör inte till fabriken, bara det de drar.
+          if (!assisters.has(e)) gives[r] += eco.gives[r];
           takes[r] += eco.takes[r];
         }
       }
+      const economy0 = world.players[PLAYER_ID].economy;
+      const stalled = economy0.efficiency < 0.99 && takes.mass + takes.energy > 0;
 
       const head = selected.length === 1
-        ? describe(selected[0], { enemy: false })
+        ? describe(selected[0], { enemy: false, world })
         : `<div class="info-name">${selected.length} selected</div>`;
       const economy = economyLine('Produces', gives, '+', 'info-gives') + economyLine('Consumes', takes, '−', 'info-takes');
-      el.innerHTML = head + (economy || '<div class="info-row info-sub">No resource use</div>');
+      const stallNote = stalled
+        ? `<div class="info-row info-takes">Resource shortage: running at ${Math.round(economy0.efficiency * 100)}% speed</div>`
+        : '';
+      el.innerHTML = head + (economy || '<div class="info-row info-sub">No resource use</div>') + stallNote;
     },
   };
 }

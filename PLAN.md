@@ -161,8 +161,6 @@ tests/
 - [x] **5.5 Placeringsregel: aldrig helt instängd.** Förbjud en placering om den gör att någon spawnpunkt saknar väg till kärnan. Det här är alternativ A. Alternativ B är att fiender skjuter sig igenom.
   *Test (Vitest):* en placering som stänger vägen nekas.
 - [x] **5.6 Separation.** Fiender knuffar varandra lätt så att de inte överlappar.
-- [ ] **5.7 Rendera med `InstancedMesh`.** (Gjort. FPS med 300 fiender återstår att mäta i ett synligt fönster: `game.spawn(300)` i konsolen.)
-  *Test:* 300 fiender ger fortfarande 60 FPS.
 
 - [x] **5.8 Vägsökning för egna enheter.** ACU:n och ingenjörer går runt byggnader och brant terräng med A* på samma rutnät. Är sikten fri går de rakt, och vägen kortas av där det går. Den räknas om när byggnader tillkommer eller försvinner. Klickar man på en blockerad plats går enheten så nära den kommer.
   *Test (Vitest):* ACU:n tar sig förbi en mur utan att gå in i den. En byggare når en byggplats bakom en mur. En flyttorder till en blockerad ruta slutar intill den.
@@ -189,7 +187,7 @@ tests/
 
 Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.com/FAForever/fa).
 
-- [x] **6.9 FA-värden.** HP, kostnader, byggtider, BuildRate, produktion och vapen från blueprints. Räckvidd och projektilfart är halverade, eftersom första kartan (128×128) är ungefär hälften så stor som en FA-karta. **Obs:** detta måste justeras när större kartor kommer, se 10.1.
+- [x] **6.9 FA-värden.** HP, kostnader, byggtider, BuildRate, produktion och vapen från blueprints. Räckvidd och projektilfart är halverade, eftersom första kartan (128×128) är ungefär hälften så stor som en FA-karta. **Obs:** detta måste justeras när större kartor kommer, se 10.7.
 - [x] **6.10 Startresurser.** 650 mass och 3900 energi (ACU:ns lager, som FA ger vid start). ACU:n ger +1 mass och +20 energi; kärnan ger inget.
 - [x] **6.11 Upkeep.** Mass Extractor drar 2 energi/s och producerar mindre vid energibrist.
 - [x] **6.12 Info om markering.** Panel med namn, HP, regen, veterancy och vad det markerade ger och drar i mass och energi.
@@ -198,6 +196,8 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 - [x] **6.15 Egna enheter i vägen.** En enhet i rörelse knuffas inte undan, och enheter på en ny byggplats flyttar sig.
 - [x] **6.16 HP-regen och veterancy enligt FAF.** Erfarenhet är dödad massa fördelad efter skada. Varje nivå ger +10 % max-HP, läkning och extra regen. ACU:n har egna trösklar och regen 10 HP/s.
   *Test (Vitest):* `tests/faRules.test.js`.
+- [x] **6.17 Lådmarkering som i FA.** FA-motorns `SelectionPriority`: stridsenheter 1, ACU och ingenjörer 3, byggnader 5. En låda med blandat innehåll tar bara det med lägst värde, så armé och ingenjörer markeras aldrig tillsammans.
+- [x] **6.18 Assist på fabrik syns.** Fabrikens infopanel visar byggkraft inklusive assistenter och vad de drar, och varnar när resursbrist håller tillbaka bygget.
 
 ## Fas 7: Vågor
 
@@ -223,7 +223,7 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 - [x] **8.2 Reparera kärnan.** Quantum Gateway (UEB0304, rätt FA-namn): 10000 HP, 3000 mass och 30000 energi, BuildTime 4097.
 - [x] **8.3 Återvinna vrak** med högerklick. Som i FAF: tiden är massan / (BuildRate × 10) s, och vraket innehåller kostnad × 0,9 × tech-faktor (T1 0,9), alltså 81 %.
   *Test:* mass-lagret ökar.
-- [x] **8.4 Patrull (P).** Fram och tillbaka mellan punkter; Shift lägger till fler. Byggare reparerar och återvinner automatiskt på vägen, och beväpnade enheter stannar och slåss. Felsökningsvyerna har flyttat till F8 (blockerade rutor) och F9 (flödesfält).
+- [x] **8.4 Patrull (P).** Fram och tillbaka mellan punkter; Shift lägger till fler. Byggare reparerar byggnader (inte enheter) och återvinner automatiskt på vägen, och beväpnade enheter stannar och slåss. Felsökningsvyerna har flyttat till F8 (blockerade rutor) och F9 (flödesfält).
 - [x] **8.5 Granska fiender.** Vänsterklick på en fiende eller ett vrak visar den i infopanelen (utan att markera den): namn, fraktion, HP, veterancy, vapen (skada, DPS, räckvidd), kills, fart och massvärde. Samma stridsvärden visas för egna enheter.
 
 ## Fas 9: Spelbar match
@@ -233,34 +233,32 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 - [x] **9.3 ACU-död.** Den återuppstår vid kärnan efter 30 s (`acuRespawnSeconds`), utan veterancy.
 - [x] **9.4 Startmeny.** Välj karta (First Defense eller Crossroads) och svårighetsgrad. I dev hoppar `?quick` över menyn.
 - [x] **9.5 Paus och spelhastighet.** Mellanslag/Pause pausar, +/− ändrar hastigheten (0,25×–4×).
-- [ ] **9.6 Balansera fiendetrycket** (baseRate, growthPerMinute och enhetsvikter) mot FA-ekonomin. *Påbörjat:* `node scripts/balance.mjs 25 50` kör en skriptad spelare utan grafik. Den dör för tidigt (runt 5–7 min, och fabriken blir aldrig klar), så skriptet behöver felsökas innan det säger något om balansen.
 
 **🎯 Milstolpe: ett komplett, spelbart tower defense-spel.**
 
-## Fas 10: Fler torn och djup
+## Fas 10: Kommande
 
-- [ ] **10.1 Kartskala för avstånd.** Räckvidd och projektilfart (och eventuellt enheternas fart) är i dag hårdkodat halverade i `data/units.js` och `data/structures.js`. Inför större kartor: lagra FA:s ohalverade värden i data och låt en skalfaktor per karta (t.ex. `map.distanceScale`) räkna fram dem, så att varje karta får rätt avstånd.
-  *Test (Vitest):* en Mantis räckvidd blir 18 × kartans skalfaktor. Samma enhet får olika räckvidd på kartor med olika skala.
+Allt här ska fortfarande följa grundprinciperna: bara riktiga FA-enheter och FA-byggnader (namn och värden från FAF:s blueprints), och all text i spelet på engelska.
 
-Allt här är FA-byggnader och FA-enheter. De nya namnen läggs till på den godkända listan från 4.11.
-
-- [ ] Wall Section som visuellt fäster ihop med intilliggande sektioner
-- [ ] T1 Anti-Air Turret och Cybran-flyg (t.ex. *Zeus* T1 Bomber och *Jester* T1 Light Gunship) som ignorerar flödesfältet och flyger rakt
-- [ ] T2: Point Defense, Artillery Installation, Shield Generator, Tactical Missile Defense och Cybran T2-fiender (t.ex. *Rhino*)
-- [ ] Radar System som visar inkommande vågor på minimapen
-- [ ] Uppgradering av Mass Extractor och fabriker från T1 till T2 till T3, som i FA
-- [ ] Mass Fabricator, Mass Storage och Energy Storage med adjacency-bonus som i FA
-- [ ] Fiender med Tactical Missile Launcher, mot spelarens Tactical Missile Defense
-- [ ] Cybran T3 (t.ex. *Loyalist* och *Brick*)
-- [ ] Bossvågor med Cybran-experimentella enheter: *Monkeylord* och *Megalith*
-- [ ] Quantum Gate kan bygga Support Armored Command Units, som i FA
-- [ ] Fler fiendefraktioner (Aeon och Seraphim) med sina egna FA-enheter
+- [ ] **10.1 Snyggare modeller för enheter och byggnader.** Mer detaljerade modeller som är tydligt lika sina FA-förlagor (siluett, proportioner, lagfärg). FA:s egna modeller är upphovsrättsskyddade, så modellerna görs själva (procedurellt eller som egna glTF).
+  *Test:* varje enhet och byggnad går att känna igen inzoomat; FPS påverkas inte märkbart.
+- [ ] **10.2 Air och anti-air.** UEF T1 Air Factory och flygplan, och T1 Anti-Air Turret. Fienden får Cybran-flyg. Flygplan ignorerar flödesfältet och terrängen, och bara luftvärn och vapen som kan skjuta mot luft träffar dem, som i FA.
+  *Test (Vitest):* flyg flyger rakt över murar; markvapen skjuter inte på flyg; luftvärn gör det.
+- [ ] **10.3 Alla UEF T1-enheter.** Alla UEF T1-landenheter går att bygga (land scout, light assault bot, medium tank, mobile light artillery, mobile anti-air och engineer), med namn och värden från FAF:s blueprints. Både spelaren och fienden kan bygga dem: fiendens pool ska kunna innehålla UEF-enheter.
+  *Test (Vitest):* varje UEF T1-enhet finns på listan över FA-namn och kan produceras i fabriken; fiendens pool kan skapa dem.
+- [ ] **10.4 Radar och fog of war.** Krigsdimma: man ser bara det som är inom egna enheters och byggnaders siktradie. UEF Radar System visar fiender inom sin radie som radarblippar. Värden från blueprints.
+  *Test (Vitest):* en fiende utanför sikt och radar är dold; inom radar syns den som blipp; inom sikt syns den helt.
+- [ ] **10.5 T2.** UEF T2-byggnader och T2-enheter (t.ex. T2 Point Defense, Shield Generator, T2 Land Factory och T2-stridsvagnar) och motsvarande T2-fiender, med FA-värden. Uppgradering av fabriker från T1 till T2 som i FA.
+  *Test (Vitest):* en T1-fabrik kan uppgraderas till T2 och sedan bygga T2-enheter.
+- [ ] **10.6 Uppgradera Mass Extractor.** T1 till T2 till T3 som i FA, med uppgraderingskostnad, byggtid och ny produktion och upkeep från blueprints. Produktionen fortsätter under uppgraderingen.
+  *Test (Vitest):* efter uppgraderingen ger utvinnaren T2:s mass och drar T2:s energi.
+- [ ] **10.7 Fler kartor med mer variation.** Fler och större kartor med olika terräng (raviner, höjder och flera vägar) och olika antal spawnpunkter. **Räckvidd och projektilfart** är i dag hårdkodat halverade för första kartans storlek, så lagra FA:s ohalverade värden i data och låt en skalfaktor per karta räkna fram dem.
+  *Test (Vitest):* alla kartor klarar karttesterna (spawnpunkter når kärnan); samma enhet får rätt räckvidd på kartor med olika skala.
 
 ## Fas 11: Utseende
 
-- [x] Glödande lagfärg (strategiska ikoner fanns redan; FA-trogna ikoner återstår)
+- [x] Glödande lagfärg och strategiska ikoner
 - [x] Byggeffekt (nanopartiklar längs strålen, och en wireframe som den växande modellen fyller i)
-- [ ] glTF-modeller i stället för boxar *(kräver fria modeller; FA:s egna är upphovsrättsskyddade)*
 - [x] Ljud: syntetiserade skott och explosioner, och talsyntes för "Construction complete" (M slår av och på)
 - [x] Minimap (klick/drag flyttar kameran)
 

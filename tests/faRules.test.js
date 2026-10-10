@@ -229,3 +229,30 @@ describe('fixar', () => {
     expect(eng.orders).toHaveLength(0);
   });
 });
+
+describe('markering och patrull som i FA', () => {
+  it('lådmarkering tar bara bästa SelectionPriority: stridsenheter före ACU/ingenjörer före byggnader', async () => {
+    const { selectInRect } = await import('../src/input/selection.js');
+    const toScreen = (e) => ({ x: e.x, y: e.z });
+    const all = [
+      { id: 1, kind: 'unit', type: 'striker', owner: 1, x: 1, z: 1 },
+      { id: 2, kind: 'unit', type: 'engineer', owner: 1, x: 2, z: 2 },
+      { id: 3, kind: 'unit', type: 'acu', owner: 1, x: 3, z: 3 },
+      { id: 4, kind: 'structure', type: 'pointDefense', owner: 1, x: 4, z: 4 },
+    ];
+    const rect = { x0: 0, y0: 0, x1: 10, y1: 10 };
+    expect(selectInRect(all, toScreen, rect, 1)).toEqual([1]);
+    expect(selectInRect(all.slice(1), toScreen, rect, 1)).toEqual([2, 3]);
+    expect(selectInRect(all.slice(3), toScreen, rect, 1)).toEqual([4]);
+  });
+
+  it('en patrullerande byggare reparerar inte enheter', () => {
+    const { world } = setup();
+    const eng = addUnit(world, 'engineer', { x: 40, z: 40, owner: PLAYER_ID });
+    const tank = addUnit(world, 'striker', { x: 43, z: 40, owner: PLAYER_ID });
+    tank.hp = 100;
+    cmd(world, { type: 'patrol', ids: [eng.id], x: 50, z: 40 });
+    ticks(world, 60);
+    expect(tank.hp).toBe(100);
+  });
+});

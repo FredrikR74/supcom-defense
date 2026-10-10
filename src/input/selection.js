@@ -1,6 +1,6 @@
 import { queueCommand } from '../sim/commands.js';
 import { PLAYER_ID } from '../sim/constants.js';
-import { needsRepair } from '../sim/entities.js';
+import { needsRepair, getDef } from '../sim/entities.js';
 
 /** Hur långt musen måste dras (pixlar) innan det räknas som lådmarkering. */
 const DRAG_THRESHOLD = 5;
@@ -15,12 +15,22 @@ export function selectInRect(entities, toScreen, rect, owner) {
   const y0 = Math.min(rect.y0, rect.y1);
   const y1 = Math.max(rect.y0, rect.y1);
   const inside = entities.filter((e) => {
-    if (e.owner !== owner) return false;
+    if (e.owner !== owner || (e.kind !== 'unit' && e.kind !== 'structure')) return false;
     const p = toScreen(e);
     return p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1;
   });
-  const units = inside.filter((e) => e.kind === 'unit');
-  return (units.length > 0 ? units : inside).map((e) => e.id);
+  // Som FA-motorn: bara det med bästa (lägsta) SelectionPriority i rutan väljs.
+  const best = Math.min(...inside.map(selectionPriority));
+  return inside.filter((e) => selectionPriority(e) === best).map((e) => e.id);
+}
+
+/**
+ * FA:s General.SelectionPriority: stridsenheter 1 (standard), ACU och ingenjörer 3,
+ * byggnader 5. En lådmarkering med blandat innehåll tar bara den lägsta.
+ */
+export function selectionPriority(e) {
+  const def = getDef(e.type);
+  return def?.selectionPriority ?? (e.kind === 'structure' ? 5 : 1);
 }
 
 /**

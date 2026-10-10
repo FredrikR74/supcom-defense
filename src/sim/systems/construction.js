@@ -186,7 +186,7 @@ function startReclaimOrder(world, e, order) {
 /** Hur långt en patrullerande byggare letar efter något att reparera eller återvinna. */
 const PATROL_SCAN_EXTRA = 8;
 
-/** Patrullerande byggare tar närmaste skadade egna sak eller vrak på vägen. */
+/** Patrullerande byggare tar närmaste skadade egna byggnad (inte enheter) eller vrak på vägen. */
 function patrolScan(world, e) {
   if (!(units[e.type].buildPower > 0)) return;
   const radius = units[e.type].buildRange + PATROL_SCAN_EXTRA;
@@ -194,7 +194,7 @@ function patrolScan(world, e) {
   let bestDist = radius;
   for (const t of world.entities) {
     if (t === e) continue;
-    const repair = t.owner === e.owner && needsRepair(t);
+    const repair = t.owner === e.owner && t.kind === 'structure' && needsRepair(t);
     if (!repair && t.kind !== 'wreck') continue;
     const d = Math.hypot(t.x - e.x, t.z - e.z) - t.radius;
     if (d < bestDist) {

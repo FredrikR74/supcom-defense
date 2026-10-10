@@ -98,7 +98,20 @@ export function createRenderer(canvas, world) {
       if (!ground) return null;
       const structure = world.entities.find((e) => e.kind === 'structure' &&
         Math.abs(ground.x - e.x) <= e.radius && Math.abs(ground.z - e.z) <= e.radius);
-      return structure?.id ?? null;
+      if (structure) return structure.id;
+      // Små enheter i rörelse är svåra att träffa: ta närmaste enhet eller vrak nära markpunkten.
+      const tolerance = 0.8 + rig.distance * 0.01;
+      let best = null;
+      let bestDist = Infinity;
+      for (const e of world.entities) {
+        if (e.kind !== 'unit' && e.kind !== 'wreck') continue;
+        const d = Math.hypot(e.x - ground.x, e.z - ground.z) - e.radius;
+        if (d <= tolerance && d < bestDist) {
+          best = e;
+          bestDist = d;
+        }
+      }
+      return best?.id ?? null;
     },
     /** Skärmposition i pixlar för entitetens mitt. */
     entityScreenPos(entity) {

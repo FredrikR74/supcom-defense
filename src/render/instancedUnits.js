@@ -76,6 +76,10 @@ export function createInstancedBatch(type, { capacity = 2048, material = null, s
       for (const p of parts) {
         p.count = count;
         p.instanceMatrix.needsUpdate = true;
+        // Three.js cachar avgränsningssfären vid första plockningen. Enheterna
+        // rör sig och nya tillkommer, så den måste räknas om, annars missar klicken.
+        p.boundingSphere = null;
+        p.boundingBox = null;
       }
       iconGeometry.setDrawRange(0, count);
       iconGeometry.attributes.position.needsUpdate = true;
