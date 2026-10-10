@@ -230,10 +230,10 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 
 - [x] **9.1 Förlust.** Kärnan förstörs: en förlustskärm visar hur länge man höll ut, med en Restart-knapp.
 - [x] **9.2 Ingen vinst: spelet pågår tills man dör.** Trycket accelererar ((1 + 0,5 × min)^1,5) och växer utan gräns. Panelen visar överlevd tid och hur fort trycket ökar.
-- [ ] **9.3 ACU-död.** Den återuppstår efter X sekunder (eller förlust, se designvalen).
-- [ ] **9.4 Startmeny.** Välj karta och svårighetsgrad (HP-multiplikator för fiender).
-- [ ] **9.5 Paus och spelhastighet.**
-- [ ] **9.6 Balansera fiendetrycket** (baseRate, growthPerMinute och enhetsvikter) mot FA-ekonomin.
+- [x] **9.3 ACU-död.** Den återuppstår vid kärnan efter 30 s (`acuRespawnSeconds`), utan veterancy.
+- [x] **9.4 Startmeny.** Välj karta (First Defense eller Crossroads) och svårighetsgrad. I dev hoppar `?quick` över menyn.
+- [x] **9.5 Paus och spelhastighet.** Mellanslag/Pause pausar, +/− ändrar hastigheten (0,25×–4×).
+- [ ] **9.6 Balansera fiendetrycket** (baseRate, growthPerMinute och enhetsvikter) mot FA-ekonomin. *Påbörjat:* `node scripts/balance.mjs 25 50` kör en skriptad spelare utan grafik. Den dör för tidigt (runt 5–7 min, och fabriken blir aldrig klar), så skriptet behöver felsökas innan det säger något om balansen.
 
 **🎯 Milstolpe: ett komplett, spelbart tower defense-spel.**
 
@@ -258,11 +258,11 @@ Allt här är FA-byggnader och FA-enheter. De nya namnen läggs till på den god
 
 ## Fas 11: Utseende
 
-- [ ] SupCom-färgpalett, glödande lagfärg och strategiska ikoner
-- [ ] Byggeffekt (nanostrålar från byggaren och en "wireframe" som fylls i)
-- [ ] glTF-modeller i stället för boxar
-- [ ] Ljud: skott, explosioner och "Construction complete"
-- [ ] Minimap
+- [x] Glödande lagfärg (strategiska ikoner fanns redan; FA-trogna ikoner återstår)
+- [x] Byggeffekt (nanopartiklar längs strålen, och en wireframe som den växande modellen fyller i)
+- [ ] glTF-modeller i stället för boxar *(kräver fria modeller; FA:s egna är upphovsrättsskyddade)*
+- [x] Ljud: syntetiserade skott och explosioner, och talsyntes för "Construction complete" (M slår av och på)
+- [x] Minimap (klick/drag flyttar kameran)
 
 ---
 
