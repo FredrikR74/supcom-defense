@@ -67,6 +67,19 @@ const MODELS = {
     ];
   },
 
+  /** Land Factory: platta med en hall baktill och två byggportaler, öppen framåt (+z). */
+  landFactory() {
+    const { metal, team, dark, glow } = MATERIALS;
+    return [
+      box(4, 0.4, 4, dark, 0, 0.2, 0),
+      box(3.6, 1.6, 1.4, team, 0, 1.2, -1.1), // hall
+      box(0.35, 1.8, 2.2, metal, -1.6, 1.1, 0.6), // sidoarmar
+      box(0.35, 1.8, 2.2, metal, 1.6, 1.1, 0.6),
+      box(3.55, 0.3, 0.35, metal, 0, 2.05, 1.5), // portal
+      box(2.6, 0.08, 2.2, glow, 0, 0.44, 0.6), // byggyta
+    ];
+  },
+
   massExtractor() {
     const { metal, team, massGlow } = MATERIALS;
     return [

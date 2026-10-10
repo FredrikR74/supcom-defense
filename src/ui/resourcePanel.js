@@ -1,6 +1,6 @@
-const LABELS = { mass: 'Mass', energy: 'Energi' };
+const LABELS = { mass: 'Mass', energy: 'Energy' };
 
-const fmt = (v) => Math.floor(v).toLocaleString('sv-SE');
+const fmt = (v) => Math.floor(v).toLocaleString('en-US');
 const rate = (v) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1);
 
 /** Resurspanel högst upp: lager, maxkapacitet, inkomst och utgift per sekund. */
@@ -37,7 +37,7 @@ export function createResourcePanel(el) {
         ui.spent.textContent = rate(-res.spent);
       }
       const stalled = economy.efficiency < 1;
-      efficiency.textContent = stalled ? `Effektivitet ${Math.round(economy.efficiency * 100)} %` : '';
+      efficiency.textContent = stalled ? `Efficiency ${Math.round(economy.efficiency * 100)}%` : '';
       efficiency.hidden = !stalled;
     },
   };

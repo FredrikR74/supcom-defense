@@ -1,8 +1,9 @@
-const BASIC_STRUCTURES = ['massExtractor', 'powerGenerator', 'wall', 'pointDefense'];
+const BASIC_STRUCTURES = ['landFactory', 'massExtractor', 'powerGenerator', 'wall', 'pointDefense'];
 
 /**
- * Enhetsdefinitioner. `speed` i världsenheter per sekund, `radius` och
- * `buildRange` i världsenheter. `builds` är byggnader enheten kan bygga.
+ * Enhetsdefinitioner (UEF). `name` är FA:s beskrivning, se data/faNames.js.
+ * `speed` i världsenheter per sekund, `radius` och `buildRange` i världsenheter.
+ * `builds` är byggnader enheten kan bygga.
  */
 export default {
   acu: {
@@ -22,7 +23,7 @@ export default {
     buildPower: 5,
     buildRange: 4,
     builds: BASIC_STRUCTURES,
-    cost: { mass: 50, energy: 250 },
-    buildTime: 50,
+    cost: { mass: 52, energy: 260 },
+    buildTime: 260,
   },
 };

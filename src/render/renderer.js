@@ -40,9 +40,8 @@ export function createRenderer(canvas, world) {
   const entities = createEntityView(terrain);
   scene.add(entities.meshes, entities.icons, entities.overlay);
 
-  // Förhandsvisning av byggnaden man håller på att placera, en per typ.
+  // Förhandsvisningar av byggnader man håller på att placera: en pool per typ.
   const placementGhosts = {};
-  let activeGhost = null;
 
   function resize() {
     const w = canvas.clientWidth;
@@ -77,10 +76,20 @@ export function createRenderer(canvas, world) {
     pickAtNdc(ndcX, ndcY) {
       return pickGround(rig.rayAt(ndcX, ndcY));
     },
-    /** Entitets-id under en skärmpunkt i NDC, eller null. */
+    /**
+     * Entitets-id under en skärmpunkt i NDC, eller null. Missar strålen alla
+     * meshes (t.ex. en nästan platt ofärdig byggnad) räcker det att markpunkten
+     * ligger inom en byggnads fotavtryck.
+     */
     pickEntityAtNdc(ndcX, ndcY) {
       raycaster.setFromCamera(ndcVec.set(ndcX, ndcY), camera);
-      return entities.pick(raycaster);
+      const hit = entities.pick(raycaster);
+      if (hit !== null) return hit;
+      const ground = pickGround(raycaster.ray);
+      if (!ground) return null;
+      const structure = world.entities.find((e) => e.kind === 'structure' &&
+        Math.abs(ground.x - e.x) <= e.radius && Math.abs(ground.z - e.z) <= e.radius);
+      return structure?.id ?? null;
     },
     /** Skärmposition i pixlar för entitetens mitt. */
     entityScreenPos(entity) {
@@ -90,19 +99,25 @@ export function createRenderer(canvas, world) {
     entityLabelScreenPos(entity) {
       return toScreen(entities.labelAnchor(entity));
     },
-    /** Visar förhandsvisningen för `type` vid `pos`, grön om `ok`, annars röd. `type` null döljer. */
-    setPlacementGhost(type, pos, ok) {
-      if (activeGhost) activeGhost.visible = false;
-      activeGhost = null;
-      if (!type) return;
-      if (!placementGhosts[type]) {
-        placementGhosts[type] = createGhost(type);
-        scene.add(placementGhosts[type]);
+    /**
+     * Visar förhandsvisningar för `type` på platserna i `placements` ([{ pos, ok }]),
+     * gröna om ok, annars röda. Tom lista döljer alla.
+     */
+    setPlacementGhosts(type, placements = []) {
+      for (const [t, pool] of Object.entries(placementGhosts)) {
+        pool.forEach((g, i) => { g.visible = t === type && i < placements.length; });
       }
-      activeGhost = placementGhosts[type];
-      activeGhost.visible = true;
-      activeGhost.position.set(pos.x, getHeight(terrain, pos.x, pos.z), pos.z);
-      setGhostState(activeGhost, ok ? 'ok' : 'bad');
+      if (!type) return;
+      const pool = (placementGhosts[type] ??= []);
+      placements.forEach(({ pos, ok }, i) => {
+        if (!pool[i]) {
+          pool[i] = createGhost(type);
+          scene.add(pool[i]);
+        }
+        pool[i].visible = true;
+        pool[i].position.set(pos.x, getHeight(terrain, pos.x, pos.z), pos.z);
+        setGhostState(pool[i], ok ? 'ok' : 'bad');
+      });
     },
     isStrategic() {
       return rig.distance > STRATEGIC_DISTANCE;

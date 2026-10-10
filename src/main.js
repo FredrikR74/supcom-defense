@@ -43,6 +43,7 @@ const commandPanel = createCommandPanel(document.getElementById('commands'), {
   onProduce: (unit) => {
     for (const id of selectedIds()) queueCommand(world, { type: 'produce', owner: PLAYER_ID, id, unit });
   },
+  onRepeat: (value) => queueCommand(world, { type: 'setRepeat', owner: PLAYER_ID, ids: selectedIds(), value }),
   onSell: sellSelected,
 });
 
@@ -55,6 +56,8 @@ if (import.meta.env.DEV) {
   window.game = {
     world,
     selection,
+    view,
+    ui,
     tick(n = 1) {
       for (let i = 0; i < n; i++) tickWorld(world);
       return world.tick;
@@ -86,10 +89,10 @@ function frame(now) {
 
   const cursor = ndc && view.pickAtNdc(ndc.x, ndc.y);
   debug.update(world, frameSeconds, [
-    `zoom ${view.rig.distance.toFixed(0)}${view.isStrategic() ? ' (strategisk)' : ''}`,
+    `zoom ${view.rig.distance.toFixed(0)}${view.isStrategic() ? ' (strategic)' : ''}`,
     cursor
-      ? `mus  ${cursor.x.toFixed(1)}, ${cursor.z.toFixed(1)}  h ${cursor.y.toFixed(2)}`
-      : 'mus  -',
+      ? `mouse ${cursor.x.toFixed(1)}, ${cursor.z.toFixed(1)}  h ${cursor.y.toFixed(2)}`
+      : 'mouse -',
   ]);
   requestAnimationFrame(frame);
 }

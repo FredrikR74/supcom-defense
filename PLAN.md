@@ -29,6 +29,7 @@ Ett single player-tower defense-spel i webbläsaren, med Supreme Commander: Forg
 5. **Börja fult.** Använd boxar och cylindrar i stället för modeller. Snygga grafiken sist.
 6. **All balans ligger i data.** Enheter, torn och vågor definieras i `data/` så att du kan finjustera utan att ändra logiken.
 7. **Bara riktiga FA-enheter och FA-byggnader.** Allt spelaren bygger och alla fiender ska finnas i Supreme Commander: Forged Alliance, med samma namn, tech-nivå och roll. Spelaren är **UEF** och fienderna är **Cybran**. Vi hittar inte på egna enheter eller byggnader. Det enda avsteget från FA är spelläget (tower defense). Namn, roller och ungefärliga relationer mellan stats tas från FA. Absoluta värden får skalas för balansen. Ett test kontrollerar att alla namn i `data/` finns på en godkänd lista (se 4.11).
+8. **All text i spelet är på engelska.** Det gäller knappar, paneler, hover-info, felsökningsrutan, kartnamn och felmeddelanden, precis som i FA. Kodkommentarer och planen är på svenska.
 
 ## Teknikval
 
@@ -128,17 +129,17 @@ tests/
 
 ## Fas 4b: Byggarbetsflöden som i SupCom
 
-- [ ] **4.8 Land Factory.** UEF T1 Land Factory kan byggas av ACU:n och ingenjörer och har en produktionskö. **Ingenjörer byggs i fabriken och inte i kärnan**, som i FA. Kärnan (Quantum Gate) slutar producera ingenjörer.
-  *Test (Vitest):* fabriken producerar en ingenjör efter buildTime / buildPower. Kärnan har ingen produktionslista.
-- [ ] **4.9 Waypoint från fabrik.** Högerklick med fabriken markerad sätter en samlingspunkt (rally point). Shift+högerklick köar flera waypoints. Nya enheter följer dem. Visa en flagga och linjer när fabriken är markerad.
+- [x] **4.8 Land Factory.** UEF T1 Land Factory kan byggas av ACU:n och ingenjörer och har en produktionskö. **Ingenjörer byggs i fabriken och inte i kärnan**, som i FA. Kärnan (Quantum Gate) slutar producera ingenjörer. Man kan köa enheter, sätta waypoints och slå på repetering medan fabriken fortfarande byggs, och produktionen startar när den är klar.
+  *Test (Vitest):* fabriken producerar en ingenjör efter buildTime / buildPower. Kärnan har ingen produktionslista. En kö som läggs medan fabriken byggs börjar produceras när fabriken är klar.
+- [x] **4.9 Waypoint från fabrik.** Högerklick med fabriken markerad sätter en samlingspunkt (rally point). Shift+högerklick köar flera waypoints. Nya enheter följer dem. Visa en flagga och linjer när fabriken är markerad.
   *Test (Vitest):* en ny enhet får fabrikens waypoints som order. Manuellt: enheterna går till flaggan.
-- [ ] **4.10 Repetera produktion.** En knapp slår av och på repetering av kön, som i FA.
+- [x] **4.10 Repetera produktion.** En knapp slår av och på repetering av kön, som i FA.
   *Test (Vitest):* med repetering läggs en färdig enhet sist i kön igen.
-- [ ] **4.11 Kontroll av FA-namn.** En lista över godkända FA-namn (UEF och Cybran) med tech-nivå. Den ska kontrolleras mot en FA-enhetsdatabas när steget görs. Byt `Wall` mot FA:s namn *Wall Section*.
+- [x] **4.11 Kontroll av FA-namn.** En lista över godkända FA-namn (UEF och Cybran) med tech-nivå. Den ska kontrolleras mot en FA-enhetsdatabas när steget görs. Byt `Wall` mot FA:s namn *Wall Section*.
   *Test (Vitest):* varje `name` i `data/structures.js` och `data/units.js` finns på listan.
-- [ ] **4.12 Dra ut en rad byggnader med Shift+dra.** I placeringsläget håller du Shift och drar från en startpunkt. Förhandsvisningar läggs ut längs linjen med en byggnads bredd mellan sig, så att murar blir sammanhängande. När du släpper köas alla platser som är giltiga, i ordning från startpunkten.
+- [x] **4.12 Dra ut en rad byggnader med Shift+dra.** I placeringsläget håller du Shift och drar från en startpunkt. Förhandsvisningar läggs ut längs linjen med en byggnads bredd mellan sig, så att murar blir sammanhängande. När du släpper köas alla platser som är giltiga, i ordning från startpunkten.
   *Test (Vitest):* `lineOfPlacements(start, end, size)` ger rätt rutor för vågräta, lodräta och diagonala drag. Manuellt: dra en mur med 10 sektioner.
-- [ ] **4.13 Assistera en annan enhet.** Högerklick med byggare markerade:
+- [x] **4.13 Assistera en annan enhet.** Högerklick med byggare markerade:
   - på en **egen byggare** (ACU eller ingenjör): följ den och hjälp till med det den bygger
   - på en **egen fabrik**: hjälp fabriken så att produktionen går fortare (byggkrafterna läggs ihop)
 

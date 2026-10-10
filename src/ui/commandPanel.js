@@ -7,10 +7,10 @@ const costText = (cost) => `${cost.mass} M · ${cost.energy} E`;
 
 /**
  * Kommandopanel längst ner: byggknappar för markerade byggare, produktionsknappar
- * för markerade fabriker och Sälj för markerade byggnader.
- * Byggs bara om när innehållet ändras.
+ * och repetering för markerade fabriker, och Sell för markerade byggnader.
+ * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
-export function createCommandPanel(el, { onBuild, onProduce, onSell }) {
+export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell }) {
   let signature = '';
 
   function button(label, sub, onClick, { active = false, badge = '' } = {}) {
@@ -32,14 +32,17 @@ export function createCommandPanel(el, { onBuild, onProduce, onSell }) {
       for (const e of selected) {
         if (e.kind === 'unit') for (const t of units[e.type].builds ?? []) buildable.add(t);
       }
-      const producers = selected.filter((e) => e.kind === 'structure' && e.built && structures[e.type].produces);
-      const producible = new Set(producers.flatMap((e) => structures[e.type].produces));
-      const queued = (type) => producers.reduce(
+      // Även ofärdiga fabriker: man kan köa medan de byggs.
+      const factories = selected.filter((e) => e.kind === 'structure' && structures[e.type].produces);
+      const producible = new Set(factories.flatMap((e) => structures[e.type].produces));
+      const queued = (type) => factories.reduce(
         (n, e) => n + e.productionQueue.filter((t) => t === type).length, 0);
+      const repeat = factories.length > 0 && factories.every((f) => f.repeat);
       const sellable = selected.filter((e) => e.kind === 'structure' && getDef(e.type).cost);
 
       const sig = JSON.stringify([
-        [...buildable], [...producible].map((t) => [t, queued(t)]), sellable.length, ui.placing?.type,
+        [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat,
+        sellable.length, ui.placing?.type,
       ]);
       if (sig === signature) return;
       signature = sig;
@@ -56,8 +59,11 @@ export function createCommandPanel(el, { onBuild, onProduce, onSell }) {
         const n = queued(type);
         el.appendChild(button(def.name, costText(def.cost), () => onProduce(type), { badge: n ? `${n}` : '' }));
       }
+      if (factories.length) {
+        el.appendChild(button('Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
+      }
       if (sellable.length) {
-        el.appendChild(button('Sälj', 'Delete', () => onSell()));
+        el.appendChild(button('Sell', 'Delete', () => onSell()));
       }
       el.hidden = el.childElementCount === 0;
     },

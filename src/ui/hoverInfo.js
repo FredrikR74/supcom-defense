@@ -16,11 +16,12 @@ export function createHoverInfo(el) {
     update(entity, screen) {
       el.hidden = !entity;
       if (!entity) return;
-      name.textContent = getDef(entity.type)?.name ?? entity.type;
+      const def = getDef(entity.type);
+      name.textContent = def?.unitName ? `${def.unitName} (${def.name})` : def?.name ?? entity.type;
       if (entity.kind === 'structure' && !entity.built) {
         fill.style.width = `${entity.progress * 100}%`;
         fill.style.background = '#67e8f9';
-        hp.textContent = `Bygger ${Math.floor(entity.progress * 100)} %`;
+        hp.textContent = `Building ${Math.floor(entity.progress * 100)}%`;
       } else {
         const frac = entity.hp / entity.maxHp;
         fill.style.width = `${frac * 100}%`;

@@ -12,6 +12,19 @@ const ringMaterial = new THREE.MeshBasicMaterial({
   depthTest: false,
 });
 
+const flagPole = new THREE.CylinderGeometry(0.05, 0.05, 2, 6).translate(0, 1, 0);
+const flagCloth = new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(0, 2, 0), new THREE.Vector3(0, 1.4, 0), new THREE.Vector3(0.8, 1.7, 0),
+]);
+const flagMaterial = new THREE.MeshBasicMaterial({ color: 0x4ade80, side: THREE.DoubleSide });
+
+/** Samlingspunktsflagga (fabrikens waypoint). */
+function createRallyFlag() {
+  const group = new THREE.Group();
+  group.add(new THREE.Mesh(flagPole, flagMaterial), new THREE.Mesh(flagCloth, flagMaterial));
+  return group;
+}
+
 /** Interpolerad position för en entitet (enheter rör sig mellan tick). */
 function lerpPos(e, alpha) {
   if (e.prevX === undefined) return { x: e.x, z: e.z };
@@ -55,6 +68,8 @@ export function createEntityView(terrain) {
   const views = new Map();
   /** Byggorder-objekt -> spökmodell för köade byggen som inte påbörjats. */
   const queuedGhosts = new Map();
+  /** Fabriks-id -> flagga vid fabrikens sista waypoint. */
+  const rallyFlags = new Map();
 
   const orderLines = createLineBuffer(512, new THREE.LineBasicMaterial({
     color: 0x4ade80, transparent: true, opacity: 0.7, depthTest: false,
@@ -82,27 +97,60 @@ export function createEntityView(terrain) {
     views.set(entity.id, { mesh, icon, ring, top });
   }
 
+  /** Punkten en order pekar på; guard-order pekar på den assisterade enheten. */
+  function orderPoint(o) {
+    if (o.type !== 'guard') return o;
+    const v = views.get(o.targetId);
+    return v ? { x: v.mesh.position.x, z: v.mesh.position.z } : null;
+  }
+
   function updateOrderLines(world, selection, alpha) {
     orderLines.begin();
     const lift = 0.3;
     for (const e of world.entities) {
-      if (!selection.has(e.id) || !e.orders?.length) continue;
+      if (!selection.has(e.id)) continue;
+      // Enheter: deras order. Fabriker: deras waypoints.
+      const points = e.orders ?? e.rallyPoints;
+      if (!points?.length) continue;
       let from = lerpPos(e, alpha);
-      for (const o of e.orders) {
+      for (const o of points) {
+        const p = orderPoint(o);
+        if (!p) break;
         orderLines.add(
           from.x, groundY(from.x, from.z) + lift, from.z,
-          o.x, groundY(o.x, o.z) + lift, o.z,
+          p.x, groundY(p.x, p.z) + lift, p.z,
         );
-        from = o;
+        from = p;
       }
     }
     orderLines.end();
   }
 
+  /** En flagga vid sista waypointen för varje markerad fabrik. */
+  function updateRallyFlags(world, selection) {
+    const shown = new Set();
+    for (const e of world.entities) {
+      if (!selection.has(e.id) || !e.rallyPoints?.length) continue;
+      shown.add(e.id);
+      if (!rallyFlags.has(e.id)) {
+        const flag = createRallyFlag();
+        overlay.add(flag);
+        rallyFlags.set(e.id, flag);
+      }
+      const p = e.rallyPoints[e.rallyPoints.length - 1];
+      rallyFlags.get(e.id).position.set(p.x, groundY(p.x, p.z), p.z);
+    }
+    for (const [id, flag] of rallyFlags) {
+      if (shown.has(id)) continue;
+      overlay.remove(flag);
+      rallyFlags.delete(id);
+    }
+  }
+
   function updateBeams(world) {
     beams.begin();
     for (const e of world.entities) {
-      if (e.kind !== 'unit' || e.buildJob?.kind !== 'structure') continue;
+      if (e.kind !== 'unit' || !e.buildJob) continue;
       const v = views.get(e.id);
       const target = views.get(e.buildJob.targetId);
       if (!v || !target) continue;
@@ -164,6 +212,7 @@ export function createEntityView(terrain) {
         views.delete(id);
       }
       updateOrderLines(world, selection, alpha);
+      updateRallyFlags(world, selection);
       updateBeams(world);
       updateQueuedGhosts(world, owner);
     },

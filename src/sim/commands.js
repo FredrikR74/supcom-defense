@@ -16,6 +16,8 @@ const HANDLERS = {
   assist: applyAssist,
   sell: applySell,
   produce: applyProduce,
+  setRally: applySetRally,
+  setRepeat: applySetRepeat,
 };
 
 export function applyCommands(world) {
@@ -57,12 +59,30 @@ function applyBuild(world, { owner, ids, structure, x, z, queue }) {
   }
 }
 
-/** `{ type: 'assist', owner, ids, targetId, queue }`: hjälp till att bygga en ofärdig byggnad. */
+const isBuilder = (e) => (units[e.type].buildPower ?? 0) > 0;
+
+/**
+ * `{ type: 'assist', owner, ids, targetId, queue }`:
+ * - på en ofärdig byggnad: hjälp till att bygga den
+ * - på en egen byggare eller fabrik: följ den och hjälp med det den bygger (guard)
+ */
 function applyAssist(world, { owner, ids, targetId, queue }) {
   const target = getEntity(world, targetId);
-  if (!target || target.kind !== 'structure' || target.owner !== owner || target.built) return;
+  if (!target || target.owner !== owner) return;
+
+  const assistable = target.kind === 'unit'
+    ? isBuilder(target)
+    : target.built && Boolean(structures[target.type].produces);
+  if (assistable) {
+    for (const e of ownUnits(world, ids, owner, isBuilder)) {
+      if (e.id !== targetId) giveOrder(e, { type: 'guard', targetId }, queue);
+    }
+    return;
+  }
+
+  if (target.kind !== 'structure' || target.built) return;
   const def = structures[target.type];
-  for (const e of ownUnits(world, ids, owner, canBuild(target.type))) {
+  for (const e of ownUnits(world, ids, owner, isBuilder)) {
     const reach = units[e.type].buildRange + def.size / 2;
     giveOrder(e, {
       type: 'build',
@@ -91,10 +111,33 @@ function applySell(world, { owner, ids }) {
   }
 }
 
-/** `{ type: 'produce', owner, id, unit, count }`: köa enheter i en fabrik (eller kärnan). */
+/**
+ * `{ type: 'produce', owner, id, unit, count }`: köa enheter i en fabrik.
+ * Går även medan fabriken byggs; produktionen startar när den är klar.
+ */
 function applyProduce(world, { owner, id, unit, count = 1 }) {
   const e = getEntity(world, id);
-  if (!e || e.kind !== 'structure' || e.owner !== owner || !e.built) return;
+  if (!e || e.kind !== 'structure' || e.owner !== owner) return;
   if (!structures[e.type].produces?.includes(unit)) return;
   for (let i = 0; i < count; i++) e.productionQueue.push(unit);
+}
+
+/** Egna fabriker bland `ids`, även ofärdiga. */
+function ownFactories(world, ids, owner) {
+  return ids
+    .map((id) => getEntity(world, id))
+    .filter((e) => e && e.kind === 'structure' && e.owner === owner && e.rallyPoints);
+}
+
+/** `{ type: 'setRally', owner, ids, x, z, queue }`: utan `queue` ersätts tidigare waypoints. */
+function applySetRally(world, { owner, ids, x, z, queue }) {
+  for (const f of ownFactories(world, ids, owner)) {
+    if (!queue) f.rallyPoints.length = 0;
+    f.rallyPoints.push({ x, z });
+  }
+}
+
+/** `{ type: 'setRepeat', owner, ids, value }`: repeterad kö lägger färdiga enheter sist igen. */
+function applySetRepeat(world, { owner, ids, value }) {
+  for (const f of ownFactories(world, ids, owner)) f.repeat = value;
 }

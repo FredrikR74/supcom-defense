@@ -13,7 +13,7 @@ export function getDef(type) {
  */
 export function addStructure(world, type, { x, z, owner, built = true }) {
   const def = structures[type];
-  if (!def) throw new Error(`Okänd byggnadstyp: ${type}`);
+  if (!def) throw new Error(`Unknown structure type: ${type}`);
   const entity = {
     id: world.nextEntityId++,
     kind: 'structure',
@@ -29,6 +29,9 @@ export function addStructure(world, type, { x, z, owner, built = true }) {
     production: def.production ? { ...def.production } : null,
     productionQueue: def.produces ? [] : null,
     productionProgress: 0,
+    /** Waypoints som nya enheter från fabriken följer. */
+    rallyPoints: def.produces ? [] : null,
+    repeat: false,
   };
   world.entities.push(entity);
   markOccupancy(world, entity, entity.id);
@@ -38,7 +41,7 @@ export function addStructure(world, type, { x, z, owner, built = true }) {
 /** Skapar en enhet från dess definition i data/units.js. */
 export function addUnit(world, type, { x, z, owner, heading = 0 }) {
   const def = units[type];
-  if (!def) throw new Error(`Okänd enhetstyp: ${type}`);
+  if (!def) throw new Error(`Unknown unit type: ${type}`);
   const entity = {
     id: world.nextEntityId++,
     kind: 'unit',

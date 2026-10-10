@@ -2,7 +2,7 @@
  * Första kartan. Alla positioner är i världskoordinater (rutor), origo i nordvästra hörnet.
  */
 export default {
-  name: 'Första försvaret',
+  name: 'First Defense',
   size: 128,
   seed: 1337,
   terrain: {

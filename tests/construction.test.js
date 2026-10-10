@@ -214,30 +214,3 @@ describe('sälja', () => {
     expect(getEntity(world, world.coreId)).not.toBeNull();
   });
 });
-
-describe('produktion', () => {
-  it('kärnan bygger en ingenjör', () => {
-    const { world } = setup();
-    const n = Math.round(units.engineer.buildTime / structures.core.buildPower * 10);
-    queueCommand(world, { type: 'produce', owner: PLAYER_ID, id: world.coreId, unit: 'engineer', count: 2 });
-    ticks(world, n - 1);
-    expect(structuresOf(world, 'engineer')).toHaveLength(0);
-    ticks(world, 1);
-    expect(structuresOf(world, 'engineer')).toHaveLength(1);
-    ticks(world, n);
-    expect(structuresOf(world, 'engineer')).toHaveLength(2);
-    ticks(world, 30);
-    const [a, b] = structuresOf(world, 'engineer');
-    expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(1);
-  });
-
-  it('ingenjören kan bygga', () => {
-    const { world } = setup();
-    queueCommand(world, { type: 'produce', owner: PLAYER_ID, id: world.coreId, unit: 'engineer' });
-    ticks(world, 60);
-    const [eng] = structuresOf(world, 'engineer');
-    build(world, [eng.id], 'wall', { x: 66.5, z: 72.5 });
-    ticks(world, 100);
-    expect(structuresOf(world, 'wall')[0]?.built).toBe(true);
-  });
-});

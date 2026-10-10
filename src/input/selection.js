@@ -23,7 +23,7 @@ export function selectInRect(entities, toScreen, rect, owner) {
 }
 
 /**
- * Vänsterklick/dra markerar, högerklick ger flyttorder eller assist (Shift köar).
+ * Vänsterklick/dra markerar. Högerklick ger flyttorder, fabrikswaypoint eller assist (Shift köar).
  * `selection` är ett Set med entitets-id:n.
  */
 export function createSelectionInput(canvas, boxEl, view, world, selection) {
@@ -57,23 +57,24 @@ export function createSelectionInput(canvas, boxEl, view, world, selection) {
       const ids = [...selection];
       if (ids.length === 0) return;
       const ndc = toNdc(p);
-      // Högerklick på en egen ofärdig byggnad: hjälp till att bygga den.
+      // Högerklick på något eget som går att assistera: en ofärdig byggnad,
+      // en annan enhet eller en fabrik. Simuleringen avgör vilka som kan hjälpa.
       const targetId = view.pickEntityAtNdc(ndc.x, ndc.y);
       const target = world.entities.find((ent) => ent.id === targetId);
-      if (target?.kind === 'structure' && target.owner === PLAYER_ID && !target.built) {
-        queueCommand(world, { type: 'assist', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
+      const assistable = target?.owner === PLAYER_ID && (
+        target.kind === 'unit' ||
+        (target.kind === 'structure' && (!target.built || target.rallyPoints)));
+      const helpers = ids.filter((id) => id !== targetId);
+      if (assistable && helpers.length > 0) {
+        queueCommand(world, { type: 'assist', owner: PLAYER_ID, ids: helpers, targetId, queue: e.shiftKey });
         return;
       }
       const ground = view.pickAtNdc(ndc.x, ndc.y);
       if (!ground) return;
-      queueCommand(world, {
-        type: 'move',
-        owner: PLAYER_ID,
-        ids,
-        x: ground.x,
-        z: ground.z,
-        queue: e.shiftKey,
-      });
+      // Enheter går dit, fabriker får en waypoint dit.
+      const order = { owner: PLAYER_ID, ids, x: ground.x, z: ground.z, queue: e.shiftKey };
+      queueCommand(world, { type: 'move', ...order });
+      queueCommand(world, { type: 'setRally', ...order });
     }
   });
 

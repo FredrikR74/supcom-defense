@@ -34,6 +34,7 @@ function structureIcon(dotColor, scale = 1) {
 
 const DRAW = {
   core: structureIcon('#7dd3fc'),
+  landFactory: structureIcon('#e5e7eb', 0.9),
   massExtractor: structureIcon('#a3e635', 0.8),
   powerGenerator: structureIcon('#facc15', 0.8),
   wall: structureIcon(null, 0.5),
