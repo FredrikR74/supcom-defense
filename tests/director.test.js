@@ -102,15 +102,15 @@ describe('fiendens strömmande tryck', () => {
   });
 
   it('typer låses upp med tiden', () => {
-    const w = setup(100, {
+    const w = setup(50, {
       ...TEST_DIRECTOR,
       unitPool: [{ type: 'mole', weight: 1 }, { type: 'medusa', weight: 1000, fromMinute: 2 }],
     });
     seconds(w, 60);
-    expect(enemies(w).some((e) => e.type === 'medusa')).toBe(false);
-    clearEnemies(w);
+    expect(w.director.spawned.medusa ?? 0).toBe(0);
+    expect(w.director.spawned.mole).toBeGreaterThan(0);
     seconds(w, 75);
-    expect(enemies(w).some((e) => e.type === 'medusa')).toBe(true);
+    expect(w.director.spawned.medusa).toBeGreaterThan(0);
   });
 
   it('överlever man tiden vinner man och inga fler fiender kommer', () => {

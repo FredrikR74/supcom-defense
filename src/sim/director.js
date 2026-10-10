@@ -35,6 +35,8 @@ export function createDirector(config, difficulty = 50) {
     spawnTimer: 0,
     nextType: null,
     spentMass: 0,
+    /** Antal skapade fiender per typ. */
+    spawned: {},
     config,
   };
 }
@@ -93,6 +95,7 @@ export function directorSystem(world) {
     d.budget -= cost;
     d.spentMass += cost;
     spawnEnemy(world, d.nextType, d.spawnIndex);
+    d.spawned[d.nextType] = (d.spawned[d.nextType] ?? 0) + 1;
     d.nextType = chooseType(world, d);
   }
 }
