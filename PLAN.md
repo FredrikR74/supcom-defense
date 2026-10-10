@@ -47,6 +47,7 @@ src/
   input/             // kamera, markering, byggläge
   ui/                // paneler, minikarta, ljud, startmeny
   data/              // units, structures, maps, faNames, gameConfig
+  devtools/          // modellvisaren (/models.html)
 tests/
 scripts/balance.mjs  // ofärdigt balansverktyg utan grafik
 ```
@@ -63,7 +64,7 @@ Enheter: UEF ACU, Engineer och MA12 Striker. Fiender: Cybran Mantis, Mole och Me
 
 ## Kommande
 
-- [ ] **1. Snyggare modeller för enheter och byggnader.** Mer detaljerade modeller som är tydligt lika sina FA-förlagor (siluett, proportioner, lagfärg). FA:s egna modeller är upphovsrättsskyddade, så modellerna görs själva (procedurellt eller som egna glTF).
+- [ ] **1. Snyggare modeller för enheter och byggnader.** Mer detaljerade modeller som är tydligt lika sina FA-förlagor (siluett, proportioner, lagfärg). Modellerna görs procedurellt i kod med egen design (fasade prismor, paneler, lagfärgsränder och animerade delar), sammanslagna per material så att de bara kostar några få draw calls. FA:s egna modeller används inte. Alla nuvarande enheter och byggnader är omgjorda; granska dem i modellvisaren `/models.html`. Nya enheter görs i samma stil med hjälpfunktionerna i `models.js` (`prism`, `chamferBox`, `strut`, `insectLegs`).
   *Test:* varje enhet och byggnad går att känna igen inzoomat; FPS påverkas inte märkbart.
 - [ ] **2. Air och anti-air.** UEF T1 Air Factory och flygplan, och T1 Anti-Air Turret. Fienden får Cybran-flyg. Flygplan ignorerar flödesfältet och terrängen, och bara luftvärn och vapen som kan skjuta mot luft träffar dem, som i FA.
   *Test (Vitest):* flyg flyger rakt över murar; markvapen skjuter inte på flyg; luftvärn gör det.

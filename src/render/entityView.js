@@ -57,6 +57,21 @@ function createLineBuffer(max, material) {
   };
 }
 
+/** Benen svänger i takt med sträckan som gåtts och tonar ut när enheten står still. */
+function animateWalk(walk, x, z, frameSeconds) {
+  const dist = walk.x === null ? 0 : Math.hypot(x - walk.x, z - walk.z);
+  walk.x = x;
+  walk.z = z;
+  if (frameSeconds <= 0) return;
+  const moving = dist / frameSeconds > 0.3;
+  walk.amp += ((moving ? 1 : 0) - walk.amp) * Math.min(1, frameSeconds * 8);
+  walk.phase += dist * 4.2;
+  const swing = Math.sin(walk.phase) * 0.5 * walk.amp;
+  walk.legL.rotation.x = swing;
+  walk.legR.rotation.x = -swing;
+  if (walk.body) walk.body.position.y = walk.bodyY + Math.abs(Math.cos(walk.phase)) * 0.05 * walk.amp;
+}
+
 /**
  * Håller en mesh och en strategisk ikon per entitet i världen synkade,
  * plus markeringsringar, orderlinjer, byggstrålar och spöken för köade byggen.
@@ -146,7 +161,10 @@ export function createEntityView(terrain) {
     idleIcon.scale.multiplyScalar(0.7);
     idleIcon.visible = false;
     overlay.add(idleIcon);
-    views.set(entity.id, { mesh, icon, ring, top, idleIcon, wire, turret: mesh.getObjectByName('turret') });
+    const legL = mesh.getObjectByName('legL');
+    const legR = mesh.getObjectByName('legR');
+    const walk = legL && legR ? { legL, legR, body: mesh.getObjectByName('torso'), bodyY: mesh.getObjectByName('torso')?.position.y ?? 0, phase: 0, amp: 0, x: null, z: null } : null;
+    views.set(entity.id, { mesh, icon, ring, top, idleIcon, wire, walk, turret: mesh.getObjectByName('turret') });
   }
 
   /** Var en entitet ritas just nu (vanlig mesh eller instansierad). */
@@ -299,6 +317,7 @@ export function createEntityView(terrain) {
         const y = groundY(x, z);
         v.mesh.position.set(x, y, z);
         if (e.heading !== undefined) v.mesh.rotation.y = e.heading;
+        if (v.walk) animateWalk(v.walk, x, z, frameSeconds);
         // Tornets vinkel är i världen; på en enhet är tornet ett barn till den roterade kroppen.
         if (v.wire) {
           v.wire.visible = !e.built;

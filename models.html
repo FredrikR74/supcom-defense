@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Model Viewer</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f14; color: #cbd5e1; font: 14px system-ui, sans-serif; overflow: hidden; }
+      canvas { display: block; }
+      #bar { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+      #bar button { background: #1e293b; color: inherit; border: 1px solid #334155; padding: 4px 10px; cursor: pointer; }
+      #bar button.on { background: #2563eb; border-color: #3b82f6; }
+    </style>
+  </head>
+  <body>
+    <div id="bar"></div>
+    <script type="module" src="/src/devtools/modelViewer.js"></script>
+  </body>
+</html>
