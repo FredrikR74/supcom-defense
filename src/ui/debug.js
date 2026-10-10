@@ -1,4 +1,4 @@
-/** Debugruta i hörnet: FPS, tick och tick per sekund. */
+/** Debugruta i hörnet: FPS, tick, tick per sekund och valfria extrarader. */
 export function createDebugOverlay(el) {
   let frames = 0;
   let ticksAtLastSample = 0;
@@ -7,7 +7,7 @@ export function createDebugOverlay(el) {
   let tps = 0;
 
   return {
-    update(world, frameSeconds) {
+    update(world, frameSeconds, extraLines = []) {
       frames++;
       sampleTime += frameSeconds;
       if (sampleTime >= 1) {
@@ -17,7 +17,12 @@ export function createDebugOverlay(el) {
         ticksAtLastSample = world.tick;
         sampleTime = 0;
       }
-      el.textContent = `FPS  ${fps.toFixed(0)}\ntick ${world.tick}\nTPS  ${tps.toFixed(1)}`;
+      el.textContent = [
+        `FPS  ${fps.toFixed(0)}`,
+        `tick ${world.tick}`,
+        `TPS  ${tps.toFixed(1)}`,
+        ...extraLines,
+      ].join('\n');
     },
   };
 }

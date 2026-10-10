@@ -73,16 +73,16 @@ tests/
 
 ## Fas 1: Karta och kamera
 
-- [ ] **1.1 Mark med byggrutnät.** Ett plan på 128×128 med synligt rutnät (1 ruta = 1 byggenhet).
+- [x] **1.1 Mark med byggrutnät.** Ett plan på 128×128 med synligt rutnät (1 ruta = 1 byggenhet).
   *Test:* rutnätet syns.
-- [ ] **1.2 Höjdkarta.** Låga kullar och en platå i mitten för basen.
+- [x] **1.2 Höjdkarta.** Låga kullar och en platå i mitten för basen.
   *Test (Vitest):* `getHeight(x, z)` returnerar rätt värde.
-- [ ] **1.3 Panorering.** WASD/piltangenter och musen mot skärmkanten.
-- [ ] **1.4 Zoom mot muspekaren**, som i SupCom.
+- [x] **1.3 Panorering.** WASD/piltangenter och musen mot skärmkanten.
+- [x] **1.4 Zoom mot muspekaren**, som i SupCom.
   *Test:* punkten under pekaren står still medan du zoomar.
-- [ ] **1.5 Strategisk zoom.** Långt utzoomat visas ikoner i stället för meshes.
+- [x] **1.5 Strategisk zoom.** Långt utzoomat visas ikoner i stället för meshes.
   *Test:* zooma ut och in.
-- [ ] **1.6 Kartobjekt.** Kärnans position, fiendernas spawnpunkter och massfyndigheter, alla definierade i en kartfil.
+- [x] **1.6 Kartobjekt.** Kärnans position, fiendernas spawnpunkter och massfyndigheter, alla definierade i en kartfil.
   *Test:* markörerna syns på rätt plats.
 
 ## Fas 2: Kärna och ekonomi
