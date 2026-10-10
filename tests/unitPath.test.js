@@ -77,10 +77,10 @@ describe('egna enheter går runt hinder', () => {
   it('en byggare når en byggplats bakom en mur', () => {
     const { world, acu } = setup();
     wall(world, 60, 60, 78);
-    cmd(world, { type: 'build', ids: [acu.id], structure: 'pointDefense', x: 50.5, z: 69.5 });
+    cmd(world, { type: 'build', ids: [acu.id], structure: 'powerGenerator', x: 51, z: 69 });
     runChecked(world, acu, 300);
-    const pd = world.entities.find((e) => e.type === 'pointDefense');
-    expect(pd?.built).toBe(true);
+    const pgen = world.entities.find((e) => e.type === 'powerGenerator');
+    expect(pgen?.built).toBe(true);
     expect(acu.x).toBeLessThan(60);
   });
 

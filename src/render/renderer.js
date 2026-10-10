@@ -128,6 +128,12 @@ export function createRenderer(canvas, world) {
         setGhostState(pool[i], ok ? 'ok' : 'bad');
       });
     },
+    /** Flyttar kameran så att den tittar på (x, z). */
+    centerOn(x, z) {
+      rig.target.x = x;
+      rig.target.z = z;
+      rig.apply();
+    },
     /** Felsökning: visa/dölj blockerade rutor respektive flödesfältet. */
     toggleBlockedCells() { pathDebug.toggleBlocked(); },
     toggleFlowField() { pathDebug.toggleFlow(); },

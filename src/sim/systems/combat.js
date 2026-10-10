@@ -1,6 +1,7 @@
 import { TICK_SECONDS } from '../constants.js';
 import { createSpatialHash } from '../spatialHash.js';
 import { getDef, getEntity, removeEntity, addWreck } from '../entities.js';
+import { recordDamage, disperseVeterancy } from '../veterancy.js';
 
 /** Hur nära nedslagspunkten en entitets kant måste vara för att träffas. */
 const HIT_TOLERANCE = 0.3;
@@ -42,8 +43,21 @@ function buildHash(world) {
 }
 
 /**
+ * Målprioritet som i FA (TargetPriorities för t.ex. Mantis): först mobila
+ * enheter, sedan försvarsbyggnader, sedan allt annat. BENIGN-byggnader som
+ * murar skjuts aldrig på automatiskt. Lägre tal = viktigare, null = aldrig.
+ */
+export function targetPriority(t) {
+  const def = getDef(t.type);
+  if (def?.benign) return null;
+  if (t.kind === 'unit') return 0;
+  if (def?.weapon) return 1;
+  return 2;
+}
+
+/**
  * Varje entitet med vapen behåller sitt mål så länge det lever och är inom
- * räckvidd, annars väljs närmaste fiende inom räckvidd (eller inget).
+ * räckvidd, annars väljs det viktigaste målet inom räckvidd (närmast vid lika).
  */
 export function targetingSystem(world) {
   const { hash, maxRadius } = buildHash(world);
@@ -55,12 +69,17 @@ export function targetingSystem(world) {
     if (current && current.hp > 0 && edgeDistance(e, current) <= weapon.range) continue;
 
     let best = null;
+    let bestPrio = Infinity;
     let bestDist = Infinity;
     for (const t of hash.queryRadius(e.x, e.z, weapon.range + maxRadius)) {
       if (!areEnemies(e, t) || t.hp <= 0) continue;
+      const prio = targetPriority(t);
+      if (prio === null) continue;
       const d = edgeDistance(e, t);
-      if (d <= weapon.range && d < bestDist) {
+      if (d > weapon.range) continue;
+      if (prio < bestPrio || (prio === bestPrio && d < bestDist)) {
         best = t;
+        bestPrio = prio;
         bestDist = d;
       }
     }
@@ -102,6 +121,7 @@ export function weaponsSystem(world) {
     e.weaponCooldown += 1 / weapon.rateOfFire;
     world.projectiles.push({
       owner: e.owner,
+      sourceId: e.id,
       x: e.x,
       z: e.z,
       prevX: e.x,
@@ -153,7 +173,10 @@ export function projectileSystem(world) {
         bestDist = d;
       }
     }
-    if (hit) hit.hp -= p.damage;
+    if (hit) {
+      hit.hp -= p.damage;
+      recordDamage(hit, p.sourceId, p.damage);
+    }
     emit(world, { type: hit ? 'hit' : 'miss', owner: p.owner, x: p.x, z: p.z, y: p.y });
   }
   world.projectiles = remaining;
@@ -163,6 +186,7 @@ export function projectileSystem(world) {
 export function deathSystem(world) {
   const dead = world.entities.filter((e) => isTargetable(e) && e.hp <= 0);
   for (const e of dead) {
+    disperseVeterancy(world, e);
     const def = getDef(e.type);
     const progress = e.kind === 'structure' ? e.progress : 1;
     const mass = (def.cost?.mass ?? 0) * progress * world.config.wreckMassFraction;

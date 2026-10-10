@@ -87,11 +87,11 @@ describe('vågor', () => {
     ticks(w, 25);
     expect(waveInfo(w)).toMatchObject({ state: 'active', current: 1, remaining: 3 });
     killAll(w);
-    const before = economy.mass.stored;
+    economy.mass.stored = 100;
     ticks(w, 2);
     expect(waveInfo(w)).toMatchObject({ state: 'build', completed: 1, next: { number: 2 } });
-    // Bonus + kärnans inkomst under två tick.
-    expect(economy.mass.stored).toBeCloseTo(before + TEST_WAVES[0].bonus + 0.2);
+    // Bonus + ACU:ns inkomst under två tick.
+    expect(economy.mass.stored).toBeCloseTo(100 + TEST_WAVES[0].bonus + units.acu.production.mass * 0.2);
   });
 
   it('vågen är inte klar förrän alla har kommit', () => {

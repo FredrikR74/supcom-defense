@@ -12,6 +12,8 @@ import { createResourcePanel } from './ui/resourcePanel.js';
 import { createHoverInfo } from './ui/hoverInfo.js';
 import { createCommandPanel } from './ui/commandPanel.js';
 import { createWavePanel } from './ui/wavePanel.js';
+import { createSelectionInfo } from './ui/selectionInfo.js';
+import { createIdlePanel } from './ui/idlePanel.js';
 import firstDefense from './data/maps/firstDefense.js';
 
 const canvas = document.getElementById('game');
@@ -52,6 +54,15 @@ const commandPanel = createCommandPanel(document.getElementById('commands'), {
 const startNextWave = () => queueCommand(world, { type: 'startWave', owner: PLAYER_ID });
 const wavePanel = createWavePanel(document.getElementById('waves'), document.getElementById('toast'), {
   onStartWave: startNextWave,
+});
+
+const selectionInfo = createSelectionInfo(document.getElementById('info'));
+const idlePanel = createIdlePanel(document.getElementById('idle'), {
+  onSelect: (unit) => {
+    selection.clear();
+    selection.add(unit.id);
+    view.centerOn(unit.x, unit.z);
+  },
 });
 
 window.addEventListener('keydown', (e) => {
@@ -111,6 +122,8 @@ function frame(now) {
   resources.update(world.players[PLAYER_ID].economy);
   commandPanel.update(world, selection, ui);
   wavePanel.update(world);
+  selectionInfo.update(world, selection);
+  idlePanel.update(world);
 
   const cursor = ndc && view.pickAtNdc(ndc.x, ndc.y);
   debug.update(world, frameSeconds, [

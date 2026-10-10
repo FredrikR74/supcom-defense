@@ -1,6 +1,7 @@
 import { TICK_SECONDS } from '../constants.js';
 import { addStructure, addUnit, getEntity } from '../entities.js';
-import { canPlace } from '../placement.js';
+import { canPlace, footprint } from '../placement.js';
+import { isBlockedCell } from '../pathing.js';
 import { guardDestination } from '../guard.js';
 import structures from '../../data/structures.js';
 import units from '../../data/units.js';
@@ -33,6 +34,46 @@ function findUnfinished(world, type, x, z, owner) {
     e.kind === 'structure' && !e.built && e.type === type && e.x === x && e.z === z && e.owner === owner) ?? null;
 }
 
+/** Närmaste ruta (mittpunkt) som inte är blockerad, sökt i växande ringar runt (x, z). */
+function nearestFreeSpot(world, x, z) {
+  const n = world.terrain.size;
+  const cx = Math.floor(x);
+  const cz = Math.floor(z);
+  for (let r = 1; r < 12; r++) {
+    let best = null;
+    let bestDist = Infinity;
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        const nx = cx + dx;
+        const nz = cz + dz;
+        if (nx < 0 || nz < 0 || nx >= n || nz >= n || isBlockedCell(world, nz * n + nx)) continue;
+        const d = Math.hypot(nx + 0.5 - x, nz + 0.5 - z);
+        if (d < bestDist) {
+          best = { x: nx + 0.5, z: nz + 0.5 };
+          bestDist = d;
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+/**
+ * Egna enheter som står på en ny byggplats flyttar sig till närmaste lediga
+ * ruta och fortsätter sedan med det de höll på med, som i FA.
+ */
+function clearBuildSite(world, structure) {
+  const { cx, cz, size } = footprint(structure.type, structure.x, structure.z);
+  for (const u of world.entities) {
+    if (u.kind !== 'unit' || u.owner !== structure.owner) continue;
+    if (u.x < cx || u.x > cx + size || u.z < cz || u.z > cz + size) continue;
+    const spot = nearestFreeSpot(world, u.x, u.z);
+    if (spot) u.orders.unshift({ type: 'move', x: spot.x, z: spot.z });
+  }
+}
+
 function startBuildOrder(world, e, order) {
   let target = order.targetId ? getEntity(world, order.targetId) : null;
   if (order.targetId && (!target || target.built)) {
@@ -54,6 +95,7 @@ function startBuildOrder(world, e, order) {
         owner: e.owner,
         built: false,
       });
+      clearBuildSite(world, target);
     }
     order.targetId = target.id;
   }

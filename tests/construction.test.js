@@ -16,6 +16,9 @@ function setup() {
   const world = createWorld({ map: firstDefense });
   const acu = getEntity(world, world.acuId);
   const economy = world.players[PLAYER_ID].economy;
+  // Under maxlagret, så att inkomsten syns i beräkningarna.
+  economy.mass.stored = 500;
+  economy.energy.stored = 2000;
   return { world, acu, economy };
 }
 
@@ -64,7 +67,7 @@ describe('byggande', () => {
     const { world, acu, economy } = setup();
     const n = buildTicks('pointDefense', ACU_POWER);
     const { mass, energy } = structures.pointDefense.cost;
-    const income = structures.core.production;
+    const income = units.acu.production;
     build(world, [acu.id], 'pointDefense', WALL_SPOT);
     ticks(world, n / 2);
     // Halvvägs: halva kostnaden förbrukad.
@@ -99,7 +102,7 @@ describe('byggande', () => {
     build(world, [acu.id], 'powerGenerator', PGEN_SPOT);
     ticks(world, buildTicks('powerGenerator', ACU_POWER) + 1);
     expect(economy.energy.income).toBe(
-      structures.core.production.energy + structures.powerGenerator.production.energy,
+      units.acu.production.energy + structures.powerGenerator.production.energy,
     );
   });
 
@@ -107,7 +110,7 @@ describe('byggande', () => {
     const { world, acu, economy } = setup();
     build(world, [acu.id], 'powerGenerator', PGEN_SPOT);
     ticks(world, 5);
-    expect(economy.energy.income).toBe(structures.core.production.energy);
+    expect(economy.energy.income).toBe(units.acu.production.energy);
   });
 
   it('bygger på en fyndighet', () => {
@@ -115,19 +118,22 @@ describe('byggande', () => {
     build(world, [acu.id], 'massExtractor', { x: 56, z: 72 });
     ticks(world, 200);
     expect(structuresOf(world, 'massExtractor')[0].built).toBe(true);
-    expect(economy.mass.income).toBe(structures.core.production.mass + structures.massExtractor.production.mass);
+    expect(economy.mass.income).toBe(units.acu.production.mass + structures.massExtractor.production.mass);
   });
 
   it('går långsammare vid strömavbrott', () => {
     const { world, acu, economy } = setup();
     economy.mass.stored = 0;
-    // Vägg: 3 mass/s vid byggkraft 10. Kärnan ger 1 mass/s, så effektiviteten blir 1/3.
+    // Mur: kostnad × byggkraft / byggtid mass per sekund. ACU:n ger 1 mass/s.
+    const demand = structures.wall.cost.mass * ACU_POWER / structures.wall.buildTime;
+    const eff = units.acu.production.mass / demand;
+    expect(eff).toBeLessThan(1);
     build(world, [acu.id], 'wall', WALL_SPOT);
     ticks(world, buildTicks('wall', ACU_POWER));
     const [wall] = structuresOf(world, 'wall');
     expect(wall.built).toBe(false);
-    expect(wall.progress).toBeCloseTo(1 / 3, 1);
-    ticks(world, buildTicks('wall', ACU_POWER) * 2);
+    expect(wall.progress).toBeCloseTo(eff, 1);
+    ticks(world, Math.ceil(buildTicks('wall', ACU_POWER) * (1 / eff - 1)) + 2);
     expect(wall.built).toBe(true);
   });
 
@@ -188,7 +194,7 @@ describe('sälja', () => {
     queueCommand(world, { type: 'sell', owner: PLAYER_ID, ids: [pd.id] });
     ticks(world, 1);
     expect(getEntity(world, pd.id)).toBeNull();
-    const income = structures.core.production.mass / 10;
+    const income = units.acu.production.mass / 10;
     expect(economy.mass.stored).toBeCloseTo(before + income + structures.pointDefense.cost.mass * 0.5);
     expect(world.occupancy[69 * 128 + 60]).toBe(0);
   });
@@ -203,7 +209,7 @@ describe('sälja', () => {
     queueCommand(world, { type: 'sell', owner: PLAYER_ID, ids: [pd.id] });
     acu.orders.length = 0;
     ticks(world, 1);
-    const income = structures.core.production.mass / 10;
+    const income = units.acu.production.mass / 10;
     expect(economy.mass.stored).toBeCloseTo(before + income + structures.pointDefense.cost.mass * 0.25);
   });
 

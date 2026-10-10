@@ -105,8 +105,10 @@ describe('Point Defense', () => {
     const m = enemyAt(w, 36, 30.5);
     m.orders.length = 0; // står still
     m.hp = 10000;
-    // Första skottet avfyras direkt och är framme efter 5,5 / 30 s, nästa avfyras efter 0,3 s.
-    ticks(w, 3);
+    // Första skottet avfyras direkt och är framme efter avståndet / projektilfarten;
+    // nästa avfyras först efter 0,3 s.
+    const flight = Math.ceil((5.5 / structures.pointDefense.weapon.projectileSpeed) * 10);
+    ticks(w, flight + 1); // nästa skott avfyras efter 3 tick och landar senare än så här
     expect(10000 - m.hp).toBe(structures.pointDefense.weapon.damage);
   });
 
@@ -120,7 +122,8 @@ describe('Point Defense', () => {
     m.x = m.prevX = 42;
     m.z = m.prevZ = 36; // flyttad i sidled
     m.orders.length = 0;
-    ticks(w, 5);
+    // Första skottet hinner landa på den gamla platsen; nästa (mot den nya) har inte landat än.
+    ticks(w, Math.ceil((11.5 / structures.pointDefense.weapon.projectileSpeed) * 10));
     expect(m.hp).toBe(10000);
     expect(w.events.some((e) => e.type === 'miss')).toBe(true);
   });
@@ -137,14 +140,33 @@ describe('fiender anfaller', () => {
 
   it('fiender stannar och skjuter på byggnader på vägen', () => {
     const w = setup();
-    const wall = addStructure(w, 'wall', { x: 20.5, z: 64.5, owner: PLAYER_ID });
+    const pgen = addStructure(w, 'powerGenerator', { x: 21, z: 66, owner: PLAYER_ID });
     const m = spawnEnemy(w, 'mantis', 0);
     ticks(w, 100);
-    expect(m.targetId).toBe(wall.id);
-    expect(wall.hp).toBeLessThan(wall.maxHp);
+    expect(m.targetId).toBe(pgen.id);
+    expect(pgen.hp).toBeLessThan(pgen.maxHp);
     const x = m.x;
     ticks(w, 10);
     expect(m.x).toBe(x); // står still medan den skjuter
+  });
+
+  it('murar skjuts inte på automatiskt (BENIGN i FA): fienden går förbi', () => {
+    const w = setup();
+    const wall = addStructure(w, 'wall', { x: 20.5, z: 66.5, owner: PLAYER_ID });
+    const m = spawnEnemy(w, 'mantis', 0);
+    ticks(w, 150);
+    expect(wall.hp).toBe(wall.maxHp);
+    expect(m.x).toBeGreaterThan(30);
+  });
+
+  it('mobila enheter prioriteras före byggnader, som i FA', () => {
+    const w = setup();
+    const m = enemyAt(w, 40, 40);
+    m.orders.length = 0;
+    addStructure(w, 'powerGenerator', { x: 43, z: 40, owner: PLAYER_ID }); // närmast
+    const eng = addUnit(w, 'engineer', { x: 40, z: 46, owner: PLAYER_ID });
+    targetingSystem(w);
+    expect(m.targetId).toBe(eng.id);
   });
 
   it('en förstörd mur öppnar vägen igen', () => {

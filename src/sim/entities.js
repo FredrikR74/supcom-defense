@@ -57,6 +57,7 @@ export function addUnit(world, type, { x, z, owner, heading = 0 }) {
     speed: def.speed,
     hp: def.maxHp,
     maxHp: def.maxHp,
+    production: def.production ? { ...def.production } : null,
     orders: [],
   };
   track(world, entity);
@@ -99,4 +100,9 @@ export function removeEntity(world, id) {
   const [entity] = world.entities.splice(i, 1);
   world.byId?.delete(id);
   if (entity.kind === 'structure') markOccupancy(world, entity, 0);
+}
+
+/** En byggare (ACU, ingenjör) utan order och utan pågående bygge. */
+export function isIdleBuilder(e) {
+  return e.kind === 'unit' && (units[e.type]?.buildPower ?? 0) > 0 && e.orders.length === 0 && !e.buildJob;
 }

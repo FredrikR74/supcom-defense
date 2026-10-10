@@ -183,6 +183,20 @@ tests/
   *Test:* en förstörd mur öppnar en väg.
 - [x] **6.8 Muzzle flash och explosionseffekt.** En enkel partikelboll.
 
+## Fas 6b: FA-regler och översikt
+
+Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.com/FAForever/fa).
+
+- [x] **6.9 FA-värden.** HP, kostnader, byggtider, BuildRate, produktion och vapen från blueprints. Räckvidd och projektilfart är halverade.
+- [x] **6.10 Startresurser.** 650 mass och 3900 energi (ACU:ns lager, som FA ger vid start). ACU:n ger +1 mass och +20 energi; kärnan ger inget.
+- [x] **6.11 Upkeep.** Mass Extractor drar 2 energi/s och producerar mindre vid energibrist.
+- [x] **6.12 Info om markering.** Panel med namn, HP, regen, veterancy och vad det markerade ger och drar i mass och energi.
+- [x] **6.13 Sysslolösa byggare.** "Zz"-markering ovanför och knappar som markerar nästa sysslolösa ACU eller ingenjör och flyttar kameran dit.
+- [x] **6.14 FA:s målprioritering.** Mobila enheter först, sedan försvarsbyggnader. Murar (BENIGN) skjuts aldrig automatiskt.
+- [x] **6.15 Egna enheter i vägen.** En enhet i rörelse knuffas inte undan, och enheter på en ny byggplats flyttar sig.
+- [x] **6.16 HP-regen och veterancy enligt FAF.** Erfarenhet är dödad massa fördelad efter skada. Varje nivå ger +10 % max-HP, läkning och extra regen. ACU:n har egna trösklar och regen 10 HP/s.
+  *Test (Vitest):* `tests/faRules.test.js`.
+
 ## Fas 7: Vågor
 
 - [x] **7.1 Vågdata.** `waves.js` innehåller en lista med `{ enemies: [{type, count, interval, spawn}] }`.

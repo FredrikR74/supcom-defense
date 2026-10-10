@@ -9,6 +9,10 @@ const SPACING = 0.9;
 /**
  * Enheter som står för nära varandra knuffas isär, men aldrig in i en byggnad
  * eller brant terräng. Står två på exakt samma punkt avgör deras id riktningen.
+ *
+ * En enhet som rör sig (har flyttat sig detta tick) knuffas aldrig: den går
+ * förbi, och en stillastående enhet i vägen glider undan. Två som rör sig
+ * passerar varandra. Så står egna ingenjörer inte i vägen för ACU:n.
  */
 export function separationSystem(world) {
   const units = world.entities.filter((e) => e.kind === 'unit');
@@ -33,13 +37,18 @@ export function separationSystem(world) {
         dz = Math.sin(angle);
         d = 1;
       }
-      const amount = ((min - Math.hypot(b.x - a.x, b.z - a.z)) * PUSH) / 2;
+      const aMoving = a.x !== a.prevX || a.z !== a.prevZ;
+      const bMoving = b.x !== b.prevX || b.z !== b.prevZ;
+      if (aMoving && bMoving) continue;
+      // Andel av knuffen som a respektive b tar.
+      const shareA = aMoving ? 0 : bMoving ? 1 : 0.5;
+      const amount = (min - Math.hypot(b.x - a.x, b.z - a.z)) * PUSH;
       const px = (dx / d) * amount;
       const pz = (dz / d) * amount;
       const pa = push.get(a) ?? { x: 0, z: 0 };
       const pb = push.get(b) ?? { x: 0, z: 0 };
-      push.set(a, { x: pa.x - px, z: pa.z - pz });
-      push.set(b, { x: pb.x + px, z: pb.z + pz });
+      push.set(a, { x: pa.x - px * shareA, z: pa.z - pz * shareA });
+      push.set(b, { x: pb.x + px * (1 - shareA), z: pb.z + pz * (1 - shareA) });
     }
   }
 

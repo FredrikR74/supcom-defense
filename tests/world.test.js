@@ -3,6 +3,8 @@ import { createWorld, tickWorld, PLAYER_ID } from '../src/sim/world.js';
 import { addStructure, getEntity, removeEntity } from '../src/sim/entities.js';
 import firstDefense from '../src/data/maps/firstDefense.js';
 import structures from '../src/data/structures.js';
+import units from '../src/data/units.js';
+import gameConfig from '../src/data/gameConfig.js';
 
 const config = {
   startingResources: { mass: 500, energy: 2000 },
@@ -14,6 +16,15 @@ describe('world', () => {
     const world = createWorld();
     for (let i = 0; i < 5; i++) tickWorld(world);
     expect(world.tick).toBe(5);
+  });
+
+  it('startar med FA:s startresurser (ACU:ns lager: 650 mass, 3900 energi)', () => {
+    const { economy } = createWorld().players[PLAYER_ID];
+    expect(gameConfig.startingResources).toEqual({ mass: 650, energy: 3900 });
+    expect(economy.mass.stored).toBe(650);
+    expect(economy.energy.stored).toBe(3900);
+    expect(economy.mass.max).toBe(650);
+    expect(economy.energy.max).toBe(3900);
   });
 
   it('ger spelaren startkapital från konfigurationen', () => {
@@ -35,11 +46,14 @@ describe('world', () => {
     expect(core.maxHp).toBe(structures.core.maxHp);
   });
 
-  it('kärnan ger basinkomst', () => {
+  it('ACU:n ger inkomst som i FA (+1 mass, +20 energi), kärnan ingen', () => {
+    expect(structures.core.production).toBeUndefined();
     const world = createWorld({ map: firstDefense, config });
     const { economy } = world.players[PLAYER_ID];
     for (let i = 0; i < 10; i++) tickWorld(world);
-    const { mass, energy } = structures.core.production;
+    const { mass, energy } = units.acu.production;
+    expect(mass).toBe(1);
+    expect(energy).toBe(20);
     expect(economy.mass.stored).toBeCloseTo(500 + mass);
     expect(economy.energy.stored).toBeCloseTo(2000 + energy);
     expect(economy.mass.income).toBe(mass);

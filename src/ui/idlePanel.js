@@ -1,0 +1,43 @@
+import { PLAYER_ID } from '../sim/constants.js';
+import { isIdleBuilder } from '../sim/entities.js';
+
+/**
+ * Knappar för sysslolösa byggare, som FA:s "idle engineer"-knapp: klick markerar
+ * nästa sysslolösa ACU/ingenjör och flyttar kameran dit (klicka igen för nästa).
+ */
+export function createIdlePanel(el, { onSelect }) {
+  const buttons = {};
+  const cursor = { acu: 0, engineer: 0 };
+  for (const [type, label] of [['acu', 'Idle ACU'], ['engineer', 'Idle Engineers']]) {
+    const b = document.createElement('button');
+    b.className = 'idle-button';
+    b.dataset.type = type;
+    b.addEventListener('mousedown', (e) => e.stopPropagation());
+    b.addEventListener('click', () => {
+      const idle = currentIdle(type);
+      if (idle.length === 0) return;
+      cursor[type] = (cursor[type] + 1) % idle.length;
+      onSelect(idle[cursor[type]]);
+    });
+    el.appendChild(b);
+    buttons[type] = { b, label };
+  }
+
+  let world = null;
+  const currentIdle = (type) =>
+    world.entities.filter((e) => e.owner === PLAYER_ID && e.type === type && isIdleBuilder(e));
+
+  return {
+    update(w) {
+      world = w;
+      let any = false;
+      for (const [type, { b, label }] of Object.entries(buttons)) {
+        const n = currentIdle(type).length;
+        b.hidden = n === 0;
+        b.textContent = type === 'acu' ? label : `${label} (${n})`;
+        any ||= n > 0;
+      }
+      el.hidden = !any;
+    },
+  };
+}

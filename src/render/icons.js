@@ -98,6 +98,21 @@ const DRAW = {
     ctx.moveTo(s - 22, 22); ctx.lineTo(22, s - 22);
     ctx.stroke();
   },
+  /** Sysslolös byggare: gul bricka med "Zz". */
+  idle: (ctx, s) => {
+    ctx.fillStyle = '#facc15';
+    ctx.strokeStyle = '#0b0f14';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(s / 2, s / 2, s / 2 - 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#0b0f14';
+    ctx.font = 'bold 28px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Zz', s / 2, s / 2 + 2);
+  },
   spawn: (ctx, s) => {
     ctx.fillStyle = '#ef4444';
     ctx.strokeStyle = '#ffffff';

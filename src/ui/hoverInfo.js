@@ -27,7 +27,8 @@ export function createHoverInfo(el) {
       el.hidden = !entity;
       if (!entity) return;
       const def = getDef(entity.type);
-      name.textContent = def?.unitName ? `${def.unitName} (${def.name})` : def?.name ?? entity.type;
+      name.textContent = (def?.unitName ? `${def.unitName} (${def.name})` : def?.name ?? entity.type) +
+        (entity.vetLevel ? ` ${'★'.repeat(entity.vetLevel)}` : '');
       if (entity.kind === 'wreck') {
         name.textContent = 'Wreckage';
         fill.style.width = '0%';

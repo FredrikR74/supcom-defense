@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { createIcon } from './icons.js';
+import { isIdleBuilder } from '../sim/entities.js';
 import { createModel, createGhost, WRECK_MATERIAL } from './models.js';
 import { createInstancedBatch } from './instancedUnits.js';
 
@@ -121,7 +122,12 @@ export function createEntityView(terrain) {
     icons.add(icon);
     overlay.add(ring);
     const top = new THREE.Box3().setFromObject(mesh).max.y;
-    views.set(entity.id, { mesh, icon, ring, top, turret: mesh.getObjectByName('turret') });
+    // Markering för sysslolösa byggare (syns även utzoomat).
+    const idleIcon = createIcon('idle');
+    idleIcon.scale.multiplyScalar(0.7);
+    idleIcon.visible = false;
+    overlay.add(idleIcon);
+    views.set(entity.id, { mesh, icon, ring, top, idleIcon, turret: mesh.getObjectByName('turret') });
   }
 
   /** Punkten en order pekar på; guard-order pekar på den assisterade enheten. */
@@ -249,12 +255,15 @@ export function createEntityView(terrain) {
         v.icon.position.set(x, y + 1, z);
         v.ring.position.set(x, y + 0.05, z);
         v.ring.visible = selection.has(e.id);
+        v.idleIcon.visible = e.owner === owner && isIdleBuilder(e);
+        if (v.idleIcon.visible) v.idleIcon.position.set(x, y + v.top + 1.2, z);
       }
       for (const [id, v] of views) {
         if (alive.has(id)) continue;
         meshes.remove(v.mesh);
         icons.remove(v.icon);
         overlay.remove(v.ring);
+        overlay.remove(v.idleIcon);
         views.delete(id);
       }
       for (const b of batches.values()) b.end();

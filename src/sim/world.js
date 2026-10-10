@@ -1,12 +1,13 @@
 import { createRng } from './rng.js';
 import { generateTerrain } from './terrain.js';
 import { createEconomy, stepEconomy } from './economy.js';
-import { addStructure, addUnit } from './entities.js';
+import { addStructure, addUnit, getDef } from './entities.js';
 import { applyCommands } from './commands.js';
 import { movementSystem } from './systems/movement.js';
 import { constructionDemand, constructionProgress } from './systems/construction.js';
 import { separationSystem } from './systems/separation.js';
 import { targetingSystem, weaponsSystem, projectileSystem, deathSystem } from './systems/combat.js';
+import { regenSystem } from './veterancy.js';
 import { computeSteepCells, updatePathing } from './pathing.js';
 import { TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 import gameConfig from '../data/gameConfig.js';
@@ -74,17 +75,35 @@ export function createTerrainForMap(map) {
   });
 }
 
+/**
+ * Produktion från klara byggnader och från enheter (ACU:n), byggares efterfrågan
+ * och byggnaders löpande förbrukning (upkeep). En byggnad med upkeep producerar
+ * bara i proportion till hur mycket av sin upkeep den fick förra ticket, så en
+ * Mass Extractor ger mindre mass vid energibrist, som i FA.
+ */
 function economySystem(world) {
   for (const player of Object.values(world.players)) {
     if (!player.economy) continue;
     const producers = [];
     const consumers = [];
+    const upkeeps = [];
     for (const e of world.entities) {
-      if (e.owner !== player.id) continue;
-      if (e.production && e.built) producers.push(e.production);
+      if (e.owner !== player.id || (e.kind !== 'unit' && e.kind !== 'structure')) continue;
+      const active = e.kind === 'unit' || e.built;
+      const def = getDef(e.type);
+      if (active && e.production) {
+        const k = e.upkeepEfficiency ?? 1;
+        producers.push({ mass: e.production.mass * k, energy: e.production.energy * k });
+      }
+      if (active && def.upkeep) {
+        const c = { demand: def.upkeep, entity: e };
+        consumers.push(c);
+        upkeeps.push(c);
+      }
       if (e.demand) consumers.push(e);
     }
     stepEconomy(player.economy, producers, consumers, TICK_SECONDS);
+    for (const c of upkeeps) c.entity.upkeepEfficiency = c.efficiency;
   }
 }
 
@@ -103,5 +122,6 @@ export function tickWorld(world) {
   weaponsSystem(world);
   projectileSystem(world);
   deathSystem(world);
+  regenSystem(world);
   world.tick++;
 }
