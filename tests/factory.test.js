@@ -73,7 +73,7 @@ describe('Land Factory', () => {
     ticks(world, ENGINEER_TICKS + 1);
     const [eng] = engineers(world);
     expect(eng).toBeDefined();
-    expect(eng.orders[0]).toEqual({ type: 'move', x: 70, z: 90 });
+    expect(eng.orders[0]).toMatchObject({ type: 'move', x: 70, z: 90 });
   });
 
   it('ingenjören från fabriken kan bygga', () => {

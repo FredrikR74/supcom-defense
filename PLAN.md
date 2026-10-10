@@ -162,6 +162,9 @@ tests/
 - [ ] **5.7 Rendera med `InstancedMesh`.** (Gjort. FPS med 300 fiender återstår att mäta i ett synligt fönster: `game.spawn(300)` i konsolen.)
   *Test:* 300 fiender ger fortfarande 60 FPS.
 
+- [x] **5.8 Vägsökning för egna enheter.** ACU:n och ingenjörer går runt byggnader och brant terräng med A* på samma rutnät. Är sikten fri går de rakt, och vägen kortas av där det går. Den räknas om när byggnader tillkommer eller försvinner. Klickar man på en blockerad plats går enheten så nära den kommer.
+  *Test (Vitest):* ACU:n tar sig förbi en mur utan att gå in i den. En byggare når en byggplats bakom en mur. En flyttorder till en blockerad ruta slutar intill den.
+
 ## Fas 6: Strid
 
 - [ ] **6.1 HP och död.** HP-stapel. Vid 0 HP tas enheten bort och lämnar ett vrak.

@@ -1,6 +1,7 @@
 import { TICK_SECONDS } from '../constants.js';
 import { guardDestination } from '../guard.js';
 import { flowTarget } from '../pathing.js';
+import { steer } from '../unitPath.js';
 
 /** Målpunkt och stoppavstånd för en order, eller null om ordern inte innebär förflyttning. */
 function destination(world, e, order) {
@@ -17,16 +18,18 @@ function destination(world, e, order) {
 }
 
 /**
- * Enheter går rakt mot sin första order. En flyttorder är klar vid målet och
- * nästa order tar vid. Bygg- och guard-order stannar inom räckhåll (`reach`)
- * och lämnas kvar åt byggsystemet. Fiender med `attackCore` följer flödesfältet
- * ruta för ruta tills de står intill kärnan.
+ * Enheter går mot sin första order. En flyttorder är klar vid målet och nästa
+ * order tar vid. Bygg- och guard-order stannar inom räckhåll (`reach`) och
+ * lämnas kvar åt byggsystemet. Fiender med `attackCore` följer flödesfältet
+ * ruta för ruta tills de står intill kärnan, och stannar när de har ett mål att
+ * skjuta på. Egna enheter går runt hinder med A* (se unitPath.js).
  */
 export function movementSystem(world) {
   for (const e of world.entities) {
     if (e.kind !== 'unit') continue;
     e.prevX = e.x;
     e.prevZ = e.z;
+    if (e.orders[0]?.type === 'attackCore' && e.targetId) continue; // står och skjuter
 
     let budget = e.speed * TICK_SECONDS;
     for (let steps = 0; budget > 0 && e.orders.length > 0 && steps < 8; steps++) {
@@ -36,11 +39,16 @@ export function movementSystem(world) {
         if (order.type === 'guard') e.orders.shift(); // den assisterade är borta
         break;
       }
+      const goal = order.type === 'attackCore' ? dest : steer(world, e, order, dest);
+      if (goal.stuck) {
+        if (order.type === 'move') e.orders.shift(); // så nära som det går
+        break;
+      }
 
-      const dx = dest.x - e.x;
-      const dz = dest.z - e.z;
+      const dx = goal.x - e.x;
+      const dz = goal.z - e.z;
       const dist = Math.hypot(dx, dz);
-      const remaining = dist - dest.reach;
+      const remaining = dist - goal.reach;
       if (remaining <= 1e-9) break; // framme (bygg/guard: inom räckhåll)
       e.heading = Math.atan2(dx, dz);
 
@@ -50,7 +58,11 @@ export function movementSystem(world) {
       budget -= step;
 
       if (step === remaining) {
-        if (order.type === 'attackCore') continue; // nästa ruta i flödesfältet
+        if (goal.waypoint || order.type === 'attackCore') {
+          e.x = goal.x;
+          e.z = goal.z;
+          continue; // nästa vägpunkt / nästa ruta i flödesfältet
+        }
         if (order.type !== 'move') break; // inom räckhåll, byggsystemet tar över
         e.x = order.x;
         e.z = order.z;
