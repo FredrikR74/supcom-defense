@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { createIcon } from './icons.js';
 import { createModel, createGhost } from './models.js';
+import { createInstancedBatch } from './instancedUnits.js';
 
 /** Markeringsring, platt på marken. */
 const ringGeometry = new THREE.RingGeometry(0.85, 1, 40).rotateX(-Math.PI / 2);
@@ -70,6 +71,21 @@ export function createEntityView(terrain) {
   const queuedGhosts = new Map();
   /** Fabriks-id -> flagga vid fabrikens sista waypoint. */
   const rallyFlags = new Map();
+  /** Fiendeenheter ritas instansierat, en batch per typ. */
+  const batches = new Map();
+  /** Fiende-id -> { x, y, z, top } där den ritades senast. */
+  const instancedPos = new Map();
+
+  function batchFor(type) {
+    if (!batches.has(type)) {
+      const batch = createInstancedBatch(type);
+      batch.icons.visible = true; // synligheten styrs av föräldragrupperna
+      meshes.add(batch.group);
+      icons.add(batch.icons);
+      batches.set(type, batch);
+    }
+    return batches.get(type);
+  }
 
   const orderLines = createLineBuffer(512, new THREE.LineBasicMaterial({
     color: 0x4ade80, transparent: true, opacity: 0.7, depthTest: false,
@@ -190,7 +206,17 @@ export function createEntityView(terrain) {
 
     sync(world, alpha, selection, owner) {
       const alive = new Set();
+      for (const b of batches.values()) b.begin();
+      instancedPos.clear();
       for (const e of world.entities) {
+        if (e.kind === 'unit' && e.owner !== owner) {
+          const b = batchFor(e.type);
+          const { x, z } = lerpPos(e, alpha);
+          const y = groundY(x, z);
+          b.add(e.id, x, y, z, e.heading);
+          instancedPos.set(e.id, { x, y, z, top: b.top });
+          continue;
+        }
         alive.add(e.id);
         if (!views.has(e.id)) create(e);
         const v = views.get(e.id);
@@ -211,6 +237,7 @@ export function createEntityView(terrain) {
         overlay.remove(v.ring);
         views.delete(id);
       }
+      for (const b of batches.values()) b.end();
       updateOrderLines(world, selection, alpha);
       updateRallyFlags(world, selection);
       updateBeams(world);
@@ -226,6 +253,10 @@ export function createEntityView(terrain) {
     pick(raycaster) {
       const targets = icons.visible ? icons.children : meshes.children;
       const hit = raycaster.intersectObjects(targets, true)[0];
+      for (const b of batches.values()) {
+        const id = hit && b.idForHit(hit);
+        if (id != null) return id;
+      }
       let obj = hit?.object;
       while (obj && obj.userData.entityId === undefined) obj = obj.parent;
       return obj?.userData.entityId ?? null;
@@ -233,6 +264,8 @@ export function createEntityView(terrain) {
 
     /** Världspunkt för entitetens mitt (där den renderas just nu). */
     center(entity) {
+      const ip = instancedPos.get(entity.id);
+      if (ip) return new THREE.Vector3(ip.x, ip.y + ip.top / 2, ip.z);
       const v = views.get(entity.id);
       if (v) return v.mesh.position.clone().setY(v.mesh.position.y + v.top / 2);
       return new THREE.Vector3(entity.x, groundY(entity.x, entity.z), entity.z);
@@ -240,6 +273,8 @@ export function createEntityView(terrain) {
 
     /** Världspunkt ovanför entiteten, där t.ex. en HP-stapel ska sitta. */
     labelAnchor(entity) {
+      const ip = instancedPos.get(entity.id);
+      if (ip) return new THREE.Vector3(ip.x, ip.y + ip.top + 0.5, ip.z);
       const v = views.get(entity.id);
       if (v) return v.mesh.position.clone().setY(v.mesh.position.y + v.top + 0.5);
       return new THREE.Vector3(entity.x, groundY(entity.x, entity.z) + 2.5, entity.z);

@@ -148,18 +148,18 @@ tests/
 
 ## Fas 5: Fiender och vägar
 
-- [ ] **5.1 Passerbarhetsrutnät.** Branta rutor och byggnader blockerar. Lägg till ett felsökningsläge som visar dem.
+- [x] **5.1 Passerbarhetsrutnät.** Branta rutor och byggnader blockerar. Lägg till ett felsökningsläge som visar dem.
   *Test (Vitest):* en ruta med byggnad blir blockerad.
-- [ ] **5.2 Flödesfält mot kärnan.** En BFS/Dijkstra från kärnan över hela rutnätet. Räknas om när en byggnad placeras eller förstörs.
+- [x] **5.2 Flödesfält mot kärnan.** En BFS/Dijkstra från kärnan över hela rutnätet. Räknas om när en byggnad placeras eller förstörs.
   *Test (Vitest):* varje fri ruta pekar mot en granne närmare kärnan.
-- [ ] **5.3 Visualisera flödesfältet.** Felsökningsläge med pilar.
+- [x] **5.3 Visualisera flödesfältet.** Felsökningsläge med pilar.
   *Test:* pilarna går runt en mur du bygger.
-- [ ] **5.4 Spawna en fiende.** En Cybran T1 *Mantis* (stridsvagn) som följer flödesfältet till kärnan.
+- [x] **5.4 Spawna en fiende.** En Cybran T1 *Mantis* (Assault Bot) som följer flödesfältet till kärnan.
   *Test:* den kör till kärnan och svänger runt hinder.
-- [ ] **5.5 Placeringsregel: aldrig helt instängd.** Förbjud en placering om den gör att någon spawnpunkt saknar väg till kärnan. Det här är alternativ A. Alternativ B är att fiender skjuter sig igenom.
+- [x] **5.5 Placeringsregel: aldrig helt instängd.** Förbjud en placering om den gör att någon spawnpunkt saknar väg till kärnan. Det här är alternativ A. Alternativ B är att fiender skjuter sig igenom.
   *Test (Vitest):* en placering som stänger vägen nekas.
-- [ ] **5.6 Separation.** Fiender knuffar varandra lätt så att de inte överlappar.
-- [ ] **5.7 Rendera med `InstancedMesh`.**
+- [x] **5.6 Separation.** Fiender knuffar varandra lätt så att de inte överlappar.
+- [ ] **5.7 Rendera med `InstancedMesh`.** (Gjort. FPS med 300 fiender återstår att mäta i ett synligt fönster: `game.spawn(300)` i konsolen.)
   *Test:* 300 fiender ger fortfarande 60 FPS.
 
 ## Fas 6: Strid

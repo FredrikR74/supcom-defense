@@ -3,6 +3,7 @@ import { createCameraRig } from './cameraRig.js';
 import { createTerrainMesh } from './terrainMesh.js';
 import { createMapMarkers } from './mapMarkers.js';
 import { createEntityView } from './entityView.js';
+import { createPathDebug } from './pathDebug.js';
 import { createGhost, setGhostState } from './models.js';
 import { PLAYER_ID } from '../sim/constants.js';
 import { raycastTerrain, isInsideMap, getHeight } from '../sim/terrain.js';
@@ -39,6 +40,8 @@ export function createRenderer(canvas, world) {
   scene.add(markers.meshes, markers.icons);
   const entities = createEntityView(terrain);
   scene.add(entities.meshes, entities.icons, entities.overlay);
+  const pathDebug = createPathDebug(terrain);
+  scene.add(pathDebug.group);
 
   // Förhandsvisningar av byggnader man håller på att placera: en pool per typ.
   const placementGhosts = {};
@@ -119,12 +122,16 @@ export function createRenderer(canvas, world) {
         setGhostState(pool[i], ok ? 'ok' : 'bad');
       });
     },
+    /** Felsökning: visa/dölj blockerade rutor respektive flödesfältet. */
+    toggleBlockedCells() { pathDebug.toggleBlocked(); },
+    toggleFlowField() { pathDebug.toggleFlow(); },
     isStrategic() {
       return rig.distance > STRATEGIC_DISTANCE;
     },
     render(world, alpha, selection) {
       const strategic = rig.distance > STRATEGIC_DISTANCE;
       entities.sync(world, alpha, selection, PLAYER_ID);
+      pathDebug.update(world);
       markers.setStrategic(strategic);
       entities.setStrategic(strategic);
       renderer.render(scene, camera);

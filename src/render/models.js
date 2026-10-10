@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 export const PLAYER_COLOR = 0x3b82f6;
+export const ENEMY_COLOR = 0xb91c1c;
 
 const MATERIALS = {
   metal: new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.4 }),
@@ -10,6 +11,8 @@ const MATERIALS = {
   glow: new THREE.MeshStandardMaterial({ color: 0x7dd3fc, emissive: 0x38bdf8, emissiveIntensity: 1.2 }),
   massGlow: new THREE.MeshStandardMaterial({ color: 0xbef264, emissive: 0x84cc16, emissiveIntensity: 1 }),
   energyGlow: new THREE.MeshStandardMaterial({ color: 0xfde047, emissive: 0xeab308, emissiveIntensity: 1.2 }),
+  enemy: new THREE.MeshStandardMaterial({ color: ENEMY_COLOR, metalness: 0.4, roughness: 0.5 }),
+  enemyGlow: new THREE.MeshStandardMaterial({ color: 0xfca5a5, emissive: 0xef4444, emissiveIntensity: 1.4 }),
 };
 
 function box(w, h, d, material, x, y, z) {
@@ -52,6 +55,27 @@ const MODELS = {
       box(0.3, 0.9, 0.3, team, 0.78, 1.25, 0),
       gun,
     ];
+  },
+
+  /** Cybran Mantis (Assault Bot): insektslik kropp på fyra ben med två laserkanoner. */
+  mantis() {
+    const { dark, enemy, enemyGlow } = MATERIALS;
+    const parts = [
+      box(0.8, 0.3, 1.0, enemy, 0, 0.6, 0), // kropp
+      box(0.45, 0.25, 0.4, enemy, 0, 0.8, 0.35), // huvud
+      box(0.3, 0.06, 0.05, enemyGlow, 0, 0.82, 0.56), // ögon
+    ];
+    for (const [x, z] of [[-0.45, 0.35], [0.45, 0.35], [-0.45, -0.35], [0.45, -0.35]]) {
+      const leg = box(0.12, 0.6, 0.12, dark, x, 0.3, z);
+      leg.rotation.z = x > 0 ? -0.35 : 0.35;
+      parts.push(leg);
+    }
+    for (const x of [-0.25, 0.25]) {
+      const gun = cylinder(0.06, 0.55, dark, x, 0.72, 0.6, 6);
+      gun.rotation.x = Math.PI / 2;
+      parts.push(gun);
+    }
+    return parts;
   },
 
   /** Ingenjör: liten svävare med byggarm. */

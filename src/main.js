@@ -1,6 +1,7 @@
 import { createWorld, tickWorld, TICK_SECONDS, PLAYER_ID } from './sim/world.js';
 import { getEntity } from './sim/entities.js';
 import { queueCommand } from './sim/commands.js';
+import { spawnEnemy } from './sim/enemies.js';
 import { createFixedStep } from './loop.js';
 import { createRenderer } from './render/renderer.js';
 import { createCameraInput } from './input/cameraInput.js';
@@ -49,6 +50,13 @@ const commandPanel = createCommandPanel(document.getElementById('commands'), {
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Delete') sellSelected();
+  // Felsökning: P = blockerade rutor, O = flödesfältet.
+  if (e.code === 'KeyP') view.toggleBlockedCells();
+  if (e.code === 'KeyO') view.toggleFlowField();
+  // Bara i dev tills vågorna finns (fas 7): N = en Mantis vid varje spawnpunkt.
+  if (import.meta.env.DEV && e.code === 'KeyN') {
+    world.map.spawns.forEach((_, i) => spawnEnemy(world, 'mantis', i));
+  }
 });
 
 // Felsökning i webbläsarkonsolen (bara i dev): game.world, game.tick(100).
@@ -58,6 +66,11 @@ if (import.meta.env.DEV) {
     selection,
     view,
     ui,
+    /** Skapar `n` fiender av `type`, fördelade över spawnpunkterna. */
+    spawn(n = 1, type = 'mantis') {
+      for (let i = 0; i < n; i++) spawnEnemy(world, type, i);
+      return world.entities.length;
+    },
     tick(n = 1) {
       for (let i = 0; i < n; i++) tickWorld(world);
       return world.tick;

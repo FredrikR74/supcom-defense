@@ -15,6 +15,15 @@ export default {
     buildRange: 5,
     builds: BASIC_STRUCTURES,
   },
+  /** Cybran T1 Assault Bot. FA: 270 HP, fart 3.6. */
+  mantis: {
+    name: 'Assault Bot',
+    unitName: 'Mantis',
+    faction: 'Cybran',
+    maxHp: 270,
+    speed: 3.6,
+    radius: 0.6,
+  },
   engineer: {
     name: 'Engineer',
     maxHp: 200,

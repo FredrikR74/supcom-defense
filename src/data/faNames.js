@@ -18,7 +18,7 @@ export default [
   { name: 'Quantum Gate', faction: 'UEF', tech: 3, verified: true },
 
   // Cybran (fienderna)
-  { name: 'Tank', unitName: 'Mantis', faction: 'Cybran', tech: 1, verified: true },
+  { name: 'Assault Bot', unitName: 'Mantis', faction: 'Cybran', tech: 1, verified: true },
   { name: 'Land Scout', unitName: 'Mole', faction: 'Cybran', tech: 1, verified: true },
   { name: 'Mobile Light Artillery', unitName: 'Medusa', faction: 'Cybran', tech: 1, verified: true },
   { name: 'Light Assault Bot', unitName: 'Hunter', faction: 'Cybran', tech: 1, verified: false },

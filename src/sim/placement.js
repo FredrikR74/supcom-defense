@@ -1,4 +1,5 @@
 import { getHeight } from './terrain.js';
+import { wouldBlockPaths } from './pathing.js';
 import structures from '../data/structures.js';
 
 /** Största höjdskillnad inom ett fotavtryck som går att bygga på. */
@@ -96,6 +97,13 @@ export function canPlace(world, type, x, z) {
     if (covers) return fail('covers mass deposit');
   }
 
+  // Fienderna måste alltid kunna nå kärnan från varje spawnpunkt.
+  if (map.spawns?.length) {
+    const cells = [];
+    for (let z0 = cz; z0 < cz + size; z0++) for (let x0 = cx; x0 < cx + size; x0++) cells.push(z0 * terrain.size + x0);
+    if (wouldBlockPaths(world, cells)) return fail('blocks enemy path');
+  }
+
   return { ok: true };
 }
 
@@ -109,4 +117,5 @@ export function markOccupancy(world, entity, value) {
       world.occupancy[z0 * n + x0] = value;
     }
   }
+  world.pathDirty = true;
 }

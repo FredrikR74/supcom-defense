@@ -61,6 +61,16 @@ const DRAW = {
     ctx.fill();
     ctx.stroke();
   },
+  /** Cybran-landenhet: liten röd cirkel med vit kant. */
+  mantis: (ctx, s) => {
+    ctx.fillStyle = '#ef4444';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(s / 2, s / 2, s / 2 - 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  },
   spawn: (ctx, s) => {
     ctx.fillStyle = '#ef4444';
     ctx.strokeStyle = '#ffffff';
@@ -86,8 +96,12 @@ const DRAW = {
 
 const textures = {};
 
+export function getIconTexture(kind) {
+  return (textures[kind] ??= iconTexture(DRAW[kind]));
+}
+
 export function createIcon(kind) {
-  textures[kind] ??= iconTexture(DRAW[kind]);
+  getIconTexture(kind);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: textures[kind],
     sizeAttenuation: false,
