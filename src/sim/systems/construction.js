@@ -91,6 +91,7 @@ export function constructionDemand(world) {
     e.buildJob = null;
     e.demand = null;
     if (e.kind === 'structure') startProductionJob(e);
+    else if (e.kind !== 'unit') continue;
     else if (e.orders[0]?.type === 'build') startBuildOrder(world, e, e.orders[0]);
     else if (e.orders[0]?.type === 'guard') guards.push(e);
   }

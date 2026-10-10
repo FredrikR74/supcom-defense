@@ -9,16 +9,17 @@ const ICON_PIXELS = 18;
  * Många enheter av samma typ ritade med en InstancedMesh per modelldel
  * (ett fåtal draw calls oavsett antal) och strategiska ikoner som ett Points-moln.
  */
-export function createInstancedBatch(type, capacity = 2048) {
+export function createInstancedBatch(type, { capacity = 2048, material = null, scaleY = 1 } = {}) {
   const group = new THREE.Group();
   const model = createModel(type);
+  model.scale.y = scaleY;
   model.updateMatrixWorld(true);
 
   const parts = [];
   model.traverse((o) => {
     if (!o.isMesh) return;
     const geometry = o.geometry.clone().applyMatrix4(o.matrixWorld);
-    const mesh = new THREE.InstancedMesh(geometry, o.material, capacity);
+    const mesh = new THREE.InstancedMesh(geometry, material ?? o.material, capacity);
     mesh.count = 0;
     mesh.frustumCulled = false;
     parts.push(mesh);

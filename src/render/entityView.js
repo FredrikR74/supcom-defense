@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { createIcon } from './icons.js';
-import { createModel, createGhost } from './models.js';
+import { createModel, createGhost, WRECK_MATERIAL } from './models.js';
 import { createInstancedBatch } from './instancedUnits.js';
 
 /** Markeringsring, platt på marken. */
@@ -73,6 +73,17 @@ export function createEntityView(terrain) {
   const rallyFlags = new Map();
   /** Fiendeenheter ritas instansierat, en batch per typ. */
   const batches = new Map();
+  /** Vrak ritas instansierat i mörkt material, en batch per typ (utan ikoner). */
+  const wreckBatches = new Map();
+
+  function wreckBatchFor(type) {
+    if (!wreckBatches.has(type)) {
+      const batch = createInstancedBatch(type, { material: WRECK_MATERIAL, scaleY: 0.5 });
+      meshes.add(batch.group);
+      wreckBatches.set(type, batch);
+    }
+    return wreckBatches.get(type);
+  }
   /** Fiende-id -> { x, y, z, top } där den ritades senast. */
   const instancedPos = new Map();
 
@@ -110,7 +121,7 @@ export function createEntityView(terrain) {
     icons.add(icon);
     overlay.add(ring);
     const top = new THREE.Box3().setFromObject(mesh).max.y;
-    views.set(entity.id, { mesh, icon, ring, top });
+    views.set(entity.id, { mesh, icon, ring, top, turret: mesh.getObjectByName('turret') });
   }
 
   /** Punkten en order pekar på; guard-order pekar på den assisterade enheten. */
@@ -207,8 +218,16 @@ export function createEntityView(terrain) {
     sync(world, alpha, selection, owner) {
       const alive = new Set();
       for (const b of batches.values()) b.begin();
+      for (const b of wreckBatches.values()) b.begin();
       instancedPos.clear();
       for (const e of world.entities) {
+        if (e.kind === 'wreck') {
+          const b = wreckBatchFor(e.type);
+          const y = groundY(e.x, e.z);
+          b.add(e.id, e.x, y, e.z, e.heading);
+          instancedPos.set(e.id, { x: e.x, y, z: e.z, top: b.top });
+          continue;
+        }
         if (e.kind === 'unit' && e.owner !== owner) {
           const b = batchFor(e.type);
           const { x, z } = lerpPos(e, alpha);
@@ -224,6 +243,7 @@ export function createEntityView(terrain) {
         const y = groundY(x, z);
         v.mesh.position.set(x, y, z);
         if (e.heading !== undefined) v.mesh.rotation.y = e.heading;
+        if (v.turret) v.turret.rotation.y = e.turretHeading ?? 0;
         // Ofärdiga byggnader växer upp ur marken.
         v.mesh.scale.y = e.kind === 'structure' && !e.built ? 0.1 + 0.9 * e.progress : 1;
         v.icon.position.set(x, y + 1, z);
@@ -238,6 +258,7 @@ export function createEntityView(terrain) {
         views.delete(id);
       }
       for (const b of batches.values()) b.end();
+      for (const b of wreckBatches.values()) b.end();
       updateOrderLines(world, selection, alpha);
       updateRallyFlags(world, selection);
       updateBeams(world);
@@ -253,7 +274,7 @@ export function createEntityView(terrain) {
     pick(raycaster) {
       const targets = icons.visible ? icons.children : meshes.children;
       const hit = raycaster.intersectObjects(targets, true)[0];
-      for (const b of batches.values()) {
+      for (const b of [...batches.values(), ...wreckBatches.values()]) {
         const id = hit && b.idForHit(hit);
         if (id != null) return id;
       }

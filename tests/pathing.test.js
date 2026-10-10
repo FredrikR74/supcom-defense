@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { createWorld, tickWorld, PLAYER_ID, ENEMY_ID } from '../src/sim/world.js';
 import { addStructure, addUnit } from '../src/sim/entities.js';
 import { canPlace } from '../src/sim/placement.js';
-import { computeSteepCells, cellIndex, isBlockedCell, updatePathing, ARRIVE_DISTANCE, MAX_UNIT_SLOPE } from '../src/sim/pathing.js';
+import { computeSteepCells, cellIndex, isBlockedCell, updatePathing, MAX_UNIT_SLOPE } from '../src/sim/pathing.js';
 import { spawnEnemy } from '../src/sim/enemies.js';
 import { createSpatialHash } from '../src/sim/spatialHash.js';
 import firstDefense from '../src/data/maps/firstDefense.js';
+import units from '../src/data/units.js';
 
 const N = firstDefense.size;
 const world = () => createWorld({ map: firstDefense });
@@ -91,7 +92,7 @@ describe('flödesfält', () => {
 });
 
 describe('fiender', () => {
-  it('en Mantis går från spawnpunkten till kärnan', () => {
+  it('en Mantis går från spawnpunkten till kärnan och stannar inom räckvidd', () => {
     const w = world();
     const m = spawnEnemy(w, 'mantis', 0);
     expect(m.owner).toBe(ENEMY_ID);
@@ -99,13 +100,16 @@ describe('fiender', () => {
       tickWorld(w);
       expect(isBlockedCell(w, cellIndex(w, m.x, m.z))).toBe(false);
     }
-    expect(w.flow.dist[cellIndex(w, m.x, m.z)]).toBeLessThanOrEqual(ARRIVE_DISTANCE);
+    expect(m.targetId).toBe(w.coreId);
+    const core = w.entities.find((e) => e.id === w.coreId);
+    expect(Math.hypot(core.x - m.x, core.z - m.z) - core.radius).toBeLessThanOrEqual(units.mantis.weapon.range);
   });
 
   it('svänger runt en mur och kommer ändå fram', () => {
     const w = world();
-    // Mur tvärs över vägen från västra spawnpunkten, med öppning i norr.
-    for (let z = 52; z <= 76; z++) addStructure(w, 'wall', { x: 50.5, z: z + 0.5, owner: PLAYER_ID });
+    // Mur tvärs över vägen från västra spawnpunkten, med öppning i norr. Neutral
+    // ägare (0) så att fienden inte stannar och skjuter på den.
+    for (let z = 52; z <= 76; z++) addStructure(w, 'wall', { x: 50.5, z: z + 0.5, owner: 0 });
     const m = spawnEnemy(w, 'mantis', 0);
     let crossed = false;
     for (let i = 0; i < 600; i++) {
@@ -114,7 +118,7 @@ describe('fiender', () => {
       if (m.x > 51 && m.z >= 52 && m.z <= 77) crossed = true;
     }
     expect(crossed).toBe(true);
-    expect(w.flow.dist[cellIndex(w, m.x, m.z)]).toBeLessThanOrEqual(ARRIVE_DISTANCE);
+    expect(m.targetId).toBe(w.coreId);
   });
 
   it('är deterministiska för samma seed', () => {

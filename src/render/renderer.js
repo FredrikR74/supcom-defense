@@ -4,6 +4,8 @@ import { createTerrainMesh } from './terrainMesh.js';
 import { createMapMarkers } from './mapMarkers.js';
 import { createEntityView } from './entityView.js';
 import { createPathDebug } from './pathDebug.js';
+import { createCombatView } from './combatView.js';
+import { createHealthBars } from './healthBars.js';
 import { createGhost, setGhostState } from './models.js';
 import { PLAYER_ID } from '../sim/constants.js';
 import { raycastTerrain, isInsideMap, getHeight } from '../sim/terrain.js';
@@ -42,6 +44,10 @@ export function createRenderer(canvas, world) {
   scene.add(entities.meshes, entities.icons, entities.overlay);
   const pathDebug = createPathDebug(terrain);
   scene.add(pathDebug.group);
+  const combat = createCombatView(terrain);
+  scene.add(combat.group);
+  const healthBars = createHealthBars();
+  scene.add(healthBars.group);
 
   // Förhandsvisningar av byggnader man håller på att placera: en pool per typ.
   const placementGhosts = {};
@@ -128,12 +134,18 @@ export function createRenderer(canvas, world) {
     isStrategic() {
       return rig.distance > STRATEGIC_DISTANCE;
     },
-    render(world, alpha, selection) {
+    render(world, alpha, selection, frameSeconds = 0) {
       const strategic = rig.distance > STRATEGIC_DISTANCE;
       entities.sync(world, alpha, selection, PLAYER_ID);
       pathDebug.update(world);
       markers.setStrategic(strategic);
       entities.setStrategic(strategic);
+      // Händelser (skott, träffar, explosioner) blir effekter och töms sedan.
+      combat.handleEvents(world.events);
+      world.events.length = 0;
+      combat.update(world, alpha, frameSeconds);
+      healthBars.group.visible = !strategic;
+      if (!strategic) healthBars.update(world, camera, (e) => entities.labelAnchor(e));
       renderer.render(scene, camera);
     },
   };

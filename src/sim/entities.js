@@ -33,7 +33,7 @@ export function addStructure(world, type, { x, z, owner, built = true }) {
     rallyPoints: def.produces ? [] : null,
     repeat: false,
   };
-  world.entities.push(entity);
+  track(world, entity);
   markOccupancy(world, entity, entity.id);
   return entity;
 }
@@ -59,11 +59,37 @@ export function addUnit(world, type, { x, z, owner, heading = 0 }) {
     maxHp: def.maxHp,
     orders: [],
   };
-  world.entities.push(entity);
+  track(world, entity);
   return entity;
 }
 
+/**
+ * Skapar ett vrak där en enhet eller byggnad dog. Vrak blockerar inte och
+ * kan senare återvinnas för sin mass (fas 8).
+ */
+export function addWreck(world, { type, x, z, heading = 0, radius, mass }) {
+  const entity = {
+    id: world.nextEntityId++,
+    kind: 'wreck',
+    type,
+    owner: 0,
+    x,
+    z,
+    heading,
+    radius,
+    mass,
+  };
+  track(world, entity);
+  return entity;
+}
+
+function track(world, entity) {
+  world.entities.push(entity);
+  world.byId?.set(entity.id, entity);
+}
+
 export function getEntity(world, id) {
+  if (world.byId) return world.byId.get(id) ?? null;
   return world.entities.find((e) => e.id === id) ?? null;
 }
 
@@ -71,5 +97,6 @@ export function removeEntity(world, id) {
   const i = world.entities.findIndex((e) => e.id === id);
   if (i < 0) return;
   const [entity] = world.entities.splice(i, 1);
+  world.byId?.delete(id);
   if (entity.kind === 'structure') markOccupancy(world, entity, 0);
 }

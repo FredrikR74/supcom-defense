@@ -167,21 +167,21 @@ tests/
 
 ## Fas 6: Strid
 
-- [ ] **6.1 HP och död.** HP-stapel. Vid 0 HP tas enheten bort och lämnar ett vrak.
+- [x] **6.1 HP och död.** HP-stapel. Vid 0 HP tas enheten bort och lämnar ett vrak.
   *Test (Vitest):* skada som överstiger HP ger en död enhet.
-- [ ] **6.2 Fiender skadar kärnan.** Fiender som når kärnan stannar och skjuter på den.
+- [x] **6.2 Fiender skadar kärnan.** Fiender som når kärnan stannar och skjuter på den.
   *Test:* kärnans HP sjunker.
-- [ ] **6.3 Rumsligt rutnät (spatial hash)** för snabba avståndsfrågor.
+- [x] **6.3 Rumsligt rutnät (spatial hash)** för snabba avståndsfrågor.
   *Test (Vitest):* `queryRadius` returnerar rätt enheter.
-- [ ] **6.4 Tornens målsökning.** Närmaste fiende inom räckvidd, eller den som är närmast kärnan.
+- [x] **6.4 Tornens målsökning.** Närmaste fiende inom räckvidd, eller den som är närmast kärnan.
   *Test (Vitest):* rätt mål väljs.
-- [ ] **6.5 Point Defense skjuter.** Projektiler med hastighet, skada och eldhastighet. Tornet vrider sitt torn mot målet.
+- [x] **6.5 Point Defense skjuter.** Projektiler med hastighet, skada och eldhastighet. Tornet vrider sitt torn mot målet.
   *Test:* tornet dödar en fiende.
-- [ ] **6.6 Fiender skjuter på byggnader.** De angriper torn och murar inom räckvidd på vägen.
+- [x] **6.6 Fiender skjuter på byggnader.** De angriper torn och murar inom räckvidd på vägen.
   *Test:* ett torn tar skada.
-- [ ] **6.7 Byggnader kan förstöras.** Flödesfältet räknas om.
+- [x] **6.7 Byggnader kan förstöras.** Flödesfältet räknas om.
   *Test:* en förstörd mur öppnar en väg.
-- [ ] **6.8 Muzzle flash och explosionseffekt.** En enkel partikelboll.
+- [x] **6.8 Muzzle flash och explosionseffekt.** En enkel partikelboll.
 
 ## Fas 7: Vågor
 

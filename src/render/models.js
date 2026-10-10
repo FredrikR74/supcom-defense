@@ -129,17 +129,20 @@ const MODELS = {
     return [box(0.98, 1.3, 0.98, MATERIALS.concrete, 0, 0.65, 0)];
   },
 
+  /** DM1 Plasma Cannon: fast sockel och ett torn ('turret') som vrids mot målet. */
   pointDefense() {
     const { metal, team, dark } = MATERIALS;
     const barrel = cylinder(0.08, 0.7, dark, 0, 0.8, 0.45, 8);
     barrel.rotation.x = Math.PI / 2;
-    return [
-      cylinder(0.45, 0.5, metal, 0, 0.25, 0),
-      box(0.55, 0.35, 0.6, team, 0, 0.75, 0),
-      barrel,
-    ];
+    const turret = new THREE.Group();
+    turret.name = 'turret';
+    turret.add(box(0.55, 0.35, 0.6, team, 0, 0.75, 0), barrel);
+    return [cylinder(0.45, 0.5, metal, 0, 0.25, 0), turret];
   },
 };
+
+/** Mörkt, matt material för vrak. */
+export const WRECK_MATERIAL = new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 1, metalness: 0.2 });
 
 export function createModel(type) {
   const group = new THREE.Group();

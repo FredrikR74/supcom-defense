@@ -18,7 +18,11 @@ export function createHoverInfo(el) {
       if (!entity) return;
       const def = getDef(entity.type);
       name.textContent = def?.unitName ? `${def.unitName} (${def.name})` : def?.name ?? entity.type;
-      if (entity.kind === 'structure' && !entity.built) {
+      if (entity.kind === 'wreck') {
+        name.textContent = 'Wreckage';
+        fill.style.width = '0%';
+        hp.textContent = `Mass ${Math.round(entity.mass)}`;
+      } else if (entity.kind === 'structure' && !entity.built) {
         fill.style.width = `${entity.progress * 100}%`;
         fill.style.background = '#67e8f9';
         hp.textContent = `Building ${Math.floor(entity.progress * 100)}%`;

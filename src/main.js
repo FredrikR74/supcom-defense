@@ -93,7 +93,7 @@ function frame(now) {
 
   const ndc = cameraInput.mouseNdc();
   buildInput.update(ndc);
-  view.render(world, alpha, selection);
+  view.render(world, alpha, selection, frameSeconds);
 
   const hovered = ndc && !ui.placing && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y));
   hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));

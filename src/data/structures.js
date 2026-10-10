@@ -52,5 +52,7 @@ export default {
     maxHp: 1300,
     cost: { mass: 80, energy: 400 },
     buildTime: 150,
+    /** FA: 50 skada per skott, 3,33 skott/s, räckvidd 26 (halverad här). `turnRate` i grader/s. */
+    weapon: { damage: 50, rateOfFire: 3.33, range: 13, projectileSpeed: 30, turnRate: 180, muzzleHeight: 0.8 },
   },
 };

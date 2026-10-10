@@ -6,6 +6,7 @@ import { applyCommands } from './commands.js';
 import { movementSystem } from './systems/movement.js';
 import { constructionDemand, constructionProgress } from './systems/construction.js';
 import { separationSystem } from './systems/separation.js';
+import { targetingSystem, weaponsSystem, projectileSystem, deathSystem } from './systems/combat.js';
 import { computeSteepCells, updatePathing } from './pathing.js';
 import { TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 import gameConfig from '../data/gameConfig.js';
@@ -33,7 +34,13 @@ export function createWorld({ seed = 1, map = null, config = {} } = {}) {
     pathDirty: true,
     pathVersion: 0,
     entities: [],
+    /** Entitets-id -> entitet, för snabb uppslagning. */
+    byId: new Map(),
     nextEntityId: 1,
+    /** Projektiler i luften. */
+    projectiles: [],
+    /** Händelser för renderingen (skott, träffar, explosioner); töms av den som läser dem. */
+    events: [],
     commands: [],
     players: {
       [PLAYER_ID]: {
@@ -79,10 +86,14 @@ function economySystem(world) {
 export function tickWorld(world) {
   applyCommands(world);
   if (world.map) updatePathing(world);
+  targetingSystem(world);
   movementSystem(world);
   separationSystem(world);
   constructionDemand(world);
   economySystem(world);
   constructionProgress(world);
+  weaponsSystem(world);
+  projectileSystem(world);
+  deathSystem(world);
   world.tick++;
 }
