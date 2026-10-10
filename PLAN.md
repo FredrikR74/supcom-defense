@@ -4,7 +4,7 @@ Ett single player-tower defense-spel i webbläsaren, med Supreme Commander: Forg
 
 ## Spelidé
 
-- Du börjar med en **Commander (ACU)**, en **kärnbyggnad** (t.ex. en Quantum Gate) och ett startkapital i **mass** och **energi**.
+- Du börjar med en **UEF Armored Command Unit (ACU)**, en **kärnbyggnad** (en Quantum Gate) och ett startkapital i **mass** och **energi**.
 - Du bygger en bas: ekonomibyggnader och försvarstorn.
 - Du startar själv nästa **våg**. Fiender kommer från en eller flera kanter av kartan och försöker förstöra kärnan.
 - Ekonomibyggnaderna (Mass Extractors på fyndigheter och Power Generators) ger löpande inkomst. Den används till fler torn, uppgraderingar och **reparationer**.
@@ -28,6 +28,7 @@ Ett single player-tower defense-spel i webbläsaren, med Supreme Commander: Forg
 4. **Varje steg har ett test.** Det är antingen ett automatiskt test (Vitest) eller en manuell kontroll i webbläsaren.
 5. **Börja fult.** Använd boxar och cylindrar i stället för modeller. Snygga grafiken sist.
 6. **All balans ligger i data.** Enheter, torn och vågor definieras i `data/` så att du kan finjustera utan att ändra logiken.
+7. **Bara riktiga FA-enheter och FA-byggnader.** Allt spelaren bygger och alla fiender ska finnas i Supreme Commander: Forged Alliance, med samma namn, tech-nivå och roll. Spelaren är **UEF** och fienderna är **Cybran**. Vi hittar inte på egna enheter eller byggnader. Det enda avsteget från FA är spelläget (tower defense). Namn, roller och ungefärliga relationer mellan stats tas från FA. Absoluta värden får skalas för balansen. Ett test kontrollerar att alla namn i `data/` finns på en godkänd lista (se 4.11).
 
 ## Teknikval
 
@@ -125,6 +126,25 @@ tests/
 - [x] **4.7 Ingenjörer.** Kan byggas från kärnan eller en fabrik och hjälpa till att bygga (assist). Byggkraften läggs ihop.
   *Test (Vitest):* två byggare halverar tiden.
 
+## Fas 4b: Byggarbetsflöden som i SupCom
+
+- [ ] **4.8 Land Factory.** UEF T1 Land Factory kan byggas av ACU:n och ingenjörer och har en produktionskö. **Ingenjörer byggs i fabriken och inte i kärnan**, som i FA. Kärnan (Quantum Gate) slutar producera ingenjörer.
+  *Test (Vitest):* fabriken producerar en ingenjör efter buildTime / buildPower. Kärnan har ingen produktionslista.
+- [ ] **4.9 Waypoint från fabrik.** Högerklick med fabriken markerad sätter en samlingspunkt (rally point). Shift+högerklick köar flera waypoints. Nya enheter följer dem. Visa en flagga och linjer när fabriken är markerad.
+  *Test (Vitest):* en ny enhet får fabrikens waypoints som order. Manuellt: enheterna går till flaggan.
+- [ ] **4.10 Repetera produktion.** En knapp slår av och på repetering av kön, som i FA.
+  *Test (Vitest):* med repetering läggs en färdig enhet sist i kön igen.
+- [ ] **4.11 Kontroll av FA-namn.** En lista över godkända FA-namn (UEF och Cybran) med tech-nivå. Den ska kontrolleras mot en FA-enhetsdatabas när steget görs. Byt `Wall` mot FA:s namn *Wall Section*.
+  *Test (Vitest):* varje `name` i `data/structures.js` och `data/units.js` finns på listan.
+- [ ] **4.12 Dra ut en rad byggnader med Shift+dra.** I placeringsläget håller du Shift och drar från en startpunkt. Förhandsvisningar läggs ut längs linjen med en byggnads bredd mellan sig, så att murar blir sammanhängande. När du släpper köas alla platser som är giltiga, i ordning från startpunkten.
+  *Test (Vitest):* `lineOfPlacements(start, end, size)` ger rätt rutor för vågräta, lodräta och diagonala drag. Manuellt: dra en mur med 10 sektioner.
+- [ ] **4.13 Assistera en annan enhet.** Högerklick med byggare markerade:
+  - på en **egen byggare** (ACU eller ingenjör): följ den och hjälp till med det den bygger
+  - på en **egen fabrik**: hjälp fabriken så att produktionen går fortare (byggkrafterna läggs ihop)
+
+  Assisten gäller tills du ger en ny order. Har den assisterade inget jobb väntar assisten intill den.
+  *Test (Vitest):* en ingenjör som assisterar ACU:n gör ACU:ns bygge snabbare. En ingenjör som assisterar fabriken gör produktionen snabbare. Assisten följer efter när ACU:n går.
+
 ## Fas 5: Fiender och vägar
 
 - [ ] **5.1 Passerbarhetsrutnät.** Branta rutor och byggnader blockerar. Lägg till ett felsökningsläge som visar dem.
@@ -133,7 +153,7 @@ tests/
   *Test (Vitest):* varje fri ruta pekar mot en granne närmare kärnan.
 - [ ] **5.3 Visualisera flödesfältet.** Felsökningsläge med pilar.
   *Test:* pilarna går runt en mur du bygger.
-- [ ] **5.4 Spawna en fiende.** En T1-stridsvagn som följer flödesfältet till kärnan.
+- [ ] **5.4 Spawna en fiende.** En Cybran T1 *Mantis* (stridsvagn) som följer flödesfältet till kärnan.
   *Test:* den kör till kärnan och svänger runt hinder.
 - [ ] **5.5 Placeringsregel: aldrig helt instängd.** Förbjud en placering om den gör att någon spawnpunkt saknar väg till kärnan. Det här är alternativ A. Alternativ B är att fiender skjuter sig igenom.
   *Test (Vitest):* en placering som stänger vägen nekas.
@@ -167,7 +187,7 @@ tests/
 - [ ] **7.3 Våg klar.** När alla fiender i vågen är döda startar byggfasen och du får en eventuell bonus i mass.
   *Test (Vitest):* tillståndet växlar korrekt.
 - [ ] **7.4 Belöning per fiende.** Mass i vrak som kan återvinnas, eller som tilldelas direkt.
-- [ ] **7.5 Fler fiendetyper.** Snabb lätt enhet (scout), tung långsam enhet och artilleri med lång räckvidd som beskjuter tornen.
+- [ ] **7.5 Fler fiendetyper (Cybran T1).** *Mole* (Land Scout: snabb och svag), *Hunter* (Light Assault Bot) och *Medusa* (Mobile Light Artillery, lång räckvidd som beskjuter tornen).
   *Test:* varje typ syns i en egen testvåg.
 
 ## Fas 8: Reparation och återvinning
@@ -192,17 +212,19 @@ tests/
 
 ## Fas 10: Fler torn och djup
 
-- [ ] Wall-segment som fäster ihop med varandra
-- [ ] Artilleritorn (ballistiskt, områdesskada)
-- [ ] Luftvärn och flygande fiender som ignorerar flödesfältet och flyger rakt
-- [ ] Sköldgenerator (en bubbla som absorberar skada och drar energi)
-- [ ] Radar som visar inkommande vågor på minimapen
-- [ ] Uppgraderingar från T1 till T2 till T3
-- [ ] Mass Fabricator (gör om energi till mass)
-- [ ] Adjacency-bonus (lagringsbyggnader intill extractors)
-- [ ] Taktisk missilavskjutare med TMD-försvar
-- [ ] Bossvågor med experimentella enheter (t.ex. en Monkeylord-liknande spindel)
-- [ ] Fiender i flera fraktioner med olika stil
+Allt här är FA-byggnader och FA-enheter. De nya namnen läggs till på den godkända listan från 4.11.
+
+- [ ] Wall Section som visuellt fäster ihop med intilliggande sektioner
+- [ ] T1 Anti-Air Turret och Cybran-flyg (t.ex. *Zeus* T1 Bomber och *Jester* T1 Light Gunship) som ignorerar flödesfältet och flyger rakt
+- [ ] T2: Point Defense, Artillery Installation, Shield Generator, Tactical Missile Defense och Cybran T2-fiender (t.ex. *Rhino*)
+- [ ] Radar System som visar inkommande vågor på minimapen
+- [ ] Uppgradering av Mass Extractor och fabriker från T1 till T2 till T3, som i FA
+- [ ] Mass Fabricator, Mass Storage och Energy Storage med adjacency-bonus som i FA
+- [ ] Fiender med Tactical Missile Launcher, mot spelarens Tactical Missile Defense
+- [ ] Cybran T3 (t.ex. *Loyalist* och *Brick*)
+- [ ] Bossvågor med Cybran-experimentella enheter: *Monkeylord* och *Megalith*
+- [ ] Quantum Gate kan bygga Support Armored Command Units, som i FA
+- [ ] Fler fiendefraktioner (Aeon och Seraphim) med sina egna FA-enheter
 
 ## Fas 11: Utseende
 
