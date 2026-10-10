@@ -17,6 +17,7 @@ const HANDLERS = {
   assist: applyAssist,
   sell: applySell,
   produce: applyProduce,
+  cancelProduce: applyCancelProduce,
   setRally: applySetRally,
   setRepeat: applySetRepeat,
   setDifficulty: (world, { value }) => setDifficulty(world, value),
@@ -161,6 +162,25 @@ function applyProduce(world, { owner, id, unit, count = 1 }) {
   if (!e || e.kind !== 'structure' || e.owner !== owner) return;
   if (!structures[e.type].produces?.includes(unit)) return;
   for (let i = 0; i < count; i++) e.productionQueue.push(unit);
+}
+
+/**
+ * `{ type: 'cancelProduce', owner, id, index }`: ta bort en enhet ur fabrikens kö.
+ * Är det den som byggs just nu får man tillbaka det den kostat hittills.
+ */
+function applyCancelProduce(world, { owner, id, index }) {
+  const e = getEntity(world, id);
+  if (!e || e.kind !== 'structure' || e.owner !== owner || !e.productionQueue?.[index]) return;
+  const [unit] = e.productionQueue.splice(index, 1);
+  if (index !== 0) return;
+  const economy = world.players[owner]?.economy;
+  const cost = units[unit].cost;
+  if (economy) {
+    for (const r of ['mass', 'energy']) {
+      economy[r].stored = Math.min(economy[r].max, economy[r].stored + cost[r] * e.productionProgress);
+    }
+  }
+  e.productionProgress = 0;
 }
 
 /** Egna fabriker bland `ids`, även ofärdiga. */

@@ -191,3 +191,37 @@ describe('assistera en annan enhet', () => {
     expect(acu.orders).toEqual([]);
   });
 });
+
+describe('kö i fabriken', () => {
+  it('köar 5 åt gången (Ctrl+klick)', () => {
+    const { world, factory } = setup();
+    cmd(world, { type: 'produce', id: factory.id, unit: 'striker', count: 5 });
+    ticks(world, 1);
+    expect(factory.productionQueue).toEqual(Array(5).fill('striker'));
+  });
+
+  it('en köad enhet kan tas bort utan återbetalning', () => {
+    const { world, factory } = setup();
+    cmd(world, { type: 'produce', id: factory.id, unit: 'engineer', count: 3 });
+    ticks(world, 1);
+    const mass = world.players[PLAYER_ID].economy.mass.stored;
+    cmd(world, { type: 'cancelProduce', id: factory.id, index: 2 });
+    ticks(world, 1);
+    expect(factory.productionQueue).toHaveLength(2);
+    expect(world.players[PLAYER_ID].economy.mass.stored).toBeLessThanOrEqual(mass);
+  });
+
+  it('att avbryta enheten som byggs ger tillbaka det den kostat hittills', () => {
+    const { world, factory } = setup();
+    const economy = world.players[PLAYER_ID].economy;
+    cmd(world, { type: 'produce', id: factory.id, unit: 'engineer', count: 2 });
+    ticks(world, Math.round(ENGINEER_TICKS / 2));
+    expect(factory.productionProgress).toBeCloseTo(0.5, 1);
+    economy.mass.stored = 100;
+    const progress = factory.productionProgress;
+    cmd(world, { type: 'cancelProduce', id: factory.id, index: 0 });
+    ticks(world, 1);
+    expect(factory.productionQueue).toEqual(['engineer']);
+    expect(economy.mass.stored).toBeGreaterThanOrEqual(100 + units.engineer.cost.mass * progress - 1);
+  });
+});

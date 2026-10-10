@@ -10,10 +10,43 @@ const costText = (cost) => `${cost.mass} M · ${cost.energy} E`;
  * och repetering för markerade fabriker, och Sell för markerade byggnader.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
-export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell, onPatrol }) {
+export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, onRepeat, onSell, onPatrol }) {
   let signature = '';
   /** Enhetstyp -> framstegsstapel i dess produktionsknapp; uppdateras varje frame. */
   let progressBars = new Map();
+  /** Framstegsstapel i köns första ruta. */
+  let queueBar = null;
+
+  /** Fabrikens hela kö som rutor i ordning; högerklick tar bort en (som i FA). */
+  function queueStrip(factory) {
+    const strip = document.createElement('div');
+    strip.className = 'cmd-queue';
+    strip.title = 'Right-click to remove';
+    factory.productionQueue.forEach((type, i) => {
+      const def = units[type];
+      const chip = document.createElement('span');
+      chip.className = 'queue-chip' + (i === 0 ? ' queue-current' : '');
+      chip.textContent = def.unitName ?? def.name;
+      if (i === 0) {
+        queueBar = document.createElement('span');
+        queueBar.className = 'queue-progress';
+        chip.appendChild(queueBar);
+      }
+      chip.addEventListener('mousedown', (e) => e.stopPropagation());
+      chip.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        onCancelProduce(factory.id, i);
+      });
+      strip.appendChild(chip);
+    });
+    if (factory.repeat) {
+      const loop = document.createElement('span');
+      loop.className = 'queue-repeat';
+      loop.textContent = '↻ repeat';
+      strip.appendChild(loop);
+    }
+    return strip;
+  }
 
   function button(label, sub, onClick, { active = false, badge = '' } = {}) {
     const b = document.createElement('button');
@@ -44,6 +77,9 @@ export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell, o
 
       // Framsteget ändras varje frame, så det uppdateras utan att panelen byggs om.
       const updateProgress = () => {
+        if (queueBar && queueFactory) {
+          queueBar.style.width = `${(queueFactory.built ? queueFactory.productionProgress : 0) * 100}%`;
+        }
         for (const [type, bar] of progressBars) {
           const busy = factories.filter((f) => f.built && f.productionQueue[0] === type);
           const pct = busy.length ? Math.max(...busy.map((f) => f.productionProgress)) * 100 : 0;
@@ -52,8 +88,10 @@ export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell, o
       };
 
       const hasUnits = selected.some((e) => e.kind === 'unit');
+      // Kön visas för en markerad fabrik (den första om flera är markerade).
+      const queueFactory = factories[0] ?? null;
       const sig = JSON.stringify([
-        hasUnits, ui.mode,
+        hasUnits, ui.mode, queueFactory?.id, queueFactory?.productionQueue,
         [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat,
         sellable.length, ui.placing?.type,
       ]);
@@ -65,31 +103,40 @@ export function createCommandPanel(el, { onBuild, onProduce, onRepeat, onSell, o
 
       el.replaceChildren();
       progressBars = new Map();
+      queueBar = null;
+      const buttons = document.createElement('div');
+      buttons.className = 'cmd-row';
       for (const type of buildable) {
         const def = structures[type];
-        el.appendChild(button(def.name, costText(def.cost), () => onBuild(type), {
+        buttons.appendChild(button(def.name, costText(def.cost), () => onBuild(type), {
           active: ui.placing?.type === type,
         }));
       }
       for (const type of producible) {
         const def = units[type];
         const n = queued(type);
-        const b = button(def.name, costText(def.cost), () => onProduce(type), { badge: n ? `${n}` : '' });
+        // Ctrl+klick köar 5 åt gången.
+        const b = button(def.name, costText(def.cost), (e) => onProduce(type, e.ctrlKey ? 5 : 1), {
+          badge: n ? `${n}` : '',
+        });
+        b.title = 'Click: queue 1 · Ctrl+click: queue 5';
         const bar = document.createElement('span');
         bar.className = 'cmd-progress';
         b.appendChild(bar);
         progressBars.set(type, bar);
-        el.appendChild(b);
+        buttons.appendChild(b);
       }
       if (factories.length) {
-        el.appendChild(button('Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
+        buttons.appendChild(button('Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
       }
       if (hasUnits) {
-        el.appendChild(button('Patrol', 'P', () => onPatrol(), { active: ui.mode === 'patrol' }));
+        buttons.appendChild(button('Patrol', 'P', () => onPatrol(), { active: ui.mode === 'patrol' }));
       }
       if (sellable.length) {
-        el.appendChild(button('Sell', 'Delete', () => onSell()));
+        buttons.appendChild(button('Sell', 'Delete', () => onSell()));
       }
+      if (buttons.childElementCount) el.appendChild(buttons);
+      if (queueFactory?.productionQueue.length) el.appendChild(queueStrip(queueFactory));
       el.hidden = el.childElementCount === 0;
       updateProgress();
     },

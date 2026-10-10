@@ -361,3 +361,41 @@ html, body {
 #mode-hint[hidden] { display: none; }
 
 .info-enemy { color: #fca5a5; }
+
+/* Kommandopanelen: knapprad och fabrikens kö under den */
+#commands { flex-direction: column; align-items: center; }
+.cmd-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+.cmd-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 640px;
+  justify-content: center;
+}
+
+.queue-chip {
+  position: relative;
+  overflow: hidden;
+  padding: 3px 8px;
+  font: 600 11px system-ui, sans-serif;
+  color: #e5e7eb;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 3px;
+  cursor: context-menu;
+}
+
+.queue-chip:hover { border-color: #f87171; }
+.queue-current { border-color: #67e8f9; }
+
+.queue-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 0;
+  background: #67e8f9;
+}
+
+.queue-repeat { align-self: center; font: 600 11px system-ui, sans-serif; color: #facc15; }

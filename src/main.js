@@ -50,9 +50,10 @@ const sellSelected = () => queueCommand(world, { type: 'sell', owner: PLAYER_ID,
 
 const commandPanel = createCommandPanel(document.getElementById('commands'), {
   onBuild: (type) => { ui.placing = { type }; },
-  onProduce: (unit) => {
-    for (const id of selectedIds()) queueCommand(world, { type: 'produce', owner: PLAYER_ID, id, unit });
+  onProduce: (unit, count = 1) => {
+    for (const id of selectedIds()) queueCommand(world, { type: 'produce', owner: PLAYER_ID, id, unit, count });
   },
+  onCancelProduce: (id, index) => queueCommand(world, { type: 'cancelProduce', owner: PLAYER_ID, id, index }),
   onRepeat: (value) => queueCommand(world, { type: 'setRepeat', owner: PLAYER_ID, ids: selectedIds(), value }),
   onPatrol: startPatrol,
   onSell: sellSelected,

@@ -129,6 +129,7 @@ tests/
 
 ## Fas 4b: Byggarbetsflöden som i SupCom
 
+- [x] **4.15 Fabrikskö.** Ctrl+klick köar 5 åt gången. Hela kön visas som rutor i ordning, med framsteg på den första. Högerklick på en ruta tar bort den; tar man bort den som byggs får man tillbaka det den kostat hittills.
 - [x] **4.14 T1-stridsvagn.** UEF MA12 Striker (Medium Tank, UEL0201) byggs i Land Factory, med vridbart torn. Den skjuter medan den kör.
 - [x] **4.8 Land Factory.** UEF T1 Land Factory kan byggas av ACU:n och ingenjörer och har en produktionskö. **Ingenjörer byggs i fabriken och inte i kärnan**, som i FA. Kärnan (Quantum Gate) slutar producera ingenjörer. Man kan köa enheter, sätta waypoints och slå på repetering medan fabriken fortfarande byggs, och produktionen startar när den är klar.
   *Test (Vitest):* fabriken producerar en ingenjör efter buildTime / buildPower. Kärnan har ingen produktionslista. En kö som läggs medan fabriken byggs börjar produceras när fabriken är klar.
