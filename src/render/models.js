@@ -113,6 +113,22 @@ const MODELS = {
     return parts;
   },
 
+  /** UEF MA12 Striker: bandvagn med vridbart torn ('turret'). */
+  striker() {
+    const { metal, team, dark } = MATERIALS;
+    const barrel = cylinder(0.07, 0.8, dark, 0, 0.72, 0.55, 8);
+    barrel.rotation.x = Math.PI / 2;
+    const turret = new THREE.Group();
+    turret.name = 'turret';
+    turret.add(box(0.6, 0.25, 0.65, team, 0, 0.72, 0), barrel);
+    return [
+      box(0.25, 0.3, 1.3, dark, -0.45, 0.15, 0), // band
+      box(0.25, 0.3, 1.3, dark, 0.45, 0.15, 0),
+      box(0.8, 0.3, 1.2, metal, 0, 0.42, 0), // skrov
+      turret,
+    ];
+  },
+
   /** Ingenjör: liten svävare med byggarm. */
   engineer() {
     const { metal, team, glow } = MATERIALS;

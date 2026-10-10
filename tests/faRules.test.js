@@ -178,3 +178,54 @@ describe('veterancy', () => {
     expect(pd.vetLevel).toBe(0);
   });
 });
+
+describe('MA12 Striker (UEF T1 Medium Tank)', () => {
+  it('byggs i Land Factory med FA:s byggtid', () => {
+    const { world, economy } = setup();
+    economy.mass.max = economy.mass.stored = 5000;
+    economy.energy.max = economy.energy.stored = 50000;
+    const f = addStructure(world, 'landFactory', { x: 64, z: 76, owner: PLAYER_ID });
+    expect(structures.landFactory.produces).toContain('striker');
+    cmd(world, { type: 'produce', id: f.id, unit: 'striker' });
+    const n = Math.round(units.striker.buildTime / structures.landFactory.buildPower * 10);
+    ticks(world, n);
+    const tank = world.entities.find((e) => e.type === 'striker');
+    expect(tank).toBeDefined();
+    expect(tank.owner).toBe(PLAYER_ID);
+  });
+
+  it('skjuter på fiender, även medan den kör', () => {
+    const { world } = setup();
+    const tank = addUnit(world, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
+    const m = addUnit(world, 'mantis', { x: 46, z: 40, owner: ENEMY_ID });
+    m.orders.length = 0;
+    cmd(world, { type: 'move', ids: [tank.id], x: 40, z: 50 });
+    ticks(world, 30);
+    expect(m.hp).toBeLessThan(m.maxHp);
+  });
+});
+
+describe('fixar', () => {
+  it('en ACU som strider räknas inte som sysslolös', () => {
+    const { world, acu } = setup();
+    const m = addUnit(world, 'mantis', { x: acu.x + 5, z: acu.z, owner: ENEMY_ID });
+    m.orders.length = 0;
+    ticks(world, 2);
+    expect(acu.targetId).toBe(m.id);
+    expect(isIdleBuilder(acu)).toBe(false);
+  });
+
+  it('en dödad ingenjörs byggkö försvinner', () => {
+    const { world } = setup();
+    const eng = addUnit(world, 'engineer', { x: 50, z: 80, owner: PLAYER_ID });
+    for (const [i, x] of [40.5, 42.5, 44.5].entries()) {
+      cmd(world, { type: 'build', ids: [eng.id], structure: 'wall', x, z: 90.5, queue: i > 0 });
+    }
+    ticks(world, 2);
+    expect(eng.orders).toHaveLength(3);
+    eng.hp = 0;
+    ticks(world, 1);
+    expect(getEntity(world, eng.id)).toBeNull();
+    expect(eng.orders).toHaveLength(0);
+  });
+});

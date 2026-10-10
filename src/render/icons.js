@@ -61,6 +61,14 @@ const DRAW = {
     ctx.fill();
     ctx.stroke();
   },
+  /** UEF-stridsvagn: blå rektangel med vit kant. */
+  striker: (ctx, s) => {
+    ctx.fillStyle = TEAM;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.fillRect(14, 20, s - 28, s - 40);
+    ctx.strokeRect(14, 20, s - 28, s - 40);
+  },
   /** Cybran-landenhet: liten röd cirkel med vit kant. */
   mantis: (ctx, s) => {
     ctx.fillStyle = '#ef4444';

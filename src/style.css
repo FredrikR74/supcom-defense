@@ -215,8 +215,8 @@ html, body {
   .resource-income, .resource-spent { min-width: 34px; }
 }
 
-/* Vågpanel uppe till höger */
-#waves {
+/* Hotpanel uppe till höger */
+#threat {
   position: fixed;
   top: 8px;
   right: 8px;
@@ -229,25 +229,13 @@ html, body {
   border-radius: 6px;
 }
 
-.wave-title { font-weight: 700; font-size: 13px; }
-.wave-status { color: #9ca3af; }
-.wave-preview { color: #fca5a5; min-height: 1em; }
+.threat-title { font-weight: 700; font-size: 13px; }
+.threat-status { color: #9ca3af; }
+.threat-enemies { color: #fca5a5; }
+.threat-difficulty { display: block; margin-top: 6px; }
+.threat-difficulty-label { display: block; color: #e5e7eb; font-weight: 600; }
+.threat-difficulty input { width: 100%; accent-color: #facc15; }
 
-.wave-button {
-  width: 100%;
-  margin-top: 6px;
-  padding: 6px;
-  font: 600 12px system-ui, sans-serif;
-  color: #0b0f14;
-  background: #facc15;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.wave-button:hover:not(:disabled) { background: #fde047; }
-.wave-button:disabled { background: #4b5563; color: #9ca3af; cursor: default; }
-.wave-button[hidden] { display: none; }
 
 /* Notis mitt på skärmen */
 #toast {
@@ -266,9 +254,9 @@ html, body {
 
 #toast[hidden] { display: none; }
 
-/* På smala skärmar flyttas vågpanelen ner under resurspanelen */
+/* På smala skärmar flyttas hotpanelen ner under resurspanelen */
 @media (max-width: 900px) {
-  #waves { top: 52px; width: 170px; }
+  #threat { top: 52px; width: 170px; }
 }
 
 /* Info om markeringen, nere till vänster */

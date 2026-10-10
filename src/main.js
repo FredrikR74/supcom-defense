@@ -11,7 +11,7 @@ import { createDebugOverlay } from './ui/debug.js';
 import { createResourcePanel } from './ui/resourcePanel.js';
 import { createHoverInfo } from './ui/hoverInfo.js';
 import { createCommandPanel } from './ui/commandPanel.js';
-import { createWavePanel } from './ui/wavePanel.js';
+import { createThreatPanel } from './ui/threatPanel.js';
 import { createSelectionInfo } from './ui/selectionInfo.js';
 import { createIdlePanel } from './ui/idlePanel.js';
 import firstDefense from './data/maps/firstDefense.js';
@@ -51,9 +51,8 @@ const commandPanel = createCommandPanel(document.getElementById('commands'), {
   onSell: sellSelected,
 });
 
-const startNextWave = () => queueCommand(world, { type: 'startWave', owner: PLAYER_ID });
-const wavePanel = createWavePanel(document.getElementById('waves'), document.getElementById('toast'), {
-  onStartWave: startNextWave,
+const threatPanel = createThreatPanel(document.getElementById('threat'), document.getElementById('toast'), {
+  onDifficulty: (value) => queueCommand(world, { type: 'setDifficulty', owner: PLAYER_ID, value }),
 });
 
 const selectionInfo = createSelectionInfo(document.getElementById('info'));
@@ -67,8 +66,6 @@ const idlePanel = createIdlePanel(document.getElementById('idle'), {
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Delete') sellSelected();
-  // Enter startar nästa våg.
-  if (e.code === 'Enter') startNextWave();
   // Felsökning: P = blockerade rutor, O = flödesfältet.
   if (e.code === 'KeyP') view.toggleBlockedCells();
   if (e.code === 'KeyO') view.toggleFlowField();
@@ -113,7 +110,7 @@ function frame(now) {
   const ndc = cameraInput.mouseNdc();
   buildInput.update(ndc);
   for (const ev of world.events) {
-    if (ev.type === 'waveComplete') wavePanel.toast(`Wave ${ev.wave} cleared  +${ev.bonus} mass`);
+    if (ev.type === 'victory') threatPanel.toast('Victory! You survived the Cybran assault');
   }
   view.render(world, alpha, selection, frameSeconds);
 
@@ -121,7 +118,7 @@ function frame(now) {
   hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));
   resources.update(world.players[PLAYER_ID].economy);
   commandPanel.update(world, selection, ui);
-  wavePanel.update(world);
+  threatPanel.update(world);
   selectionInfo.update(world, selection);
   idlePanel.update(world);
 

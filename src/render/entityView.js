@@ -249,7 +249,8 @@ export function createEntityView(terrain) {
         const y = groundY(x, z);
         v.mesh.position.set(x, y, z);
         if (e.heading !== undefined) v.mesh.rotation.y = e.heading;
-        if (v.turret) v.turret.rotation.y = e.turretHeading ?? 0;
+        // Tornets vinkel är i världen; på en enhet är tornet ett barn till den roterade kroppen.
+        if (v.turret) v.turret.rotation.y = (e.turretHeading ?? e.heading ?? 0) - (e.kind === 'unit' ? e.heading ?? 0 : 0);
         // Ofärdiga byggnader växer upp ur marken.
         v.mesh.scale.y = e.kind === 'structure' && !e.built ? 0.1 + 0.9 * e.progress : 1;
         v.icon.position.set(x, y + 1, z);

@@ -77,6 +77,19 @@ export default {
     weapon: { damage: 230, rateOfFire: 10 / 60, range: 15, projectileSpeed: 7, muzzleHeight: 1, ballistic: true },
   },
 
+  /** UEF T1 Medium Tank (UEL0201). 24 skada, 1 skott/s, räckvidd 18, mynningshastighet 25. */
+  striker: {
+    name: 'Medium Tank',
+    unitName: 'MA12 Striker',
+    techCategory: 'TECH1',
+    maxHp: 300,
+    speed: 3.4,
+    radius: 0.7,
+    cost: { mass: 56, energy: 266 },
+    buildTime: 300,
+    weapon: { damage: 24, rateOfFire: 1, range: 9, projectileSpeed: 12.5, turnRate: 180, muzzleHeight: 0.8 },
+  },
+
   /** UEF T1 Engineer (UEL0105). */
   engineer: {
     name: 'Engineer',

@@ -98,13 +98,14 @@ export function weaponsSystem(world) {
     const target = e.targetId ? getEntity(world, e.targetId) : null;
     if (!target) {
       e.weaponCooldown = Math.max(0, e.weaponCooldown);
+      if (e.kind === 'unit') e.turretHeading = undefined; // tornet pekar framåt igen
       continue;
     }
 
     const want = Math.atan2(target.x - e.x, target.z - e.z);
     let aimed = true;
     if (weapon.turnRate) {
-      const current = e.turretHeading ?? 0;
+      const current = e.turretHeading ?? e.heading ?? 0;
       const diff = wrapAngle(want - current);
       const maxTurn = (weapon.turnRate * Math.PI / 180) * TICK_SECONDS;
       e.turretHeading = current + Math.max(-maxTurn, Math.min(maxTurn, diff));
@@ -187,6 +188,8 @@ export function deathSystem(world) {
   const dead = world.entities.filter((e) => isTargetable(e) && e.hp <= 0);
   for (const e of dead) {
     disperseVeterancy(world, e);
+    // En död byggares kö försvinner med den (och därmed köade spöken i renderingen).
+    if (e.orders) e.orders.length = 0;
     const def = getDef(e.type);
     const progress = e.kind === 'structure' ? e.progress : 1;
     const mass = (def.cost?.mass ?? 0) * progress * world.config.wreckMassFraction;

@@ -129,6 +129,7 @@ tests/
 
 ## Fas 4b: Byggarbetsflöden som i SupCom
 
+- [x] **4.14 T1-stridsvagn.** UEF MA12 Striker (Medium Tank, UEL0201) byggs i Land Factory, med vridbart torn. Den skjuter medan den kör.
 - [x] **4.8 Land Factory.** UEF T1 Land Factory kan byggas av ACU:n och ingenjörer och har en produktionskö. **Ingenjörer byggs i fabriken och inte i kärnan**, som i FA. Kärnan (Quantum Gate) slutar producera ingenjörer. Man kan köa enheter, sätta waypoints och slå på repetering medan fabriken fortfarande byggs, och produktionen startar när den är klar.
   *Test (Vitest):* fabriken producerar en ingenjör efter buildTime / buildPower. Kärnan har ingen produktionslista. En kö som läggs medan fabriken byggs börjar produceras när fabriken är klar.
 - [x] **4.9 Waypoint från fabrik.** Högerklick med fabriken markerad sätter en samlingspunkt (rally point). Shift+högerklick köar flera waypoints. Nya enheter följer dem. Visa en flagga och linjer när fabriken är markerad.
@@ -199,12 +200,17 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 
 ## Fas 7: Vågor
 
+> **Ändrat:** vågorna som spelaren startar själv (7.1–7.3) är ersatta av ett kontinuerligt fiendetryck (7.6–7.7). Ekonomin är strömmande, så fienden måste också vara det, annars kan man bara vänta och bygga i oändlighet.
+
 - [x] **7.1 Vågdata.** `waves.js` innehåller en lista med `{ enemies: [{type, count, interval, spawn}] }`.
   *Test (Vitest):* våg 1 ger rätt antal spawns över tid.
 - [x] **7.2 Vågpanel.** Visar "Våg 3/20", en knapp för nästa våg och förhandsinformation om vad som kommer.
 - [x] **7.3 Våg klar.** När alla fiender i vågen är döda startar byggfasen och du får en eventuell bonus i mass.
   *Test (Vitest):* tillståndet växlar korrekt.
 - [x] **7.4 Belöning per fiende.** Mass i vrak som kan återvinnas (som i FA), och en bonus i mass för varje besegrad våg.
+- [x] **7.6 Kontinuerligt fiendetryck.** Fienden har en strömmande "inkomst" i mass per sekund som växer med tiden. Enheter köps löpande när budgeten räcker. Spawnpunkten byts var 30:e sekund, och nya typer låses upp med tiden (Medusa från minut 4). Lugn början på 60 s. Värdena ligger i `gameConfig.director`.
+  *Test (Vitest):* spenderad mass följer budgeten, trycket växer, typer låses upp, och det är deterministiskt.
+- [x] **7.7 Svårighetsreglage 0–100.** Multiplicerar fiendens inkomst: 0 ger ×0,1 (Very easy), 50 ger ×1 (Normal) och 100 ger ×10 (Impossible). Går att ändra under spelet.
 - [x] **7.5 Fler fiendetyper (Cybran T1).** *Mole* (Land Scout: snabb och svag), *Hunter* (Light Assault Bot) och *Medusa* (Mobile Light Artillery, lång räckvidd som beskjuter tornen). *Hunter väntar tills namnet är verifierat för FA; Mole och Medusa är gjorda.*
   *Test:* varje typ syns i en egen testvåg.
 
@@ -220,11 +226,11 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 ## Fas 9: Spelbar match
 
 - [ ] **9.1 Förlust.** Kärnan förstörs och skärmen visar att spelet är över.
-- [ ] **9.2 Vinst.** Sista vågen är klarad.
+- [ ] **9.2 Vinst.** Överlev 20 minuter (`director.survivalSeconds`). Logiken finns redan; segerskärmen återstår.
 - [ ] **9.3 ACU-död.** Den återuppstår efter X sekunder (eller förlust, se designvalen).
 - [ ] **9.4 Startmeny.** Välj karta och svårighetsgrad (HP-multiplikator för fiender).
 - [ ] **9.5 Paus och spelhastighet.**
-- [ ] **9.6 10 balanserade vågor** på en karta.
+- [ ] **9.6 Balansera fiendetrycket** (baseRate, growthPerMinute och enhetsvikter) mot FA-ekonomin.
 
 **🎯 Milstolpe: ett komplett, spelbart tower defense-spel.**
 

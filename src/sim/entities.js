@@ -102,7 +102,8 @@ export function removeEntity(world, id) {
   if (entity.kind === 'structure') markOccupancy(world, entity, 0);
 }
 
-/** En byggare (ACU, ingenjör) utan order och utan pågående bygge. */
+/** En byggare (ACU, ingenjör) utan order, utan pågående bygge och som inte strider. */
 export function isIdleBuilder(e) {
-  return e.kind === 'unit' && (units[e.type]?.buildPower ?? 0) > 0 && e.orders.length === 0 && !e.buildJob;
+  return e.kind === 'unit' && (units[e.type]?.buildPower ?? 0) > 0 && e.orders.length === 0 &&
+    !e.buildJob && !e.targetId;
 }

@@ -41,7 +41,7 @@ export function createHoverInfo(el) {
         const frac = entity.hp / entity.maxHp;
         fill.style.width = `${frac * 100}%`;
         fill.style.background = frac > 0.5 ? '#4ade80' : frac > 0.25 ? '#facc15' : '#ef4444';
-        hp.textContent = `${Math.ceil(entity.hp)} / ${entity.maxHp}`;
+        hp.textContent = `${Math.ceil(entity.hp)} / ${Math.round(entity.maxHp)}`;
       }
 
       const producing = entity.kind === 'structure' && entity.built && entity.productionQueue?.length > 0;

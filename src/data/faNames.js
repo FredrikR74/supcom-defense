@@ -11,6 +11,7 @@ export default [
   { name: 'Armored Command Unit', faction: 'UEF', tech: 1, verified: true },
   { name: 'Engineer', faction: 'UEF', tech: 1, verified: true },
   { name: 'Land Factory', faction: 'UEF', tech: 1, verified: true },
+  { name: 'Medium Tank', unitName: 'MA12 Striker', faction: 'UEF', tech: 1, verified: true },
   { name: 'Mass Extractor', faction: 'UEF', tech: 1, verified: true },
   { name: 'Power Generator', faction: 'UEF', tech: 1, verified: true },
   { name: 'Wall Section', faction: 'UEF', tech: 1, verified: true },

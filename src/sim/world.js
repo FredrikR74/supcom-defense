@@ -11,15 +11,14 @@ import { regenSystem } from './veterancy.js';
 import { computeSteepCells, updatePathing } from './pathing.js';
 import { TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 import gameConfig from '../data/gameConfig.js';
-import defaultWaves from '../data/waves.js';
-import { createWaveState, waveSystem } from './waves.js';
+import { createDirector, directorSystem } from './director.js';
 
 export { TICKS_PER_SECOND, TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 
 /**
  * Hela simuleringens tillstånd. Får inte bero på DOM eller Three.js.
  */
-export function createWorld({ seed = 1, map = null, config = {}, waves = defaultWaves } = {}) {
+export function createWorld({ seed = 1, map = null, config = {} } = {}) {
   const terrain = map ? createTerrainForMap(map) : null;
   const cfg = { ...gameConfig, ...config };
   const world = {
@@ -45,9 +44,8 @@ export function createWorld({ seed = 1, map = null, config = {}, waves = default
     /** Händelser för renderingen (skott, träffar, explosioner); töms av den som läser dem. */
     events: [],
     commands: [],
-    /** Vågdefinitioner (data/waves.js) och vågornas tillstånd. */
-    waveDefs: waves,
-    wave: createWaveState(),
+    /** Fiendens strömmande tryck och svårighetsgrad. */
+    director: createDirector({ ...gameConfig.director, ...config.director }, config.difficulty ?? gameConfig.difficulty),
     players: {
       [PLAYER_ID]: {
         id: PLAYER_ID,
@@ -110,7 +108,7 @@ function economySystem(world) {
 export function tickWorld(world) {
   applyCommands(world);
   if (world.map) {
-    waveSystem(world);
+    directorSystem(world);
     updatePathing(world);
   }
   targetingSystem(world);
