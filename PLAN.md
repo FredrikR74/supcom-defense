@@ -185,13 +185,13 @@ tests/
 
 ## Fas 7: Vågor
 
-- [ ] **7.1 Vågdata.** `waves.js` innehåller en lista med `{ enemies: [{type, count, interval, spawn}] }`.
+- [x] **7.1 Vågdata.** `waves.js` innehåller en lista med `{ enemies: [{type, count, interval, spawn}] }`.
   *Test (Vitest):* våg 1 ger rätt antal spawns över tid.
-- [ ] **7.2 Vågpanel.** Visar "Våg 3/20", en knapp för nästa våg och förhandsinformation om vad som kommer.
-- [ ] **7.3 Våg klar.** När alla fiender i vågen är döda startar byggfasen och du får en eventuell bonus i mass.
+- [x] **7.2 Vågpanel.** Visar "Våg 3/20", en knapp för nästa våg och förhandsinformation om vad som kommer.
+- [x] **7.3 Våg klar.** När alla fiender i vågen är döda startar byggfasen och du får en eventuell bonus i mass.
   *Test (Vitest):* tillståndet växlar korrekt.
-- [ ] **7.4 Belöning per fiende.** Mass i vrak som kan återvinnas, eller som tilldelas direkt.
-- [ ] **7.5 Fler fiendetyper (Cybran T1).** *Mole* (Land Scout: snabb och svag), *Hunter* (Light Assault Bot) och *Medusa* (Mobile Light Artillery, lång räckvidd som beskjuter tornen).
+- [x] **7.4 Belöning per fiende.** Mass i vrak som kan återvinnas (som i FA), och en bonus i mass för varje besegrad våg.
+- [x] **7.5 Fler fiendetyper (Cybran T1).** *Mole* (Land Scout: snabb och svag), *Hunter* (Light Assault Bot) och *Medusa* (Mobile Light Artillery, lång räckvidd som beskjuter tornen). *Hunter väntar tills namnet är verifierat för FA; Mole och Medusa är gjorda.*
   *Test:* varje typ syns i en egen testvåg.
 
 ## Fas 8: Reparation och återvinning

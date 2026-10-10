@@ -71,6 +71,33 @@ const DRAW = {
     ctx.fill();
     ctx.stroke();
   },
+  /** Cybran-scout: liten röd triangel. */
+  mole: (ctx, s) => {
+    ctx.fillStyle = '#ef4444';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(s / 2, 14);
+    ctx.lineTo(s - 16, s - 18);
+    ctx.lineTo(16, s - 18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  },
+  /** Cybran-artilleri: röd cirkel med ett kryss. */
+  medusa: (ctx, s) => {
+    ctx.fillStyle = '#ef4444';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(s / 2, s / 2, s / 2 - 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(22, 22); ctx.lineTo(s - 22, s - 22);
+    ctx.moveTo(s - 22, 22); ctx.lineTo(22, s - 22);
+    ctx.stroke();
+  },
   spawn: (ctx, s) => {
     ctx.fillStyle = '#ef4444';
     ctx.strokeStyle = '#ffffff';

@@ -32,6 +32,32 @@ export default {
     cost: { mass: 40, energy: 200 },
     weapon: { damage: 12, rateOfFire: 2, range: 8, projectileSpeed: 25, muzzleHeight: 0.75 },
   },
+  /** Cybran T1 Land Scout. FA: obeväpnad, mycket låg HP, snabb (har även cloak i FA). */
+  mole: {
+    name: 'Land Scout',
+    unitName: 'Mole',
+    faction: 'Cybran',
+    maxHp: 40,
+    speed: 5,
+    radius: 0.45,
+    /** Ungefärlig kostnad, styr bara vrakets mass. */
+    cost: { mass: 12, energy: 80 },
+  },
+  /**
+   * Cybran T1 Mobile Light Artillery. FA: lägst HP av fraktionernas T1-artilleri,
+   * ballistiska granater (EMP-effekten är inte med än). Räckvidden är längre än
+   * Point Defense, som i FA.
+   */
+  medusa: {
+    name: 'Mobile Light Artillery',
+    unitName: 'Medusa',
+    faction: 'Cybran',
+    maxHp: 150,
+    speed: 2.8,
+    radius: 0.6,
+    cost: { mass: 36, energy: 180 },
+    weapon: { damage: 60, rateOfFire: 0.25, range: 16, projectileSpeed: 12, muzzleHeight: 1, ballistic: true },
+  },
   engineer: {
     name: 'Engineer',
     maxHp: 200,

@@ -88,7 +88,14 @@ export function createCombatView(terrain, capacity = 2048) {
         const x = p.prevX + (p.x - p.prevX) * alpha;
         const z = p.prevZ + (p.z - p.prevZ) * alpha;
         q.setFromAxisAngle(up, Math.atan2(p.tx - p.prevX, p.tz - p.prevZ));
-        m.compose(pos.set(x, ground(x, z) + p.y, z), q, one);
+        let y = ground(x, z) + p.y;
+        if (p.ballistic) {
+          // Artillerigranater flyger i en båge: högst mitt på vägen.
+          const total = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1;
+          const t = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / total);
+          y += 4 * (total * 0.35) * t * (1 - t);
+        }
+        m.compose(pos.set(x, y, z), q, one);
         bolts.setMatrixAt(n, m);
         bolts.setColorAt(n, OWNER_COLORS[p.owner] ?? DEFAULT_COLOR);
         n++;

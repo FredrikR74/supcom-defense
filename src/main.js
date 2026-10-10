@@ -11,6 +11,7 @@ import { createDebugOverlay } from './ui/debug.js';
 import { createResourcePanel } from './ui/resourcePanel.js';
 import { createHoverInfo } from './ui/hoverInfo.js';
 import { createCommandPanel } from './ui/commandPanel.js';
+import { createWavePanel } from './ui/wavePanel.js';
 import firstDefense from './data/maps/firstDefense.js';
 
 const canvas = document.getElementById('game');
@@ -48,8 +49,15 @@ const commandPanel = createCommandPanel(document.getElementById('commands'), {
   onSell: sellSelected,
 });
 
+const startNextWave = () => queueCommand(world, { type: 'startWave', owner: PLAYER_ID });
+const wavePanel = createWavePanel(document.getElementById('waves'), document.getElementById('toast'), {
+  onStartWave: startNextWave,
+});
+
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Delete') sellSelected();
+  // Enter startar nästa våg.
+  if (e.code === 'Enter') startNextWave();
   // Felsökning: P = blockerade rutor, O = flödesfältet.
   if (e.code === 'KeyP') view.toggleBlockedCells();
   if (e.code === 'KeyO') view.toggleFlowField();
@@ -93,12 +101,16 @@ function frame(now) {
 
   const ndc = cameraInput.mouseNdc();
   buildInput.update(ndc);
+  for (const ev of world.events) {
+    if (ev.type === 'waveComplete') wavePanel.toast(`Wave ${ev.wave} cleared  +${ev.bonus} mass`);
+  }
   view.render(world, alpha, selection, frameSeconds);
 
   const hovered = ndc && !ui.placing && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y));
   hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));
   resources.update(world.players[PLAYER_ID].economy);
   commandPanel.update(world, selection, ui);
+  wavePanel.update(world);
 
   const cursor = ndc && view.pickAtNdc(ndc.x, ndc.y);
   debug.update(world, frameSeconds, [

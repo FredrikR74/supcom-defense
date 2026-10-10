@@ -78,6 +78,41 @@ const MODELS = {
     return parts;
   },
 
+  /** Cybran Mole (Land Scout): liten, lätt spindel med en glödande sensor. */
+  mole() {
+    const { dark, enemy, enemyGlow } = MATERIALS;
+    const parts = [
+      box(0.5, 0.2, 0.7, enemy, 0, 0.45, 0),
+      cylinder(0.04, 0.4, dark, 0, 0.75, -0.15, 5),
+      box(0.12, 0.12, 0.12, enemyGlow, 0, 0.98, -0.15),
+    ];
+    for (const [x, z] of [[-0.3, 0.25], [0.3, 0.25], [-0.3, -0.25], [0.3, -0.25]]) {
+      const leg = box(0.08, 0.45, 0.08, dark, x, 0.22, z);
+      leg.rotation.z = x > 0 ? -0.4 : 0.4;
+      parts.push(leg);
+    }
+    return parts;
+  },
+
+  /** Cybran Medusa (Mobile Light Artillery): kropp på fyra ben med ett uppåtriktat kanonrör. */
+  medusa() {
+    const { dark, enemy, enemyGlow } = MATERIALS;
+    const barrel = cylinder(0.1, 1.1, dark, 0, 1.05, 0.25, 8);
+    barrel.rotation.x = Math.PI / 4;
+    const parts = [
+      box(0.85, 0.35, 1.0, enemy, 0, 0.6, 0),
+      box(0.5, 0.3, 0.5, enemy, 0, 0.85, -0.05),
+      box(0.25, 0.06, 0.05, enemyGlow, 0, 0.88, 0.21),
+      barrel,
+    ];
+    for (const [x, z] of [[-0.45, 0.35], [0.45, 0.35], [-0.45, -0.35], [0.45, -0.35]]) {
+      const leg = box(0.12, 0.6, 0.12, dark, x, 0.3, z);
+      leg.rotation.z = x > 0 ? -0.35 : 0.35;
+      parts.push(leg);
+    }
+    return parts;
+  },
+
   /** Ingenjör: liten svävare med byggarm. */
   engineer() {
     const { metal, team, glow } = MATERIALS;

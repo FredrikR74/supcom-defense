@@ -1,6 +1,7 @@
 import { getEntity, removeEntity } from './entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
+import { startWave } from './waves.js';
 
 /**
  * Spelarens kommandon läggs i en kö och verkställs i början av nästa tick.
@@ -18,6 +19,7 @@ const HANDLERS = {
   produce: applyProduce,
   setRally: applySetRally,
   setRepeat: applySetRepeat,
+  startWave: (world) => startWave(world),
 };
 
 export function applyCommands(world) {
