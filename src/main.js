@@ -3,6 +3,7 @@ import { getEntity } from './sim/entities.js';
 import { createFixedStep } from './loop.js';
 import { createRenderer } from './render/renderer.js';
 import { createCameraInput } from './input/cameraInput.js';
+import { createSelectionInput } from './input/selection.js';
 import { createDebugOverlay } from './ui/debug.js';
 import { createResourcePanel } from './ui/resourcePanel.js';
 import { createHoverInfo } from './ui/hoverInfo.js';
@@ -16,6 +17,14 @@ const cameraInput = createCameraInput(canvas, view.rig, view.pickGround);
 const debug = createDebugOverlay(document.getElementById('debug'));
 const resources = createResourcePanel(document.getElementById('resources'));
 const hoverInfo = createHoverInfo(document.getElementById('hover'));
+const selection = new Set();
+const selectionInput = createSelectionInput(
+  canvas,
+  document.getElementById('selection-box'),
+  view,
+  world,
+  selection,
+);
 
 let last = performance.now();
 
@@ -28,7 +37,8 @@ function frame(now) {
 
   // Begränsa så att en lång frame (t.ex. efter en bakgrundsflik) inte ger ett jättehopp.
   cameraInput.update(Math.min(frameSeconds, 0.1));
-  view.render(world, alpha);
+  selectionInput.prune();
+  view.render(world, alpha, selection);
 
   const ndc = cameraInput.mouseNdc();
   const hovered = ndc && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y));

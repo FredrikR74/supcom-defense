@@ -100,14 +100,14 @@ tests/
 
 ## Fas 3: Markering och ACU
 
-- [ ] **3.1 Entiteter i sim.** `world.add({type, x, z, owner})`.
+- [x] **3.1 Entiteter i sim.** `world.add({type, x, z, owner})`.
   *Test (Vitest):* lägg till och ta bort.
-- [ ] **3.2 ACU.** Startar vid kärnan och renderas som en box i spelarens färg.
-- [ ] **3.3 Klickmarkering och lådmarkering.** Den markerade enheten får en ring.
+- [x] **3.2 ACU.** Startar vid kärnan och renderas som en box i spelarens färg.
+- [x] **3.3 Klickmarkering och lådmarkering.** Den markerade enheten får en ring.
   *Test:* manuellt.
-- [ ] **3.4 Flyttorder.** Högerklick på marken, rak linje.
+- [x] **3.4 Flyttorder.** Högerklick på marken, rak linje.
   *Test (Vitest):* enheten är på förväntad position efter N tick.
-- [ ] **3.5 Ordrekö med Shift.** Visa linjer mellan waypoints.
+- [x] **3.5 Ordrekö med Shift.** Visa linjer mellan waypoints.
 
 ## Fas 4: Byggande
 

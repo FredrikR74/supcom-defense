@@ -110,3 +110,13 @@ html, body {
 .hp-fill { height: 100%; }
 
 .hover-hp { font-variant-numeric: tabular-nums; color: #9ca3af; }
+
+/* Lådmarkering */
+#selection-box {
+  position: fixed;
+  border: 1px solid #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+  pointer-events: none;
+}
+
+#selection-box[hidden] { display: none; }

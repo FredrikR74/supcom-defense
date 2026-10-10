@@ -21,6 +21,19 @@ const DRAW = {
     ctx.fillRect(8, 8, s - 16, s - 16);
     ctx.strokeRect(8, 8, s - 16, s - 16);
   },
+  acu: (ctx, s) => {
+    ctx.fillStyle = '#3b82f6';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(s / 2, 4);
+    ctx.lineTo(s - 4, s / 2);
+    ctx.lineTo(s / 2, s - 4);
+    ctx.lineTo(4, s / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  },
   spawn: (ctx, s) => {
     ctx.fillStyle = '#ef4444';
     ctx.strokeStyle = '#ffffff';

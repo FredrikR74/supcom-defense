@@ -36,7 +36,7 @@ export function createRenderer(canvas, world) {
   const markers = createMapMarkers(map, terrain);
   scene.add(markers.meshes, markers.icons);
   const entities = createEntityView(terrain);
-  scene.add(entities.meshes, entities.icons);
+  scene.add(entities.meshes, entities.icons, entities.overlay);
 
   function resize() {
     const w = canvas.clientWidth;
@@ -56,6 +56,14 @@ export function createRenderer(canvas, world) {
   const raycaster = new THREE.Raycaster();
   const ndcVec = new THREE.Vector2();
 
+  function toScreen(worldPoint) {
+    const p = worldPoint.project(camera);
+    return {
+      x: (p.x + 1) / 2 * canvas.clientWidth,
+      y: (1 - p.y) / 2 * canvas.clientHeight,
+    };
+  }
+
   return {
     rig,
     pickGround,
@@ -68,20 +76,20 @@ export function createRenderer(canvas, world) {
       raycaster.setFromCamera(ndcVec.set(ndcX, ndcY), camera);
       return entities.pick(raycaster);
     },
+    /** Skärmposition i pixlar för entitetens mitt. */
+    entityScreenPos(entity) {
+      return toScreen(entities.center(entity));
+    },
     /** Skärmposition i pixlar för punkten ovanför en entitet. */
     entityLabelScreenPos(entity) {
-      const p = entities.labelAnchor(entity).project(camera);
-      return {
-        x: (p.x + 1) / 2 * canvas.clientWidth,
-        y: (1 - p.y) / 2 * canvas.clientHeight,
-      };
+      return toScreen(entities.labelAnchor(entity));
     },
     isStrategic() {
       return rig.distance > STRATEGIC_DISTANCE;
     },
-    render(world, _alpha) {
+    render(world, alpha, selection) {
       const strategic = rig.distance > STRATEGIC_DISTANCE;
-      entities.sync(world);
+      entities.sync(world, alpha, selection);
       markers.setStrategic(strategic);
       entities.setStrategic(strategic);
       renderer.render(scene, camera);

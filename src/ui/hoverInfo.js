@@ -1,4 +1,4 @@
-import structures from '../data/structures.js';
+import { getDef } from '../sim/entities.js';
 
 /** Namn och HP-stapel ovanför den entitet musen är över. */
 export function createHoverInfo(el) {
@@ -17,7 +17,7 @@ export function createHoverInfo(el) {
       el.hidden = !entity;
       if (!entity) return;
       const frac = entity.hp / entity.maxHp;
-      name.textContent = structures[entity.type]?.name ?? entity.type;
+      name.textContent = getDef(entity.type)?.name ?? entity.type;
       fill.style.width = `${frac * 100}%`;
       fill.style.background = frac > 0.5 ? '#4ade80' : frac > 0.25 ? '#facc15' : '#ef4444';
       hp.textContent = `${Math.ceil(entity.hp)} / ${entity.maxHp}`;
