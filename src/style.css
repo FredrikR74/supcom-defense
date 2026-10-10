@@ -383,7 +383,7 @@ html, body {
   background: #1e293b;
   border: 1px solid #475569;
   border-radius: 3px;
-  cursor: context-menu;
+  cursor: pointer;
 }
 
 .queue-chip:hover { border-color: #f87171; }

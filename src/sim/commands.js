@@ -165,13 +165,19 @@ function applyProduce(world, { owner, id, unit, count = 1 }) {
 }
 
 /**
- * `{ type: 'cancelProduce', owner, id, index }`: ta bort en enhet ur fabrikens kö.
- * Är det den som byggs just nu får man tillbaka det den kostat hittills.
+ * `{ type: 'cancelProduce', owner, id, index, count }`: ta bort `count` (standard 1)
+ * enheter av samma typ ur fabrikens kö, med början vid `index`. Tas den som byggs
+ * just nu bort får man tillbaka det den kostat hittills.
  */
-function applyCancelProduce(world, { owner, id, index }) {
+function applyCancelProduce(world, { owner, id, index, count = 1 }) {
   const e = getEntity(world, id);
   if (!e || e.kind !== 'structure' || e.owner !== owner || !e.productionQueue?.[index]) return;
-  const [unit] = e.productionQueue.splice(index, 1);
+  const unit = e.productionQueue[index];
+  let n = 0;
+  while (n < count && e.productionQueue[index] === unit) {
+    e.productionQueue.splice(index, 1);
+    n++;
+  }
   if (index !== 0) return;
   const economy = world.players[owner]?.economy;
   const cost = units[unit].cost;

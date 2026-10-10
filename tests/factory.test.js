@@ -225,3 +225,15 @@ describe('kö i fabriken', () => {
     expect(economy.mass.stored).toBeGreaterThanOrEqual(100 + units.engineer.cost.mass * progress - 1);
   });
 });
+
+describe('kö i fabriken: ta bort flera', () => {
+  it('tar bort upp till count av samma typ från index', () => {
+    const { world, factory } = setup();
+    cmd(world, { type: 'produce', id: factory.id, unit: 'striker', count: 3 });
+    cmd(world, { type: 'produce', id: factory.id, unit: 'engineer', count: 2 });
+    ticks(world, 1);
+    cmd(world, { type: 'cancelProduce', id: factory.id, index: 1, count: 5 });
+    ticks(world, 1);
+    expect(factory.productionQueue).toEqual(['striker', 'engineer', 'engineer']);
+  });
+});

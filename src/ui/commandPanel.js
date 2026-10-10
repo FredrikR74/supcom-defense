@@ -17,11 +17,17 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
   /** Framstegsstapel i köns första ruta. */
   let queueBar = null;
 
-  /** Fabrikens hela kö som rutor i ordning; högerklick tar bort en (som i FA). */
+  /** Som i FA: Ctrl eller Shift gör att ett klick gäller 5 i stället för 1. */
+  const batch = (e) => (e.ctrlKey || e.shiftKey ? 5 : 1);
+
+  /**
+   * Fabrikens hela kö som rutor i ordning. Som i FA: vänsterklick lägger till fler
+   * av samma typ, högerklick tar bort; med Ctrl/Shift 5 åt gången.
+   */
   function queueStrip(factory) {
     const strip = document.createElement('div');
     strip.className = 'cmd-queue';
-    strip.title = 'Right-click to remove';
+    strip.title = 'Left-click: add · Right-click: remove · Shift/Ctrl: 5 at a time';
     factory.productionQueue.forEach((type, i) => {
       const def = units[type];
       const chip = document.createElement('span');
@@ -33,9 +39,10 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
         chip.appendChild(queueBar);
       }
       chip.addEventListener('mousedown', (e) => e.stopPropagation());
+      chip.addEventListener('click', (e) => onProduce(type, batch(e)));
       chip.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        onCancelProduce(factory.id, i);
+        onCancelProduce(factory.id, i, batch(e));
       });
       strip.appendChild(chip);
     });
@@ -115,11 +122,11 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       for (const type of producible) {
         const def = units[type];
         const n = queued(type);
-        // Ctrl+klick köar 5 åt gången.
-        const b = button(def.name, costText(def.cost), (e) => onProduce(type, e.ctrlKey ? 5 : 1), {
+        // Som i FA: Ctrl- eller Shift-klick köar 5 åt gången.
+        const b = button(def.name, costText(def.cost), (e) => onProduce(type, batch(e)), {
           badge: n ? `${n}` : '',
         });
-        b.title = 'Click: queue 1 · Ctrl+click: queue 5';
+        b.title = 'Click: queue 1 · Shift/Ctrl+click: queue 5';
         const bar = document.createElement('span');
         bar.className = 'cmd-progress';
         b.appendChild(bar);
