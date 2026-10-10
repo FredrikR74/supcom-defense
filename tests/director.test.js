@@ -68,9 +68,9 @@ describe('fiendens strömmande tryck', () => {
   it('spenderad mass följer budgeten (inom en enhets kostnad)', () => {
     const w = setup();
     seconds(w, 70);
-    // Integral av (base + growth × min) från lugnets slut i 60 s: 2 × 60 + 1 × 60 / 2 = 150.
-    expect(w.director.spentMass).toBeGreaterThan(150 - units.mantis.cost.mass);
-    expect(w.director.spentMass).toBeLessThanOrEqual(150 + 1e-6);
+    // Inkomst base × (1 + growth × min) i 60 s efter lugnet: 2 × (60 + 60/2) = 180.
+    expect(w.director.spentMass).toBeGreaterThan(180 - units.mantis.cost.mass);
+    expect(w.director.spentMass).toBeLessThanOrEqual(180 + 1e-6);
   });
 
   it('trycket växer med tiden', () => {
@@ -113,10 +113,29 @@ describe('fiendens strömmande tryck', () => {
     expect(w.director.spawned.medusa).toBeGreaterThan(0);
   });
 
-  it('överlever man tiden vinner man och inga fler fiender kommer', () => {
-    const w = setup(50, { ...TEST_DIRECTOR, survivalSeconds: 30 });
-    seconds(w, 31);
-    expect(directorInfo(w).state).toBe('victory');
+  it('spelet tar aldrig slut av sig självt: trycket fortsätter växa', () => {
+    const w = setup(0);
+    seconds(w, 30);
+    const early = threatRate(w.director);
+    w.director.elapsed = 60 * 60; // en timme in
+    expect(threatRate(w.director)).toBeGreaterThan(early * 10);
+    expect(directorInfo(w).state).toBe('active');
+  });
+
+  it('med standardvärdena accelererar trycket (exponent > 1)', () => {
+    const d = { ...gameConfig.director };
+    const rate = (min) => threatRate({ config: d, difficulty: 50, elapsed: d.graceSeconds + min * 60 });
+    expect(rate(10) - rate(9)).toBeGreaterThan(rate(1) - rate(0));
+    expect(rate(10)).toBeGreaterThan(10);
+  });
+
+  it('när kärnan förstörs är det förlust och inga fler fiender kommer', () => {
+    const w = setup();
+    seconds(w, 20);
+    w.entities.find((e) => e.id === w.coreId).hp = 0;
+    seconds(w, 1);
+    expect(directorInfo(w).state).toBe('defeat');
+    expect(w.events.some((e) => e.type === 'defeat')).toBe(true);
     const spent = w.director.spentMass;
     seconds(w, 20);
     expect(w.director.spentMass).toBe(spent);

@@ -2,6 +2,15 @@ import { TICK_SECONDS } from '../constants.js';
 import { guardDestination } from '../guard.js';
 import { flowTarget } from '../pathing.js';
 import { steer } from '../unitPath.js';
+import { getEntity, getDef } from '../entities.js';
+
+/** Gå mot målet tills det är inom vapnets räckvidd; null om målet är borta. */
+function attackDestination(world, e, order) {
+  const target = getEntity(world, order.targetId);
+  const range = getDef(e.type)?.weapon?.range;
+  if (!target || target.hp <= 0 || !range) return null;
+  return { x: target.x, z: target.z, reach: Math.max(0.5, range + target.radius - 0.5) };
+}
 
 /** Målpunkt och stoppavstånd för en order, eller null om ordern inte innebär förflyttning. */
 function destination(world, e, order) {
@@ -9,6 +18,7 @@ function destination(world, e, order) {
     case 'move': return { x: order.x, z: order.z, reach: 0 };
     case 'build': return { x: order.x, z: order.z, reach: order.reach };
     case 'guard': return guardDestination(world, e, order);
+    case 'attack': return attackDestination(world, e, order);
     case 'attackCore': {
       const p = flowTarget(world, e.x, e.z);
       return p && { x: p.x, z: p.z, reach: 0 };
@@ -36,7 +46,11 @@ export function movementSystem(world) {
       const order = e.orders[0];
       const dest = destination(world, e, order);
       if (!dest) {
-        if (order.type === 'guard') e.orders.shift(); // den assisterade är borta
+        // Den assisterade eller målet är borta: nästa order (t.ex. tillbaka mot kärnan).
+        if (order.type === 'guard' || order.type === 'attack') {
+          e.orders.shift();
+          continue;
+        }
         break;
       }
       const goal = order.type === 'attackCore' ? dest : steer(world, e, order, dest);

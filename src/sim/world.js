@@ -6,7 +6,7 @@ import { applyCommands } from './commands.js';
 import { movementSystem } from './systems/movement.js';
 import { constructionDemand, constructionProgress } from './systems/construction.js';
 import { separationSystem } from './systems/separation.js';
-import { targetingSystem, weaponsSystem, projectileSystem, deathSystem } from './systems/combat.js';
+import { targetingSystem, weaponsSystem, projectileSystem, retaliationSystem, deathSystem } from './systems/combat.js';
 import { regenSystem } from './veterancy.js';
 import { computeSteepCells, updatePathing } from './pathing.js';
 import { TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
@@ -119,6 +119,7 @@ export function tickWorld(world) {
   constructionProgress(world);
   weaponsSystem(world);
   projectileSystem(world);
+  retaliationSystem(world);
   deathSystem(world);
   regenSystem(world);
   world.tick++;

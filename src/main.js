@@ -55,6 +55,16 @@ const threatPanel = createThreatPanel(document.getElementById('threat'), documen
   onDifficulty: (value) => queueCommand(world, { type: 'setDifficulty', owner: PLAYER_ID, value }),
 });
 
+/** Kärnan föll: visa hur länge man höll ut och en knapp för att börja om. */
+function showGameOver(elapsed) {
+  const el = document.getElementById('gameover');
+  const m = Math.floor(elapsed / 60);
+  const s = String(Math.floor(elapsed % 60)).padStart(2, '0');
+  el.querySelector('.gameover-time').textContent = `You held out for ${m}:${s}`;
+  el.querySelector('.gameover-restart').onclick = () => location.reload();
+  el.hidden = false;
+}
+
 const selectionInfo = createSelectionInfo(document.getElementById('info'));
 const idlePanel = createIdlePanel(document.getElementById('idle'), {
   onSelect: (unit) => {
@@ -110,7 +120,7 @@ function frame(now) {
   const ndc = cameraInput.mouseNdc();
   buildInput.update(ndc);
   for (const ev of world.events) {
-    if (ev.type === 'victory') threatPanel.toast('Victory! You survived the Cybran assault');
+    if (ev.type === 'defeat') showGameOver(ev.elapsed);
   }
   view.render(world, alpha, selection, frameSeconds);
 

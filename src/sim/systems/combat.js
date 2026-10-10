@@ -65,6 +65,16 @@ export function targetingSystem(world) {
     const weapon = activeWeapon(e);
     if (!weapon) continue;
 
+    // En attackorder bestämmer målet så fort det är inom räckvidd.
+    const order = e.orders?.[0];
+    if (order?.type === 'attack') {
+      const t = getEntity(world, order.targetId);
+      if (t && t.hp > 0 && edgeDistance(e, t) <= weapon.range) {
+        e.targetId = t.id;
+        continue;
+      }
+    }
+
     const current = e.targetId ? getEntity(world, e.targetId) : null;
     if (current && current.hp > 0 && edgeDistance(e, current) <= weapon.range) continue;
 
@@ -175,12 +185,37 @@ export function projectileSystem(world) {
       }
     }
     if (hit) {
+      const wasAlive = hit.hp > 0;
       hit.hp -= p.damage;
       recordDamage(hit, p.sourceId, p.damage);
+      hit.lastAttackerId = p.sourceId;
+      // Dödande skott: skytten får en kill.
+      const shooter = wasAlive && hit.hp <= 0 ? getEntity(world, p.sourceId) : null;
+      if (shooter) shooter.kills = (shooter.kills ?? 0) + 1;
     }
     emit(world, { type: hit ? 'hit' : 'miss', owner: p.owner, x: p.x, z: p.z, y: p.y });
   }
   world.projectiles = remaining;
+}
+
+/**
+ * En beväpnad enhet som blir beskjuten utom räckhåll åker dit och anfaller,
+ * om den står still eller är på väg mot kärnan. En enhet med en flyttorder
+ * fortsätter dit spelaren skickat den.
+ */
+export function retaliationSystem(world) {
+  for (const e of world.entities) {
+    if (e.kind !== 'unit' || e.lastAttackerId == null) continue;
+    const attackerId = e.lastAttackerId;
+    e.lastAttackerId = null;
+    const weapon = activeWeapon(e);
+    if (!weapon || e.targetId) continue; // obeväpnad, eller har redan något att skjuta på
+    const attacker = getEntity(world, attackerId);
+    if (!attacker || attacker.hp <= 0 || edgeDistance(e, attacker) <= weapon.range) continue;
+    const order = { type: 'attack', targetId: attacker.id };
+    if (e.orders.length === 0) e.orders.push(order);
+    else if (e.orders[0].type === 'attackCore') e.orders.unshift(order);
+  }
 }
 
 /** Entiteter med 0 HP tas bort och lämnar ett vrak med en del av sin mass. */

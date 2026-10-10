@@ -210,6 +210,7 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 - [x] **7.4 Belöning per fiende.** Mass i vrak som kan återvinnas (som i FA), och en bonus i mass för varje besegrad våg.
 - [x] **7.6 Kontinuerligt fiendetryck.** Fienden har en strömmande "inkomst" i mass per sekund som växer med tiden. Enheter köps löpande när budgeten räcker. Spawnpunkten byts var 30:e sekund, och nya typer låses upp med tiden (Medusa från minut 4). Lugn början på 60 s. Värdena ligger i `gameConfig.director`.
   *Test (Vitest):* spenderad mass följer budgeten, trycket växer, typer låses upp, och det är deterministiskt.
+- [x] **7.8 Kills, attackorder och motanfall.** Varje enhet räknar sina kills. Högerklick på en fiende ger en attackorder. En beväpnad enhet som beskjuts utom räckhåll åker dit och anfaller, om den står still eller är på väg mot kärnan (en flyttorder respekteras).
 - [x] **7.7 Svårighetsreglage 0–100.** Multiplicerar fiendens inkomst: 0 ger ×0,1 (Very easy), 50 ger ×1 (Normal) och 100 ger ×10 (Impossible). Går att ändra under spelet.
 - [x] **7.5 Fler fiendetyper (Cybran T1).** *Mole* (Land Scout: snabb och svag), *Hunter* (Light Assault Bot) och *Medusa* (Mobile Light Artillery, lång räckvidd som beskjuter tornen). *Hunter väntar tills namnet är verifierat för FA; Mole och Medusa är gjorda.*
   *Test:* varje typ syns i en egen testvåg.
@@ -225,8 +226,8 @@ Värden och regler hämtade direkt från FAF:s spelkod och blueprints (github.co
 
 ## Fas 9: Spelbar match
 
-- [ ] **9.1 Förlust.** Kärnan förstörs och skärmen visar att spelet är över.
-- [ ] **9.2 Vinst.** Överlev 20 minuter (`director.survivalSeconds`). Logiken finns redan; segerskärmen återstår.
+- [x] **9.1 Förlust.** Kärnan förstörs: en förlustskärm visar hur länge man höll ut, med en Restart-knapp.
+- [x] **9.2 Ingen vinst: spelet pågår tills man dör.** Trycket accelererar ((1 + 0,5 × min)^1,5) och växer utan gräns. Panelen visar överlevd tid och hur fort trycket ökar.
 - [ ] **9.3 ACU-död.** Den återuppstår efter X sekunder (eller förlust, se designvalen).
 - [ ] **9.4 Startmeny.** Välj karta och svårighetsgrad (HP-multiplikator för fiender).
 - [ ] **9.5 Paus och spelhastighet.**

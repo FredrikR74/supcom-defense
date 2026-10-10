@@ -1,11 +1,11 @@
-import { directorInfo, difficultyLabel } from '../sim/director.js';
+import { directorInfo, difficultyLabel, threatRate } from '../sim/director.js';
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 /**
- * Panel uppe till höger: överlevd tid mot målet, fiendens tryck just nu,
+ * Panel uppe till höger: överlevd tid, fiendens tryck just nu (och hur det växer),
  * antal fiender och ett reglage för svårighetsgrad (0–100). Visar också korta
- * notiser (t.ex. vid seger). All text är på engelska.
+ * notiser. All text är på engelska.
  */
 export function createThreatPanel(el, toastEl, { onDifficulty }) {
   el.innerHTML = `
@@ -42,12 +42,16 @@ export function createThreatPanel(el, toastEl, { onDifficulty }) {
       if (document.activeElement !== slider) {
         label.textContent = `Difficulty ${info.difficulty} · ${info.label}`;
       }
-      title.textContent = info.state === 'victory'
-        ? 'Victory! You survived'
-        : `Survive ${clock(info.elapsed)} / ${clock(info.survival)}`;
-      status.textContent = info.state === 'grace'
-        ? `Enemies arrive in ${clock(info.graceLeft)}`
-        : `Enemy income ${info.rate.toFixed(1)} mass/s`;
+      title.textContent = info.state === 'defeat'
+        ? `Core destroyed at ${clock(info.elapsed)}`
+        : `Survived ${clock(info.elapsed)}`;
+      if (info.state === 'grace') {
+        status.textContent = `Enemies arrive in ${clock(info.graceLeft)}`;
+      } else {
+        // Hur mycket trycket ökar den närmaste minuten.
+        const inAMinute = threatRate({ ...world.director, elapsed: world.director.elapsed + 60 });
+        status.textContent = `Enemy income ${info.rate.toFixed(1)} mass/s (+${(inAMinute - info.rate).toFixed(1)}/min)`;
+      }
       enemies.textContent = `${info.enemies} ${info.enemies === 1 ? 'enemy' : 'enemies'} on the field`;
     },
 

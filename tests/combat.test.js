@@ -4,6 +4,7 @@ import { addStructure, addUnit, getEntity } from '../src/sim/entities.js';
 import { cellIndex, updatePathing } from '../src/sim/pathing.js';
 import { targetingSystem } from '../src/sim/systems/combat.js';
 import { spawnEnemy } from '../src/sim/enemies.js';
+import { queueCommand } from '../src/sim/commands.js';
 import units from '../src/data/units.js';
 import structures from '../src/data/structures.js';
 import firstDefense from '../src/data/maps/firstDefense.js';
@@ -188,5 +189,66 @@ describe('fiender anfaller', () => {
     ticks(w, 20);
     expect(m.hp).toBeLessThan(m.maxHp);
     expect(units.acu.weapon.range).toBeGreaterThan(6);
+  });
+});
+
+describe('kills, attackorder och motanfall', () => {
+  it('den som skjuter det dödande skottet får en kill', () => {
+    const w = setup();
+    const pd = addStructure(w, 'pointDefense', { x: 30.5, z: 30.5, owner: PLAYER_ID });
+    for (let i = 0; i < 2; i++) {
+      const m = enemyAt(w, 36 + i, 30.5);
+      m.orders.length = 0;
+    }
+    ticks(w, 120);
+    expect(pd.kills).toBe(2);
+  });
+
+  it('en beskjuten enhet utom räckhåll åker dit och anfaller', () => {
+    const w = setup();
+    const tank = addUnit(w, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
+    // Point Defense når längre än stridsvagnen.
+    const pd = addStructure(w, 'pointDefense', { x: 40.5, z: 52.5, owner: ENEMY_ID });
+    // Vänta tills tornet har vridit sig och första skottet har träffat.
+    for (let i = 0; i < 60 && tank.orders.length === 0; i++) tickWorld(w);
+    expect(tank.orders[0]).toMatchObject({ type: 'attack', targetId: pd.id });
+    ticks(w, 40);
+    expect(Math.hypot(tank.x - pd.x, tank.z - pd.z)).toBeLessThanOrEqual(units.striker.weapon.range + pd.radius);
+    expect(pd.hp).toBeLessThan(pd.maxHp);
+  });
+
+  it('en enhet med flyttorder fortsätter dit spelaren skickat den', () => {
+    const w = setup();
+    const tank = addUnit(w, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
+    addStructure(w, 'pointDefense', { x: 40.5, z: 52.5, owner: ENEMY_ID });
+    queueCommand(w, { type: 'move', owner: PLAYER_ID, ids: [tank.id], x: 20, z: 40 });
+    ticks(w, 20);
+    expect(tank.orders[0]?.type).toBe('move');
+  });
+
+  it('fiender på väg mot kärnan vänder och anfaller den som skjuter, sedan fortsätter de', () => {
+    const w = setup();
+    // Fienden är på väg bort från tornet (mot kärnan) och utom sin egen räckvidd.
+    const m = enemyAt(w, 50, 50);
+    m.orders = [{ type: 'attackCore' }];
+    const pd = addStructure(w, 'pointDefense', { x: 41.5, z: 41.5, owner: PLAYER_ID });
+    pd.hp = pd.maxHp = 1e9; // står kvar
+    m.hp = 1e6;
+    m.speed = 0.3; // långsam, så att tornets skott hinner träffa
+    for (let i = 0; i < 80 && m.orders.length === 1; i++) tickWorld(w);
+    expect(m.orders.map((o) => o.type)).toEqual(['attack', 'attackCore']);
+  });
+
+  it('högerklick på fiende ger attackorder', () => {
+    const w = setup();
+    const tank = addUnit(w, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
+    const m = enemyAt(w, 60, 40);
+    m.orders.length = 0;
+    m.hp = 60; // tre skott
+    queueCommand(w, { type: 'attack', owner: PLAYER_ID, ids: [tank.id], targetId: m.id });
+    ticks(w, 100);
+    expect(getEntity(w, m.id)).toBeNull();
+    expect(tank.kills).toBe(1);
+    expect(tank.orders).toEqual([]);
   });
 });

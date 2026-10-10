@@ -1,5 +1,6 @@
 import { spawnEnemy } from './enemies.js';
 import { TICK_SECONDS, ENEMY_ID } from './constants.js';
+import { getEntity } from './entities.js';
 import units from '../data/units.js';
 
 /**
@@ -7,8 +8,9 @@ import units from '../data/units.js';
  * resurser in hela tiden. En budget i mass per sekund växer med speltiden och
  * multipliceras med svårighetsgraden. När budgeten räcker för nästa enhet skapas
  * den. Fienderna kommer en spawnpunkt i taget, som byts med jämna mellanrum.
+ * Spelet tar aldrig slut: trycket växer tills kärnan faller.
  *
- * `world.director.state`: 'grace' (lugn början), 'active', 'victory' (överlevt).
+ * `world.director.state`: 'grace' (lugn början), 'active', 'defeat' (kärnan förstörd).
  */
 
 /** 0 → ×0,1 (mycket lätt), 50 → ×1 (normal), 100 → ×10 (omöjligt). */
@@ -43,10 +45,10 @@ export function createDirector(config, difficulty = 50) {
 
 /** Fiendens inkomst i mass per sekund just nu. */
 export function threatRate(director) {
-  const { baseRate, growthPerMinute, graceSeconds } = director.config;
+  const { baseRate, growthPerMinute, growthExponent = 1, graceSeconds } = director.config;
   if (director.elapsed < graceSeconds) return 0;
   const minutes = (director.elapsed - graceSeconds) / 60;
-  return (baseRate + growthPerMinute * minutes) * difficultyMultiplier(director.difficulty);
+  return baseRate * (1 + growthPerMinute * minutes) ** growthExponent * difficultyMultiplier(director.difficulty);
 }
 
 /** Väljer nästa fiendetyp, viktat efter vad som är upplåst vid den här tiden. */
@@ -68,14 +70,13 @@ export function setDifficulty(world, value) {
 
 export function directorSystem(world) {
   const d = world.director;
-  if (d.state === 'victory') return;
-  d.elapsed += TICK_SECONDS;
-
-  if (d.elapsed >= d.config.survivalSeconds) {
-    d.state = 'victory';
-    world.events.push({ type: 'victory' });
+  if (d.state === 'defeat') return;
+  if (world.coreId && !getEntity(world, world.coreId)) {
+    d.state = 'defeat';
+    world.events.push({ type: 'defeat', elapsed: d.elapsed });
     return;
   }
+  d.elapsed += TICK_SECONDS;
   if (d.elapsed < d.config.graceSeconds) return;
   if (d.state === 'grace') d.state = 'active';
 
@@ -106,7 +107,6 @@ export function directorInfo(world) {
   return {
     state: d.state,
     elapsed: d.elapsed,
-    survival: d.config.survivalSeconds,
     graceLeft: Math.max(0, d.config.graceSeconds - d.elapsed),
     rate: threatRate(d),
     difficulty: d.difficulty,

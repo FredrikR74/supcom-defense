@@ -20,6 +20,7 @@ const HANDLERS = {
   setRally: applySetRally,
   setRepeat: applySetRepeat,
   setDifficulty: (world, { value }) => setDifficulty(world, value),
+  attack: applyAttack,
 };
 
 export function applyCommands(world) {
@@ -48,6 +49,15 @@ function applyMove(world, { owner, ids, x, z, queue }) {
   const tz = Math.min(Math.max(z, 0), size);
   for (const e of ownUnits(world, ids, owner)) {
     giveOrder(e, { type: 'move', x: tx, z: tz }, queue);
+  }
+}
+
+/** `{ type: 'attack', owner, ids, targetId, queue }`: beväpnade enheter anfaller ett mål. */
+function applyAttack(world, { owner, ids, targetId, queue }) {
+  const target = getEntity(world, targetId);
+  if (!target || target.owner === owner || target.owner === 0) return;
+  for (const e of ownUnits(world, ids, owner, (u) => Boolean(units[u.type].weapon))) {
+    giveOrder(e, { type: 'attack', targetId }, queue);
   }
 }
 

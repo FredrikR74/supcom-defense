@@ -64,6 +64,11 @@ export function createSelectionInput(canvas, boxEl, view, world, selection) {
       const assistable = target?.owner === PLAYER_ID && (
         target.kind === 'unit' ||
         (target.kind === 'structure' && (!target.built || target.rallyPoints)));
+      // Högerklick på en fiende: anfall.
+      if (target && target.owner !== PLAYER_ID && target.owner !== 0) {
+        queueCommand(world, { type: 'attack', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
+        return;
+      }
       const helpers = ids.filter((id) => id !== targetId);
       if (assistable && helpers.length > 0) {
         queueCommand(world, { type: 'assist', owner: PLAYER_ID, ids: helpers, targetId, queue: e.shiftKey });

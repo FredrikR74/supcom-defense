@@ -66,6 +66,9 @@ export function createSelectionInfo(el) {
         head = `
           <div class="info-name">${name} <span class="info-vet">${stars(e.vetLevel)}</span></div>
           <div class="info-row"><span class="info-label">HP</span> ${Math.ceil(e.hp)} / ${Math.round(e.maxHp)}${regen ? ` <span class="info-sub">(+${regen}/s)</span>` : ''}</div>`;
+        if (def.weapon) {
+          head += `<div class="info-row"><span class="info-label">Kills</span> ${e.kills ?? 0}</div>`;
+        }
         if (e.kind === 'structure' && !e.built) {
           head += `<div class="info-row"><span class="info-label">Building</span> ${Math.floor(e.progress * 100)}%</div>`;
         }

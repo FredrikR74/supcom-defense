@@ -12,20 +12,21 @@ export default {
   wreckMassFraction: 0.5,
 
   /**
-   * Fiendens strömmande tryck (se sim/director.js). Rate i mass per sekund vid
-   * svårighetsgrad 50; svårighetsgraden multiplicerar (×0,1 vid 0, ×10 vid 100).
+   * Fiendens strömmande tryck (se sim/director.js). Inkomst i mass per sekund:
+   * baseRate × (1 + growthPerMinute × minuter) ^ growthExponent, gånger
+   * svårighetsgradens multiplikator (×0,1 vid 0, ×1 vid 50, ×10 vid 100).
+   * Spelet tar aldrig slut: trycket växer tills kärnan faller.
    */
   director: {
     /** Lugn början innan första fienden. */
     graceSeconds: 60,
     /** Fiendens inkomst när lugnet är slut. */
-    baseRate: 0.6,
-    /** Hur mycket inkomsten ökar per minut. */
-    growthPerMinute: 0.6,
+    baseRate: 1,
+    /** Tillväxt per minut. Med exponenten 1,5 blir det ~15 mass/s efter 10 min. */
+    growthPerMinute: 0.5,
+    growthExponent: 1.5,
     /** Hur ofta fienden byter spawnpunkt. */
     spawnSwitchSeconds: 30,
-    /** Överlev så här länge för att vinna. */
-    survivalSeconds: 20 * 60,
     /** Fiendetyper (Cybran T1), vikt och från vilken minut de kan komma. */
     unitPool: [
       { type: 'mole', weight: 2 },
