@@ -13,16 +13,16 @@ export default {
   terrain: {
     hillHeight: 5,
     plateau: { radius: 16, blend: 10, height: 4 },
-    mountainHeight: 18,
+    mountainHeight: 15,
     /** Bergsringen runt basen (mitt i kärnan) med en passage rakt söderut. */
-    ring: { radius: 44, width: 16, gaps: [{ angle: 0, width: 12 }] },
+    ring: { radius: 46, width: 26, gaps: [{ angle: 0, width: 14 }] },
     /** Fristående berg ute på kartan. */
     peaks: [
-      { x: 22, z: 110, radius: 9 },
-      { x: 170, z: 112, radius: 10 },
-      { x: 60, z: 172, radius: 8 },
-      { x: 140, z: 176, radius: 8 },
-      { x: 96, z: 26, radius: 7 },
+      { x: 18, z: 112, radius: 12 },
+      { x: 174, z: 112, radius: 13 },
+      { x: 56, z: 176, radius: 11 },
+      { x: 142, z: 178, radius: 11 },
+      { x: 96, z: 22, radius: 10 },
     ],
   },
   core: { x: 96, z: 96 },

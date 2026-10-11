@@ -2,6 +2,7 @@ import { TICK_SECONDS } from '../constants.js';
 import { createSpatialHash } from '../spatialHash.js';
 import { getDef, getEntity, removeEntity, addWreck } from '../entities.js';
 import { recordDamage, disperseVeterancy } from '../veterancy.js';
+import { updateGuardEngagement } from '../guard.js';
 
 /** Hur nära nedslagspunkten en entitets kant måste vara för att träffas. */
 const HIT_TOLERANCE = 0.3;
@@ -17,6 +18,16 @@ const areEnemies = (a, b) => a.owner !== b.owner && a.owner !== 0 && b.owner !==
 export function activeWeapon(e) {
   if (!isTargetable(e) || (e.kind === 'structure' && !e.built)) return null;
   return getDef(e.type)?.weapon ?? null;
+}
+
+/**
+ * Kan vapnet skjuta på `t` på avståndet `dist` (till kanten)? Luftvärn
+ * (`antiAir`) skjuter bara på flyg, och inget vapen skjuter närmare än sin
+ * minsta räckvidd (FA:s MinRadius).
+ */
+export function canTarget(weapon, t, dist) {
+  if (Boolean(weapon.antiAir) !== Boolean(getDef(t.type)?.air)) return false;
+  return dist <= weapon.range && dist >= (weapon.minRange ?? 0);
 }
 
 /** Avstånd från `a`s mitt till `b`s kant. */
@@ -60,6 +71,7 @@ export function targetPriority(t) {
  * räckvidd, annars väljs det viktigaste målet inom räckvidd (närmast vid lika).
  */
 export function targetingSystem(world) {
+  updateGuardEngagement(world);
   const { hash, maxRadius } = buildHash(world);
   for (const e of world.entities) {
     const weapon = activeWeapon(e);
@@ -69,14 +81,14 @@ export function targetingSystem(world) {
     const order = e.orders?.[0];
     if (order?.type === 'attack') {
       const t = getEntity(world, order.targetId);
-      if (t && t.hp > 0 && edgeDistance(e, t) <= weapon.range) {
+      if (t && t.hp > 0 && canTarget(weapon, t, edgeDistance(e, t))) {
         e.targetId = t.id;
         continue;
       }
     }
 
     const current = e.targetId ? getEntity(world, e.targetId) : null;
-    if (current && current.hp > 0 && edgeDistance(e, current) <= weapon.range) continue;
+    if (current && current.hp > 0 && canTarget(weapon, current, edgeDistance(e, current))) continue;
 
     let best = null;
     let bestPrio = Infinity;
@@ -86,7 +98,7 @@ export function targetingSystem(world) {
       const prio = targetPriority(t);
       if (prio === null) continue;
       const d = edgeDistance(e, t);
-      if (d > weapon.range) continue;
+      if (!canTarget(weapon, t, d)) continue;
       if (prio < bestPrio || (prio === bestPrio && d < bestDist)) {
         best = t;
         bestPrio = prio;
@@ -163,22 +175,26 @@ export function weaponsSystem(world) {
     }
     if (e.weaponCooldown > 1e-9) continue;
     e.weaponCooldown += 1 / weapon.rateOfFire;
-    world.projectiles.push({
-      owner: e.owner,
-      sourceId: e.id,
-      x: e.x,
-      z: e.z,
-      prevX: e.x,
-      prevZ: e.z,
-      tx: aim.x,
-      tz: aim.z,
-      sx: e.x,
-      sz: e.z,
-      ballistic: Boolean(weapon.ballistic),
-      y: weapon.muzzleHeight ?? 1,
-      speed: weapon.projectileSpeed,
-      damage: weapon.damage,
-    });
+    // En salva kan vara flera projektiler (FA:s ProjectilesPerOnFire).
+    for (let k = 0; k < (weapon.projectiles ?? 1); k++) {
+      world.projectiles.push({
+        owner: e.owner,
+        sourceId: e.id,
+        x: e.x,
+        z: e.z,
+        prevX: e.x,
+        prevZ: e.z,
+        tx: aim.x,
+        tz: aim.z,
+        sx: e.x,
+        sz: e.z,
+        ballistic: Boolean(weapon.ballistic),
+        y: weapon.muzzleHeight ?? 1,
+        speed: weapon.projectileSpeed,
+        damage: weapon.damage,
+        damageRadius: weapon.damageRadius ?? 0,
+      });
+    }
     emit(world, { type: 'fire', owner: e.owner, x: e.x, z: e.z, y: weapon.muzzleHeight ?? 1 });
   }
 }
@@ -207,23 +223,29 @@ export function projectileSystem(world) {
     p.x = p.tx;
     p.z = p.tz;
 
-    let hit = null;
+    // Utan splash träffas den närmaste fienden vid nedslaget; med splash
+    // (damageRadius) alla fiender vars kant är inom radien.
+    const victims = [];
+    const radius = HIT_TOLERANCE + (p.damageRadius ?? 0);
     let bestDist = Infinity;
-    for (const t of hash.queryRadius(p.x, p.z, maxRadius + HIT_TOLERANCE)) {
+    for (const t of hash.queryRadius(p.x, p.z, maxRadius + radius)) {
       if (t.owner === p.owner || t.owner === 0 || t.hp <= 0) continue;
       const d = Math.hypot(t.x - p.x, t.z - p.z) - t.radius;
-      if (d <= HIT_TOLERANCE && d < bestDist) {
-        hit = t;
+      if (d > radius) continue;
+      if (p.damageRadius > 0) victims.push(t);
+      else if (d < bestDist) {
+        victims[0] = t;
         bestDist = d;
       }
     }
-    if (hit) {
-      const wasAlive = hit.hp > 0;
-      hit.hp -= p.damage;
-      recordDamage(hit, p.sourceId, p.damage);
-      hit.lastAttackerId = p.sourceId;
+    const hit = victims[0] ?? null;
+    for (const t of victims) {
+      const wasAlive = t.hp > 0;
+      t.hp -= p.damage;
+      recordDamage(t, p.sourceId, p.damage);
+      t.lastAttackerId = p.sourceId;
       // Dödande skott: skytten får en kill.
-      const shooter = wasAlive && hit.hp <= 0 ? getEntity(world, p.sourceId) : null;
+      const shooter = wasAlive && t.hp <= 0 ? getEntity(world, p.sourceId) : null;
       if (shooter) shooter.kills = (shooter.kills ?? 0) + 1;
     }
     emit(world, { type: hit ? 'hit' : 'miss', owner: p.owner, x: p.x, z: p.z, y: p.y, ballistic: p.ballistic });
@@ -245,6 +267,7 @@ export function retaliationSystem(world) {
     if (!weapon || e.targetId) continue; // obeväpnad, eller har redan något att skjuta på
     const attacker = getEntity(world, attackerId);
     if (!attacker || attacker.hp <= 0 || edgeDistance(e, attacker) <= weapon.range) continue;
+    if (!canTarget(weapon, attacker, weapon.range)) continue; // t.ex. luftvärn mot markenheter
     const order = { type: 'attack', targetId: attacker.id };
     if (e.orders.length === 0) e.orders.push(order);
     else if (e.orders[0].type === 'attackCore') e.orders.unshift(order);

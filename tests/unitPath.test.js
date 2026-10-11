@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createWorld, tickWorld, PLAYER_ID } from '../src/sim/world.js';
+import { createWorld, tickWorld, PLAYER_ID, ENEMY_ID } from '../src/sim/world.js';
+import maps from '../src/data/maps/index.js';
 import { addStructure, getEntity } from '../src/sim/entities.js';
 import { queueCommand } from '../src/sim/commands.js';
 import { cellIndex, isBlockedCell } from '../src/sim/pathing.js';
@@ -104,4 +105,23 @@ describe('egna enheter går runt hinder', () => {
     expect(acu.z).toBe(90.5);
   });
 
+});
+
+describe('enheter i bergsterräng (Mountain Pass)', () => {
+  it('ACU:n går aldrig in i branter och kommer alltid fram så nära den kan', () => {
+    const map = maps.find((m) => m.id === 'mountainPass');
+    const world = createWorld({ map });
+    world.entities = world.entities.filter((e) => e.owner !== ENEMY_ID);
+    const acu = getEntity(world, world.acuId);
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let k = 0; k < 25; k++) {
+      queueCommand(world, { type: 'move', owner: PLAYER_ID, ids: [acu.id], x: 4 + rnd() * 184, z: 4 + rnd() * 184 });
+      for (let i = 0; i < 2500 && (i === 0 || acu.orders.length > 0); i++) {
+        tickWorld(world);
+        expect(isBlockedCell(world, cellIndex(world, acu.x, acu.z))).toBe(false);
+      }
+      expect(acu.orders).toEqual([]);
+    }
+  }, 30000);
 });

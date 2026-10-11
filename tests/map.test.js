@@ -3,6 +3,7 @@ import maps from '../src/data/maps/index.js';
 import { createTerrainForMap, createWorld } from '../src/sim/world.js';
 import { getHeight } from '../src/sim/terrain.js';
 import { cellIndex, isBlockedCell } from '../src/sim/pathing.js';
+import { canPlace } from '../src/sim/placement.js';
 
 describe.each(maps.map((m) => [m.name, m]))('kartan %s', (_name, map) => {
   const terrain = createTerrainForMap(map);
@@ -30,6 +31,11 @@ describe.each(maps.map((m) => [m.name, m]))('kartan %s', (_name, map) => {
 
   it('har kärnan mitt på platån', () => {
     expect(getHeight(terrain, map.core.x, map.core.z)).toBe(map.terrain.plateau.height);
+  });
+
+  it('en Mass Extractor går att bygga på varje fyndighet', () => {
+    const w = createWorld({ map });
+    for (const d of map.massDeposits) expect(canPlace(w, 'massExtractor', d.x, d.z)).toMatchObject({ ok: true });
   });
 
   it('alla spawnpunkter når kärnan och står på körbar mark', () => {

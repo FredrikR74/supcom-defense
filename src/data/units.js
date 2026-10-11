@@ -14,7 +14,9 @@ const BASIC_STRUCTURES = ['landFactory', 'massExtractor', 'powerGenerator', 'wal
  * - `techCategory`: styr veterancy (TECH1, TECH2, TECH3, COMMAND, ...).
  * - `selectionPriority`: FA:s General.SelectionPriority (standard 1); se selectInRect.
  * - `weapon`: `damage` per skott, `rateOfFire` skott per sekund, `range`,
- *   `projectileSpeed`, `muzzleHeight`, `ballistic` (båge).
+ *   `projectileSpeed`, `muzzleHeight`, `ballistic` (båge). Valfritt: `minRange`
+ *   (FA:s MinRadius), `damageRadius` (splash), `projectiles` per salva
+ *   (ProjectilesPerOnFire), `antiAir` (skjuter bara på flyg).
  */
 export default {
   /** UEF ACU (UEL0001). */
@@ -94,6 +96,78 @@ export default {
     cost: { mass: 56, energy: 266 },
     buildTime: 300,
     weapon: { damage: 24, rateOfFire: 1, range: 9, projectileSpeed: 12.5, turnRate: 180, muzzleHeight: 0.8 },
+  },
+
+  /**
+   * UEF T1 Land Scout (UEL0101). Tom Cat Machinegun: 4 skada, 1 skott per
+   * 2 s (10/20), räckvidd 26, mynningshastighet 25.
+   */
+  snoop: {
+    name: 'Land Scout',
+    unitName: 'Snoop',
+    techCategory: 'TECH1',
+    maxHp: 29,
+    speed: 4.5,
+    radius: 0.45,
+    cost: { mass: 12, energy: 80 },
+    buildTime: 60,
+    weapon: { damage: 4, rateOfFire: 10 / 20, range: 13, projectileSpeed: 12.5, turnRate: 360, muzzleHeight: 0.6 },
+  },
+
+  /**
+   * UEF T1 Light Assault Bot (UEL0106). Tom Cat Machinegun: 7 skada,
+   * 10/3 skott/s, räckvidd 14, mynningshastighet 25.
+   */
+  mechMarine: {
+    name: 'Light Assault Bot',
+    unitName: 'Mech Marine',
+    techCategory: 'TECH1',
+    maxHp: 60,
+    speed: 4.2,
+    radius: 0.45,
+    cost: { mass: 30, energy: 120 },
+    buildTime: 120,
+    weapon: { damage: 7, rateOfFire: 10 / 3, range: 7, projectileSpeed: 12.5, turnRate: 200, muzzleHeight: 0.75 },
+  },
+
+  /**
+   * UEF T1 Mobile Light Artillery (UEL0103). Fragmentation Artillery: 100 skada
+   * med splash (DamageRadius 1), 1 skott per 8,3 s (10/83), räckvidd 5–30,
+   * mynningshastighet 14, hög båge. FA:s FiringRandomness (spridning) är inte med.
+   */
+  lobo: {
+    name: 'Mobile Light Artillery',
+    unitName: 'Lobo',
+    techCategory: 'TECH1',
+    maxHp: 205,
+    speed: 2.8,
+    radius: 0.55,
+    cost: { mass: 36, energy: 180 },
+    buildTime: 200,
+    weapon: {
+      damage: 100, rateOfFire: 10 / 83, range: 15, minRange: 2.5, damageRadius: 0.5,
+      projectileSpeed: 7, turnRate: 70, muzzleHeight: 0.8, ballistic: true,
+    },
+  },
+
+  /**
+   * UEF T1 Mobile Anti-Air Gun (UEL0104). Linked Railgun: 13 skada, två
+   * projektiler per salva, 1 salva/s, räckvidd 32, mynningshastighet 45. Skjuter
+   * bara på flyg (FireTargetLayerCapsTable Air), så den har inga mål än.
+   */
+  archer: {
+    name: 'Mobile Anti-Air Gun',
+    unitName: 'Archer',
+    techCategory: 'TECH1',
+    maxHp: 310,
+    speed: 3.3,
+    radius: 0.5,
+    cost: { mass: 55, energy: 275 },
+    buildTime: 220,
+    weapon: {
+      damage: 13, projectiles: 2, rateOfFire: 1, range: 16, projectileSpeed: 22.5,
+      turnRate: 180, muzzleHeight: 0.9, antiAir: true,
+    },
   },
 
   /** UEF T1 Engineer (UEL0105). */

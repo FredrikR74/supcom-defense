@@ -29,3 +29,18 @@ describe('selectInRect', () => {
     expect(selectInRect(entities, toScreen, { x0: 50, y0: 50, x1: 60, y1: 60 }, 1)).toEqual([]);
   });
 });
+
+describe('dubbelklick (alla av samma typ i bild)', () => {
+  it('väljer bara egna av samma typ som syns på skärmen', async () => {
+    const { selectSameTypeOnScreen } = await import('../src/input/selection.js');
+    const entities = [
+      { id: 1, owner: 1, type: 'striker', sx: 10, sy: 10 },
+      { id: 2, owner: 1, type: 'striker', sx: 90, sy: 50 },
+      { id: 3, owner: 1, type: 'striker', sx: 150, sy: 50 }, // utanför bild
+      { id: 4, owner: 1, type: 'engineer', sx: 20, sy: 20 },
+      { id: 5, owner: 2, type: 'striker', sx: 30, sy: 30 },
+    ];
+    const ids = selectSameTypeOnScreen(entities, (e) => ({ x: e.sx, y: e.sy }), 100, 100, 1, 'striker');
+    expect(ids).toEqual([1, 2]);
+  });
+});

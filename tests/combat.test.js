@@ -273,3 +273,38 @@ describe('sikte på rörliga mål (FA:s LeadTarget)', () => {
     expect(p.z).toBe(0);
   });
 });
+
+describe('UEF T1-vapen', () => {
+  const quiet = (u) => { u.orders.length = 0; u.hp = 1e6; return u; };
+
+  it('Lobos granat skadar alla fiender inom splashradien', () => {
+    const world = createWorld({ map: firstDefense });
+    addUnit(world, 'lobo', { x: 40, z: 40, owner: PLAYER_ID });
+    const a = quiet(addUnit(world, 'mantis', { x: 40, z: 50, owner: ENEMY_ID }));
+    const b = quiet(addUnit(world, 'mantis', { x: 41.2, z: 50, owner: ENEMY_ID }));
+    for (let i = 0; i < 40; i++) tickWorld(world);
+    expect(a.hp).toBeLessThan(1e6);
+    expect(b.hp).toBeLessThan(1e6);
+  });
+
+  it('Lobo skjuter inte på mål innanför sin minsta räckvidd', () => {
+    const world = createWorld({ map: firstDefense });
+    addUnit(world, 'lobo', { x: 40, z: 40, owner: PLAYER_ID }).orders.length = 0;
+    const m = quiet(addUnit(world, 'mantis', { x: 40, z: 41.5, owner: ENEMY_ID }));
+    let fired = 0;
+    for (let i = 0; i < 60; i++) {
+      tickWorld(world);
+      fired += world.projectiles.filter((p) => p.owner === PLAYER_ID).length;
+    }
+    expect(fired).toBe(0);
+    expect(m.hp).toBe(1e6);
+  });
+
+  it('Archer är luftvärn och skjuter inte på markenheter', () => {
+    const world = createWorld({ map: firstDefense });
+    const archer = addUnit(world, 'archer', { x: 40, z: 40, owner: PLAYER_ID });
+    quiet(addUnit(world, 'mantis', { x: 40, z: 45, owner: ENEMY_ID }));
+    for (let i = 0; i < 30; i++) tickWorld(world);
+    expect(archer.targetId).toBeNull();
+  });
+});

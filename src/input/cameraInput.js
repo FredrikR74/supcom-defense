@@ -27,7 +27,8 @@ export function createCameraInput(canvas, rig, pickGround) {
   const keys = new Set();
   // `inside`: musen är över fönstret. `edgeHold`: musen lämnade fönstret över en
   // kant, så vi fortsätter panorera dit tills den kommer tillbaka.
-  const mouse = { x: 0, y: 0, inside: false, edgeHold: false };
+  // `overUi`: musen är över en knapp eller panel; då panorerar inte skärmkanten.
+  const mouse = { x: 0, y: 0, inside: false, edgeHold: false, overUi: false };
 
   const clampToCanvas = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -51,6 +52,8 @@ export function createCameraInput(canvas, rig, pickGround) {
     clampToCanvas(e);
     mouse.inside = true;
     mouse.edgeHold = false;
+    // Paneler som inte tar emot musen (pointer-events: none) räknas som spelplanen.
+    mouse.overUi = e.target !== canvas && e.target !== document.body && e.target !== document.documentElement;
   });
   window.addEventListener('mouseout', (e) => {
     if (e.relatedTarget) return; // flyttade bara mellan element
@@ -89,7 +92,7 @@ export function createCameraInput(canvas, rig, pickGround) {
         dx += KEY_DIRS[code][0];
         dz += KEY_DIRS[code][1];
       }
-      if ((mouse.inside || mouse.edgeHold) && document.hasFocus()) {
+      if (((mouse.inside && !mouse.overUi) || mouse.edgeHold) && document.hasFocus()) {
         const [ex, ez] = edgePanDirection(mouse.x, mouse.y, canvas.clientWidth, canvas.clientHeight);
         dx += ex;
         dz += ez;

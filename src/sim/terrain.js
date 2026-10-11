@@ -51,31 +51,40 @@ function createRidgedNoise(size, rng) {
 }
 
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
-/** Bergsfoten är brant: över så här många rutor går berget från mark till full höjd. */
-const CLIFF = 3.5;
+/** Bergssluttningen går från mark till full höjd över så här många rutor (S-kurva). */
+const SLOPE = 9;
+/** Låga förberg vid foten: så här brett och så stor del av bergshöjden. */
+const SKIRT = 10;
+const SKIRT_HEIGHT = 0.15;
 
 /**
- * Hur mycket berg som står i (x, z), 0..1. `ring` ({x, z, radius, width, gaps})
- * är en bergsring runt basen; varje öppning ({angle, width}) är en passage där
+ * Hur mycket berg som står i (x, z): { m } 0..1 för själva berget och { skirt }
+ * 0..1 för förbergen runt det. `ring` ({x, z, radius, width, gaps}) är en
+ * bergsring runt basen; varje öppning ({angle, width}) är en passage där
  * vinkeln är i grader från +z (söder) mot +x (öster). `peaks` ({x, z, radius})
- * är fristående berg.
+ * är fristående berg. `inside` är hur långt in i berget punkten ligger.
  */
 function mountainMask(x, z, ring, peaks) {
-  let m = 0;
+  let inside = -Infinity;
   if (ring) {
     const dx = x - ring.x;
     const dz = z - ring.z;
     const d = Math.hypot(dx, dz);
-    let r = clamp01((ring.width / 2 - Math.abs(d - ring.radius)) / CLIFF);
+    let r = ring.width / 2 - Math.abs(d - ring.radius);
     const angle = Math.atan2(dx, dz);
     for (const gap of ring.gaps ?? []) {
-      const diff = Math.abs(Math.atan2(Math.sin(angle - gap.angle * Math.PI / 180), Math.cos(angle - gap.angle * Math.PI / 180)));
-      r *= clamp01((diff * d - gap.width / 2) / CLIFF);
+      const a = gap.angle * Math.PI / 180;
+      const diff = Math.abs(Math.atan2(Math.sin(angle - a), Math.cos(angle - a)));
+      // Avstånd (längs ringen) in i bergväggen från passagens kant.
+      r = Math.min(r, diff * d - gap.width / 2);
     }
-    m = Math.max(m, r);
+    inside = Math.max(inside, r);
   }
-  for (const p of peaks ?? []) m = Math.max(m, clamp01((p.radius - Math.hypot(x - p.x, z - p.z)) / (CLIFF * 1.5)));
-  return m;
+  for (const p of peaks ?? []) inside = Math.max(inside, p.radius - Math.hypot(x - p.x, z - p.z));
+  return {
+    m: smoothstep(clamp01(inside / SLOPE)),
+    skirt: smoothstep(clamp01((inside + SKIRT) / SKIRT)),
+  };
 }
 
 /**
@@ -108,8 +117,8 @@ export function generateTerrain({ size, seed, hillHeight = 8, plateau = null, ri
         }
       }
       if (ridged) {
-        const m = mountainMask(x, z, ring, peaks);
-        if (m > 0) h += mountainHeight * m * (0.65 + 0.6 * ridged(x, z));
+        const { m, skirt } = mountainMask(x, z, ring, peaks);
+        h += mountainHeight * (m * (0.7 + 0.55 * ridged(x, z)) + skirt * SKIRT_HEIGHT);
       }
       heights[z * n + x] = h;
     }

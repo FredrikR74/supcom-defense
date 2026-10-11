@@ -6,7 +6,7 @@ import { createModel, applySurfaceDetail, poseLeg } from '../render/models.js';
  * Modellvisare för utveckling (/models.html): en modell i taget på en platta,
  * samma ljus som i spelet, och "Walk" för att se gånganimationen.
  */
-const TYPES = ['acu', 'striker', 'engineer', 'mantis', 'mole', 'medusa',
+const TYPES = ['acu', 'engineer', 'snoop', 'mechMarine', 'striker', 'lobo', 'archer', 'mantis', 'mole', 'medusa',
   'landFactory', 'massExtractor', 'powerGenerator', 'pointDefense', 'wall', 'core', 'cybranGateway'];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });

@@ -9,6 +9,7 @@ import { createCameraInput } from './input/cameraInput.js';
 import { createBuildInput } from './input/buildInput.js';
 import { createSelectionInput } from './input/selection.js';
 import { createDebugOverlay } from './ui/debug.js';
+import { createFrameProfiler } from './devtools/frameProfiler.js';
 import { createResourcePanel } from './ui/resourcePanel.js';
 import { createControlGroups } from './input/controlGroups.js';
 import { createHoverInfo } from './ui/hoverInfo.js';
@@ -37,6 +38,8 @@ function startGame({ map, difficulty }) {
   const view = createRenderer(canvas, world);
   const cameraInput = createCameraInput(canvas, view.rig, view.pickGround);
   const debug = createDebugOverlay($('debug'));
+  const profiler = createFrameProfiler();
+  const measure = profiler.measure;
   const resources = createResourcePanel($('resources'));
   const hoverInfo = createHoverInfo($('hover'));
 
@@ -91,10 +94,14 @@ function startGame({ map, difficulty }) {
   const selectionInfo = createSelectionInfo($('info'));
   const minimap = createMinimap($('minimap'), world, view);
   const idlePanel = createIdlePanel($('idle'), {
+    // Markerar utan att flytta kameran.
     onSelect: (unit) => {
       selection.clear();
       selection.add(unit.id);
-      view.centerOn(unit.x, unit.z);
+    },
+    onSelectAll: (all) => {
+      selection.clear();
+      for (const unit of all) selection.add(unit.id);
     },
   });
 
@@ -156,6 +163,8 @@ function startGame({ map, difficulty }) {
       world,
       selection,
       view,
+      /** Tid per del av bildrutan (ms), som i debugrutan. */
+      get profile() { return Object.fromEntries(profiler.report().map(([k, v]) => [k, +v.toFixed(2)])); },
       ui,
       time,
       /** Skapar `n` fiender av `type`, fördelade över spawnpunkterna. */
@@ -178,7 +187,7 @@ function startGame({ map, difficulty }) {
 
     const gameSeconds = time.paused ? 0 : frameSeconds * SPEEDS[time.speed];
     const { ticks, alpha } = step.advance(gameSeconds);
-    for (let i = 0; i < ticks; i++) tickWorld(world);
+    measure('sim', () => { for (let i = 0; i < ticks; i++) tickWorld(world); });
 
     // Begränsa så att en lång frame (t.ex. efter en bakgrundsflik) inte ger ett jättehopp.
     cameraInput.update(Math.min(frameSeconds, 0.1));
@@ -191,18 +200,18 @@ function startGame({ map, difficulty }) {
       if (ev.type === 'acuDeath') threatPanel.toast(`ACU destroyed! Respawning in ${ev.seconds} s`);
       if (ev.type === 'acuRespawn') threatPanel.toast('ACU respawned at the Quantum Gateway');
     }
-    sound.handleEvents(world.events, view.rig.target, PLAYER_ID);
-    view.render(world, alpha, selection, time.paused ? 0 : frameSeconds);
+    measure('sound', () => sound.handleEvents(world.events, view.rig.target, PLAYER_ID));
+    view.render(world, alpha, selection, time.paused ? 0 : frameSeconds, measure);
 
-    const hovered = ndc && !ui.placing && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y));
+    const hovered = measure('hover pick', () => ndc && !ui.placing && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y)));
     hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));
     resources.update(world.players[PLAYER_ID].economy);
-    commandPanel.update(world, selection, ui);
+    measure('command panel', () => commandPanel.update(world, selection, ui));
     modeHint.hidden = ui.mode !== 'patrol';
-    threatPanel.update(world, { respawnIn: acuRespawnIn(world) });
-    selectionInfo.update(world, selection, ui);
-    idlePanel.update(world);
-    minimap.update();
+    measure('threat panel', () => threatPanel.update(world, { respawnIn: acuRespawnIn(world) }));
+    measure('selection info', () => selectionInfo.update(world, selection, ui));
+    measure('idle panel', () => idlePanel.update(world));
+    measure('minimap', () => minimap.update());
 
     const speed = SPEEDS[time.speed];
     speedHint.hidden = !time.paused && speed === 1;
@@ -211,12 +220,14 @@ function startGame({ map, difficulty }) {
     if (!$('debug').hidden) {
       const cursor = ndc && view.pickAtNdc(ndc.x, ndc.y);
       debug.update(world, frameSeconds, [
+        ...profiler.report().map(([name, ms]) => `${name.padEnd(15)}${ms.toFixed(1)} ms`),
         `zoom ${view.rig.distance.toFixed(0)}${view.isStrategic() ? ' (strategic)' : ''}`,
         cursor
           ? `mouse ${cursor.x.toFixed(1)}, ${cursor.z.toFixed(1)}  h ${cursor.y.toFixed(2)}`
           : 'mouse -',
       ]);
     }
+    profiler.endFrame(frameSeconds);
     requestAnimationFrame(frame);
   }
 

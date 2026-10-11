@@ -4,9 +4,10 @@ import { isIdleBuilder, isIdleFactory } from '../sim/entities.js';
 /**
  * Knappar för sysslolösa byggare och fabriker, som FA:s "idle engineer"- och
  * "idle factory"-knappar: klick markerar nästa sysslolösa ACU, ingenjör eller
- * fabrik och flyttar kameran dit (klicka igen för nästa).
+ * fabrik (klicka igen för nästa), och dubbelklick markerar alla sysslolösa av
+ * den typen. Kameran flyttas inte.
  */
-export function createIdlePanel(el, { onSelect }) {
+export function createIdlePanel(el, { onSelect, onSelectAll }) {
   const buttons = {};
   const cursor = { acu: 0, engineer: 0, factory: 0 };
   for (const [type, label] of [['acu', 'Idle ACU'], ['engineer', 'Idle Engineers'], ['factory', 'Idle Factories']]) {
@@ -14,9 +15,14 @@ export function createIdlePanel(el, { onSelect }) {
     b.className = 'idle-button';
     b.dataset.type = type;
     b.addEventListener('mousedown', (e) => e.stopPropagation());
-    b.addEventListener('click', () => {
+    b.addEventListener('click', (e) => {
       const idle = currentIdle(type);
       if (idle.length === 0) return;
+      // Dubbelklick (andra klicket i följd) markerar alla sysslolösa av typen.
+      if (e.detail >= 2) {
+        onSelectAll(idle);
+        return;
+      }
       cursor[type] = (cursor[type] + 1) % idle.length;
       onSelect(idle[cursor[type]]);
     });

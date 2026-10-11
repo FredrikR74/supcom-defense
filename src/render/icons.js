@@ -69,6 +69,50 @@ const DRAW = {
     ctx.fillRect(14, 20, s - 28, s - 40);
     ctx.strokeRect(14, 20, s - 28, s - 40);
   },
+  /** UEF-scout: liten blå triangel (spaning). */
+  snoop: (ctx, s) => {
+    ctx.fillStyle = TEAM;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(s / 2, 14);
+    ctx.lineTo(s - 16, s - 18);
+    ctx.lineTo(16, s - 18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  },
+  /** UEF-bot: liten blå kvadrat. */
+  mechMarine: (ctx, s) => {
+    ctx.fillStyle = TEAM;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.fillRect(18, 18, s - 36, s - 36);
+    ctx.strokeRect(18, 18, s - 36, s - 36);
+  },
+  /** UEF-artilleri: blå rektangel med ett kryss. */
+  lobo: (ctx, s) => {
+    ctx.fillStyle = TEAM;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.fillRect(14, 18, s - 28, s - 36);
+    ctx.strokeRect(14, 18, s - 28, s - 36);
+    ctx.beginPath();
+    ctx.moveTo(22, 24); ctx.lineTo(s - 22, s - 24);
+    ctx.moveTo(s - 22, 24); ctx.lineTo(22, s - 24);
+    ctx.stroke();
+  },
+  /** UEF-luftvärn: blå rektangel med en vinkel uppåt. */
+  archer: (ctx, s) => {
+    ctx.fillStyle = TEAM;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.fillRect(14, 18, s - 28, s - 36);
+    ctx.strokeRect(14, 18, s - 28, s - 36);
+    ctx.beginPath();
+    ctx.moveTo(22, s - 24); ctx.lineTo(s / 2, 24); ctx.lineTo(s - 22, s - 24);
+    ctx.stroke();
+  },
   /** Cybran-landenhet: liten röd cirkel med vit kant. */
   mantis: (ctx, s) => {
     ctx.fillStyle = '#ef4444';

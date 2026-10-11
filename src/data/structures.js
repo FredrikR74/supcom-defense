@@ -35,7 +35,7 @@ export default {
     cost: { mass: 240, energy: 2100 },
     buildTime: 300,
     buildPower: 20,
-    produces: ['engineer', 'striker'],
+    produces: ['engineer', 'snoop', 'mechMarine', 'striker', 'lobo', 'archer'],
   },
   /** UEB1103. Producerar 2 mass/s och drar 2 energi/s. */
   massExtractor: {

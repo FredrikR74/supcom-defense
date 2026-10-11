@@ -1,18 +1,27 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { createIcon } from './icons.js';
-import { isIdleBuilder, isIdleFactory } from '../sim/entities.js';
+import { isIdleBuilder, isIdleFactory, getDef } from '../sim/entities.js';
 import { createModel, createGhost, WRECK_MATERIAL, BUILD_WIRE_MATERIAL } from './models.js';
 import { createInstancedBatch } from './instancedUnits.js';
 
 /** Markeringsring, platt på marken. */
 const ringGeometry = new THREE.RingGeometry(0.85, 1, 40).rotateX(-Math.PI / 2);
+/**
+ * Markeringsringen ligger på marken med djuptest, så att den del som är bakom
+ * enheten döljs av den. polygonOffset håller den ovanför marken den följer.
+ */
 const ringMaterial = new THREE.MeshBasicMaterial({
   color: 0x4ade80,
   transparent: true,
   opacity: 0.9,
-  depthTest: false,
+  depthWrite: false,
+  polygonOffset: true,
+  polygonOffsetFactor: -4,
+  polygonOffsetUnits: -4,
 });
+/** Ringens lyft över marken. */
+const RING_LIFT = 0.06;
 
 const flagPole = new THREE.CylinderGeometry(0.05, 0.05, 2, 6).translate(0, 1, 0);
 const flagCloth = new THREE.BufferGeometry().setFromPoints([
@@ -54,6 +63,26 @@ function createLineBuffer(max, material) {
       geometry.setDrawRange(0, count * 2);
       geometry.attributes.position.needsUpdate = true;
     },
+  };
+}
+
+/** Lägger ringens hörnpunkter på marken runt (x, z), så att den inte sjunker in i backar. */
+function fitRingToGroundWith(getGround) {
+  return (ring, x, y, z) => {
+    if (ring.userData.fitX === x && ring.userData.fitZ === z) return;
+    ring.userData.fitX = x;
+    ring.userData.fitZ = z;
+    ring.position.set(x, y, z);
+    const base = ring.userData.base;
+    const pos = ring.geometry.attributes.position;
+    const s = ring.scale.x;
+    for (let i = 0; i < pos.count; i++) {
+      const lx = base[i * 3];
+      const lz = base[i * 3 + 2];
+      pos.setY(i, (getGround(x + lx * s, z + lz * s) - y + RING_LIFT) / s);
+    }
+    pos.needsUpdate = true;
+    ring.geometry.computeBoundingSphere();
   };
 }
 
@@ -100,6 +129,21 @@ export function createEntityView(terrain) {
     }
     return wreckBatches.get(type);
   }
+  /**
+   * Egna enheter ritas också instansierat, en batch per typ, så att hundratals
+   * enheter bara kostar några få draw calls. Varje enhet har kvar en osynlig
+   * modell som håller dess pose (torn, ben), som batchen läser av.
+   */
+  const ownBatches = new Map();
+  function ownBatchFor(type) {
+    if (!ownBatches.has(type)) {
+      const batch = createInstancedBatch(type);
+      meshes.add(batch.group);
+      ownBatches.set(type, batch);
+    }
+    return ownBatches.get(type);
+  }
+
   /** Fiende-id -> { x, y, z, top } där den ritades senast. */
   const instancedPos = new Map();
   /** Fiende-id -> gångfas för benen: { x, z, phase, amp, frame }. */
@@ -144,6 +188,52 @@ export function createEntityView(terrain) {
   }));
   overlay.add(orderLines.object, beams.object);
 
+  // Räckviddsringar för markerade enheter och byggnader, som i FA: vapnets
+  // räckvidd (och minsta räckvidd) och byggräckvidden för byggare.
+  const weaponRings = createLineBuffer(24000, new THREE.LineBasicMaterial({
+    color: 0xf87171, transparent: true, opacity: 0.55,
+  }));
+  const buildRings = createLineBuffer(12000, new THREE.LineBasicMaterial({
+    color: 0xfacc15, transparent: true, opacity: 0.45,
+  }));
+  overlay.add(weaponRings.object, buildRings.object);
+  const RING_SEGMENTS = 56;
+
+  /** En ring med radien `r` runt (x, z) som följer marken. */
+  function addRangeRing(buffer, x, z, r) {
+    let px = x + r;
+    let pz = z;
+    let py = groundY(px, pz) + 0.15;
+    for (let i = 1; i <= RING_SEGMENTS; i++) {
+      const a = (i / RING_SEGMENTS) * Math.PI * 2;
+      const nx = x + Math.cos(a) * r;
+      const nz = z + Math.sin(a) * r;
+      const ny = groundY(nx, nz) + 0.15;
+      buffer.add(px, py, pz, nx, ny, nz);
+      px = nx;
+      py = ny;
+      pz = nz;
+    }
+  }
+
+  function updateRangeRings(world, selection, alpha, owner) {
+    weaponRings.begin();
+    buildRings.begin();
+    for (const e of world.entities) {
+      if (!selection.has(e.id) || e.owner !== owner) continue;
+      const def = getDef(e.type);
+      if (!def || (e.kind === 'structure' && !e.built)) continue;
+      const { x, z } = e.kind === 'unit' ? lerpPos(e, alpha) : e;
+      if (def.weapon) {
+        addRangeRing(weaponRings, x, z, def.weapon.range);
+        if (def.weapon.minRange) addRangeRing(weaponRings, x, z, def.weapon.minRange);
+      }
+      if (e.kind === 'unit' && def.buildPower > 0 && def.buildRange) addRangeRing(buildRings, x, z, def.buildRange);
+    }
+    weaponRings.end();
+    buildRings.end();
+  }
+
   // Nanopartiklar som strömmar längs byggstrålarna från byggaren till bygget.
   const NANO_PER_BEAM = 6;
   const nanoPositions = new Float32Array(256 * NANO_PER_BEAM * 3);
@@ -157,17 +247,25 @@ export function createEntityView(terrain) {
   let nanoTime = 0;
 
   const groundY = (x, z) => getHeight(terrain, x, z);
+  const fitRingToGround = fitRingToGroundWith(groundY);
 
   function create(entity) {
     const mesh = createModel(entity.type);
     mesh.userData.entityId = entity.id;
     const icon = createIcon(entity.type);
     icon.userData.entityId = entity.id;
-    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    // Egen kopia av geometrin, så att ringen kan följa markens höjd runt enheten.
+    const ring = new THREE.Mesh(ringGeometry.clone(), ringMaterial);
     ring.scale.setScalar(entity.radius * 1.3);
+    ring.userData.base = ringGeometry.attributes.position.array;
     ring.renderOrder = 4;
     ring.visible = false;
-    meshes.add(mesh);
+    // Enheter ritas av sin typs batch; modellen håller bara posen.
+    if (entity.kind === 'unit') {
+      mesh.userData.movable = Object.fromEntries(mesh.children.filter((o) => o.isGroup && o.name).map((o) => [o.name, o]));
+    } else {
+      meshes.add(mesh);
+    }
     icons.add(icon);
     overlay.add(ring);
     const top = new THREE.Box3().setFromObject(mesh).max.y;
@@ -314,6 +412,7 @@ export function createEntityView(terrain) {
     sync(world, alpha, selection, owner, frameSeconds = 0) {
       const alive = new Set();
       for (const b of batches.values()) b.begin();
+      for (const b of ownBatches.values()) b.begin();
       for (const b of wreckBatches.values()) b.begin();
       instancedPos.clear();
       for (const e of world.entities) {
@@ -352,9 +451,10 @@ export function createEntityView(terrain) {
         if (v.turret) v.turret.rotation.y = (e.turretHeading ?? e.heading ?? 0) - (e.kind === 'unit' ? e.heading ?? 0 : 0);
         // Ofärdiga byggnader växer upp ur marken.
         v.mesh.scale.y = e.kind === 'structure' && !e.built ? 0.1 + 0.9 * e.progress : 1;
+        if (e.kind === 'unit') ownBatchFor(e.type).add(e.id, x, y, z, v.mesh.rotation.y, null, v.mesh);
         v.icon.position.set(x, y + 1, z);
-        v.ring.position.set(x, y + 0.05, z);
         v.ring.visible = selection.has(e.id);
+        if (v.ring.visible) fitRingToGround(v.ring, x, y, z);
         v.idleIcon.visible = e.owner === owner && (isIdleBuilder(e) || isIdleFactory(e));
         if (v.idleIcon.visible) v.idleIcon.position.set(x, y + v.top + 1.2, z);
       }
@@ -368,11 +468,13 @@ export function createEntityView(terrain) {
         views.delete(id);
       }
       for (const b of batches.values()) b.end();
+      for (const b of ownBatches.values()) b.end();
       // Glöm gångfasen för fiender som inte finns längre.
       for (const [id, w] of enemyWalks) if (w.frame !== walkFrame) enemyWalks.delete(id);
       walkFrame++;
       for (const b of wreckBatches.values()) b.end();
       updateOrderLines(world, selection, alpha);
+      updateRangeRings(world, selection, alpha, owner);
       updateRallyFlags(world, selection);
       updateBeams(world, frameSeconds);
       updateQueuedGhosts(world, owner);
@@ -387,7 +489,7 @@ export function createEntityView(terrain) {
     pick(raycaster) {
       const targets = icons.visible ? icons.children : meshes.children;
       const hit = raycaster.intersectObjects(targets, true)[0];
-      for (const b of [...batches.values(), ...wreckBatches.values()]) {
+      for (const b of [...batches.values(), ...ownBatches.values(), ...wreckBatches.values()]) {
         const id = hit && b.idForHit(hit);
         if (id != null) return id;
       }

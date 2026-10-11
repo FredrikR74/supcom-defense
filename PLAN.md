@@ -68,8 +68,8 @@ Enheter: UEF ACU, Engineer och MA12 Striker. Fiender: Cybran Mantis, Mole och Me
   *Test:* varje enhet och byggnad går att känna igen inzoomat; FPS påverkas inte märkbart.
 - [ ] **2. Air och anti-air.** UEF T1 Air Factory och flygplan, och T1 Anti-Air Turret. Fienden får Cybran-flyg. Flygplan ignorerar flödesfältet och terrängen, och bara luftvärn och vapen som kan skjuta mot luft träffar dem, som i FA.
   *Test (Vitest):* flyg flyger rakt över murar; markvapen skjuter inte på flyg; luftvärn gör det.
-- [ ] **3. Alla UEF T1-enheter.** Alla UEF T1-landenheter går att bygga (land scout, light assault bot, medium tank, mobile light artillery, mobile anti-air och engineer), med namn och värden från FAF:s blueprints. Både spelaren och fienden kan bygga dem: fiendens pool ska kunna innehålla UEF-enheter.
-  *Test (Vitest):* varje UEF T1-enhet finns på listan över FA-namn och kan produceras i fabriken; fiendens pool kan skapa dem.
+- [ ] **3. UEF T1-enheter för fienden.** Spelaren kan redan bygga alla UEF T1-landenheter (Snoop, Mech Marine, MA12 Striker, Lobo, Archer och Engineer) med värden från FAF:s blueprints. Kvar: fiendens pool ska kunna innehålla UEF-enheter. Archer skjuter bara på flyg och har inga mål förrän punkt 2 (flyg) är klar.
+  *Test (Vitest):* fiendens pool kan skapa UEF-enheter.
 - [ ] **4. Radar och fog of war.** Krigsdimma: man ser bara det som är inom egna enheters och byggnaders siktradie. UEF Radar System visar fiender inom sin radie som radarblippar. Värden från blueprints.
   *Test (Vitest):* en fiende utanför sikt och radar är dold; inom radar syns den som blipp; inom sikt syns den helt.
 - [ ] **5. T2.** UEF T2-byggnader och T2-enheter (t.ex. T2 Point Defense, Shield Generator, T2 Land Factory och T2-stridsvagnar) och motsvarande T2-fiender, med FA-värden. Uppgradering av fabriker från T1 till T2 som i FA.

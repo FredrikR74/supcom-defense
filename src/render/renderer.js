@@ -167,19 +167,26 @@ export function createRenderer(canvas, world) {
     isStrategic() {
       return rig.distance > STRATEGIC_DISTANCE;
     },
-    render(world, alpha, selection, frameSeconds = 0) {
+    /** `measure(name, fn)` (valfri) mäter tiden för varje steg, se devtools/frameProfiler.js. */
+    render(world, alpha, selection, frameSeconds = 0, measure = (_name, fn) => fn()) {
       const strategic = rig.distance > STRATEGIC_DISTANCE;
-      entities.sync(world, alpha, selection, PLAYER_ID, frameSeconds);
+      measure('render: entities', () => entities.sync(world, alpha, selection, PLAYER_ID, frameSeconds));
       pathDebug.update(world);
       markers.setStrategic(strategic);
       entities.setStrategic(strategic);
       // Händelser (skott, träffar, explosioner) blir effekter och töms sedan.
-      combat.handleEvents(world.events);
-      world.events.length = 0;
-      combat.update(world, alpha, frameSeconds);
+      measure('render: effects', () => {
+        combat.handleEvents(world.events);
+        world.events.length = 0;
+        combat.update(world, alpha, frameSeconds);
+      });
       healthBars.group.visible = !strategic;
-      if (!strategic) healthBars.update(world, camera, (e) => entities.labelAnchor(e));
-      renderer.render(scene, camera);
+      if (!strategic) measure('render: health bars', () => healthBars.update(world, camera, (e) => entities.labelAnchor(e)));
+      measure('render: gpu', () => renderer.render(scene, camera));
+    },
+    /** Antal draw calls och trianglar i senaste bildrutan. */
+    stats() {
+      return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
     },
   };
 }

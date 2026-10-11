@@ -527,6 +527,132 @@ const MODELS = {
     return [...mergeByMaterial(hull), turret];
   },
 
+  /** UEF Snoop (Land Scout): snabb, fyrhjulig spaningsbil med kulspruta och sensorparabol ('turret'). */
+  snoop() {
+    const { armor, armorDark, tread, teamPanel, glow } = MATERIALS;
+    const parts = [
+      prism([[-0.42, 0.14], [0.3, 0.14], [0.44, 0.24], [0.34, 0.34], [-0.36, 0.36]], 0.42, armor, 0, 0.025),
+      chamferBox(0.3, 0.02, 0.4, teamPanel, 0, 0.375, -0.06, 0.005),
+      rotated(chamferBox(0.26, 0.02, 0.06, glow, 0, 0.3, 0.4, 0.004), 0.6), // strålkastare
+    ];
+    for (const side of [-1, 1]) {
+      for (const z of [-0.26, 0.26]) {
+        parts.push(rotated(cylinder(0.13, 0.1, tread, side * 0.26, 0.13, z, 10), 0, 0, Math.PI / 2));
+        parts.push(rotated(cylinder(0.06, 0.11, armorDark, side * 0.265, 0.13, z, 8), 0, 0, Math.PI / 2));
+      }
+      parts.push(prism([[-0.42, 0.22], [0.42, 0.22], [0.36, 0.28], [-0.36, 0.28]], 0.1, armorDark, side * 0.27, 0.01)); // stänkskärm
+    }
+    const dish = rotated(taper(0.12, 0.02, 0.04, armorDark, -0.05, 0.3, -0.1, 10), -0.5);
+    const turret = namedGroup('turret', [
+      chamferBox(0.2, 0.1, 0.22, armorDark, 0, 0.05, 0, 0.02),
+      strut([0.05, 0.08, 0.05], [0.05, 0.08, 0.34], 0.035, armorDark, true), // kulspruta
+      strut([-0.05, 0.1, -0.08], [-0.05, 0.28, -0.1], 0.02, armorDark, true),
+      dish,
+      chamferBox(0.03, 0.03, 0.02, glow, -0.05, 0.31, -0.07, 0.005),
+    ], 0, 0.36, -0.02);
+    return [...mergeByMaterial(parts), turret];
+  },
+
+  /**
+   * UEF Mech Marine (Light Assault Bot): liten tvåbent robot med en
+   * överkropp ('turret') som vrids mot målet och en kulspruta på varje arm.
+   * Benen ('legL', 'legR') har leden i höften.
+   */
+  mechMarine() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const HIP_Y = 0.48;
+    const leg = (name, x) => namedGroup(name, [
+      chamferBox(0.1, 0.1, 0.12, armorDark, 0, 0, 0, 0.02),
+      prism([[-0.06, -0.02], [0.08, -0.02], [0.09, -0.22], [-0.05, -0.24]], 0.12, armor, 0, 0.015),
+      prism([[-0.05, -0.24], [0.08, -0.24], [0.05, -0.42], [-0.06, -0.42]], 0.11, armor, 0, 0.015),
+      prism([[-0.08, -0.48], [0.14, -0.48], [0.15, -0.45], [0.06, -0.41], [-0.07, -0.41]], 0.13, armorDark, 0, 0.01),
+    ], x, HIP_Y, 0);
+    const upper = namedGroup('turret', [
+      chamferBox(0.2, 0.08, 0.14, armorDark, 0, 0.02, 0, 0.02), // bäcken
+      prism([[-0.12, 0.08], [0.1, 0.08], [0.15, 0.18], [0.12, 0.34], [-0.12, 0.34]], 0.3, armor, 0, 0.02), // bål
+      chamferBox(0.16, 0.02, 0.14, teamPanel, 0, 0.35, 0.0, 0.005),
+      prism([[-0.05, 0.34], [0.08, 0.34], [0.11, 0.39], [0.06, 0.45], [-0.05, 0.44]], 0.1, armor, 0, 0.01), // huvud
+      chamferBox(0.06, 0.012, 0.01, glow, 0, 0.395, 0.11, 0.002),
+      ...[-1, 1].flatMap((side) => [
+        chamferBox(0.1, 0.1, 0.14, armor, side * 0.2, 0.3, 0, 0.02), // axel
+        chamferBox(0.08, 0.16, 0.1, armorDark, side * 0.21, 0.18, 0.02, 0.015), // arm
+        chamferBox(0.09, 0.08, 0.2, armor, side * 0.21, 0.1, 0.1, 0.015), // vapenarm
+        chamferBox(0.02, 0.05, 0.16, teamPanel, side * 0.258, 0.1, 0.1, 0.004),
+        strut([side * 0.21, 0.09, 0.2], [side * 0.21, 0.09, 0.32], 0.03, armorDark, true),
+      ]),
+    ], 0, HIP_Y, 0);
+    return [leg('legR', -0.09), leg('legL', 0.09), upper];
+  },
+
+  /**
+   * UEF Lobo (Mobile Light Artillery): sexhjulig lavett med lågt flak, en
+   * förarhytt framtill, ett artilleritorn ('turret') baktill med ett grovt rör
+   * snett uppåt och hydraulcylindrar, stödben baktill och ammunitionslådor.
+   */
+  lobo() {
+    const { armor, armorDark, tread, teamPanel, glow } = MATERIALS;
+    const parts = [
+      chamferBox(0.56, 0.1, 1.15, armorDark, 0, 0.24, 0, 0.02), // chassi
+      prism([[0.22, 0.29], [0.5, 0.29], [0.58, 0.36], [0.48, 0.5], [0.22, 0.5]], 0.46, armor, 0, 0.025), // hytt
+      rotated(chamferBox(0.36, 0.02, 0.08, glow, 0, 0.43, 0.535, 0.004), 0.95), // vindruta
+      chamferBox(0.48, 0.05, 0.62, armor, 0, 0.31, -0.2, 0.01), // flak
+      chamferBox(0.5, 0.02, 0.08, teamPanel, 0, 0.345, 0.15, 0.005),
+    ];
+    for (const side of [-1, 1]) {
+      for (const z of [-0.42, -0.08, 0.36]) {
+        parts.push(rotated(cylinder(0.15, 0.12, tread, side * 0.3, 0.15, z, 12), 0, 0, Math.PI / 2));
+        parts.push(rotated(cylinder(0.07, 0.13, armorDark, side * 0.305, 0.15, z, 8), 0, 0, Math.PI / 2));
+      }
+      parts.push(
+        prism([[-0.58, 0.26], [0.56, 0.26], [0.5, 0.32], [-0.52, 0.32]], 0.1, armor, side * 0.31, 0.01), // stänkskärm
+        chamferBox(0.02, 0.04, 0.8, teamPanel, side * 0.365, 0.3, -0.02, 0.004),
+        // Stödben som fälls ner baktill.
+        strut([side * 0.22, 0.28, -0.52], [side * 0.36, 0.05, -0.66], 0.05, armorDark),
+        chamferBox(0.12, 0.03, 0.12, armorDark, side * 0.37, 0.025, -0.68, 0.01),
+        chamferBox(0.12, 0.1, 0.16, armorDark, side * 0.16, 0.39, 0.0, 0.015), // ammunitionslåda
+      );
+    }
+    const turret = namedGroup('turret', [
+      taper(0.2, 0.24, 0.08, armorDark, 0, 0.04, 0, 10), // vridkrans
+      chamferBox(0.3, 0.14, 0.32, armor, 0, 0.14, 0, 0.025), // vagga
+      chamferBox(0.04, 0.2, 0.22, armor, -0.13, 0.26, 0.04, 0.01), // sidosköldar
+      chamferBox(0.04, 0.2, 0.22, armor, 0.13, 0.26, 0.04, 0.01),
+      strut([0, 0.26, 0.0], [0, 0.78, 0.62], 0.11, armorDark, true), // rör
+      strut([0, 0.3, 0.05], [0, 0.46, 0.24], 0.17, armor, true), // rekylhylsa
+      strut([0, 0.74, 0.57], [0, 0.82, 0.67], 0.15, armorDark, true), // mynning
+      strut([-0.08, 0.16, -0.08], [-0.08, 0.42, 0.22], 0.035, armor, true), // hydraulik
+      strut([0.08, 0.16, -0.08], [0.08, 0.42, 0.22], 0.035, armor, true),
+    ], 0, 0.33, -0.25);
+    return [...mergeByMaterial(parts), turret];
+  },
+
+  /** UEF Archer (Mobile Anti-Air Gun): bandvagn med ett torn ('turret') med två rälskanoner mot himlen. */
+  archer() {
+    const { armor, armorDark, tread, teamPanel, glow } = MATERIALS;
+    const parts = [
+      prism([[-0.48, 0.15], [0.36, 0.15], [0.5, 0.26], [0.42, 0.36], [-0.44, 0.38]], 0.46, armor, 0, 0.025),
+    ];
+    for (const side of [-1, 1]) {
+      parts.push(
+        prism([[-0.52, 0.09], [-0.45, 0.01], [0.45, 0.01], [0.54, 0.09], [0.48, 0.22], [-0.48, 0.22]], 0.18, tread, side * 0.32),
+        prism([[-0.5, 0.2], [0.5, 0.2], [0.54, 0.26], [0.46, 0.29], [-0.48, 0.29]], 0.2, armor, side * 0.33, 0.015),
+        chamferBox(0.05, 0.015, 0.7, teamPanel, side * 0.37, 0.3, 0, 0.004),
+      );
+    }
+    const turret = namedGroup('turret', [
+      taper(0.2, 0.24, 0.12, armorDark, 0, 0.06, 0, 10),
+      chamferBox(0.34, 0.2, 0.3, armor, 0, 0.2, 0, 0.03),
+      chamferBox(0.36, 0.02, 0.2, teamPanel, 0, 0.31, -0.02, 0.005),
+      ...[-0.12, 0.12].flatMap((x) => [
+        strut([x, 0.24, 0.05], [x, 0.66, 0.42], 0.07, armorDark), // rälskanon
+        strut([x, 0.25, 0.06], [x, 0.4, 0.19], 0.1, armor),
+        strut([x, 0.66, 0.42], [x, 0.69, 0.45], 0.05, glow, true),
+      ]),
+      chamferBox(0.08, 0.06, 0.05, armorDark, 0, 0.32, -0.16, 0.01), // radar
+    ], 0, 0.38, -0.04);
+    return [...mergeByMaterial(parts), turret];
+  },
+
   /**
    * UEF T1 Engineer: låg, långsträckt bandvagn med en liten pansrad hytt, en
    * tvådelad kranarm med byggnozzel och ett motorblock baktill.

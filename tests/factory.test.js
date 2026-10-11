@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createWorld, tickWorld, PLAYER_ID } from '../src/sim/world.js';
+import { createWorld, tickWorld, PLAYER_ID, ENEMY_ID } from '../src/sim/world.js';
 import { addStructure, addUnit, getEntity } from '../src/sim/entities.js';
 import { queueCommand } from '../src/sim/commands.js';
 import structures from '../src/data/structures.js';
@@ -184,6 +184,46 @@ describe('assistera en annan enhet', () => {
     expect(eng.orders).toEqual([]);
   });
 
+  it('stridsenheter kan assistera och följer den assisterade', () => {
+    const { world, acu } = setup();
+    const tank = addUnit(world, 'striker', { x: 66, z: 72, owner: PLAYER_ID });
+    cmd(world, { type: 'assist', ids: [tank.id], targetId: acu.id });
+    cmd(world, { type: 'move', ids: [acu.id], x: 30, z: 69 });
+    ticks(world, 200);
+    expect(tank.orders[0]).toMatchObject({ type: 'guard', targetId: acu.id });
+    expect(Math.hypot(tank.x - acu.x, tank.z - acu.z)).toBeLessThan(acu.radius + 2.5);
+  });
+
+  it('en assisterande stridsenhet anfaller fiender som kommer nära den assisterade', () => {
+    const { world, acu } = setup();
+    acu.orders.length = 0;
+    const tank = addUnit(world, 'striker', { x: 64, z: 60, owner: PLAYER_ID });
+    cmd(world, { type: 'assist', ids: [tank.id], targetId: acu.id });
+    // Utom stridsvagnens räckvidd men nära ACU:n.
+    const m = addUnit(world, 'mantis', { x: acu.x + 8, z: acu.z + 6, owner: ENEMY_ID });
+    m.orders.length = 0;
+    m.hp = 1e6;
+    let shotAt = false;
+    for (let i = 0; i < 60; i++) {
+      tickWorld(world);
+      if (tank.targetId === m.id) shotAt = true;
+    }
+    expect(shotAt).toBe(true);
+    expect(tank.orders[0].type).toBe('guard');
+  });
+
+  it('en assisterande ingenjör reparerar den assisterade när den är skadad', () => {
+    const { world } = setup();
+    const tank = addUnit(world, 'striker', { x: 50, z: 70, owner: PLAYER_ID });
+    tank.hp = 100;
+    const eng = addUnit(world, 'engineer', { x: 52, z: 70, owner: PLAYER_ID });
+    cmd(world, { type: 'assist', ids: [eng.id], targetId: tank.id });
+    // Reparation går i byggtakt: 2/3 av HP:n tar 2/3 av byggtiden för ingenjören.
+    ticks(world, Math.ceil(units.striker.buildTime / units.engineer.buildPower * (2 / 3) * 10) + 20);
+    expect(tank.hp).toBe(tank.maxHp);
+    expect(eng.orders[0]).toMatchObject({ type: 'guard', targetId: tank.id });
+  });
+
   it('en enhet kan inte assistera sig själv', () => {
     const { world, acu } = setup();
     cmd(world, { type: 'assist', ids: [acu.id], targetId: acu.id });
@@ -235,5 +275,16 @@ describe('kö i fabriken: ta bort flera', () => {
     cmd(world, { type: 'cancelProduce', id: factory.id, index: 1, count: 5 });
     ticks(world, 1);
     expect(factory.productionQueue).toEqual(['striker', 'engineer', 'engineer']);
+  });
+});
+
+describe('alla UEF T1-landenheter', () => {
+  it.each(['engineer', 'snoop', 'mechMarine', 'striker', 'lobo', 'archer'])('Land Factory kan producera %s', (type) => {
+    const { world, factory } = setup();
+    world.players[PLAYER_ID].economy.mass.stored = 5000;
+    world.players[PLAYER_ID].economy.energy.stored = 50000;
+    cmd(world, { type: 'produce', id: factory.id, unit: type });
+    ticks(world, Math.ceil(units[type].buildTime / FACTORY_POWER * 10) + 2);
+    expect(world.entities.some((e) => e.type === type && e.owner === PLAYER_ID)).toBe(true);
   });
 });

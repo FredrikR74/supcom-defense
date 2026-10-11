@@ -103,7 +103,8 @@ export function createTerrainMesh(terrain, renderer, { seed = 1 } = {}) {
   // Markens normalhöjd: medianen, så att berg inte förskjuter skalan.
   const sorted = Float32Array.from(heights).sort();
   const ground = sorted[Math.floor(sorted.length / 2)];
-  const maxH = sorted[sorted.length - 1];
+  // Snö bara på riktiga berg: högt över marken och nära kartans högsta topp.
+  const snowLine = Math.max(ground + 11, sorted[sorted.length - 1] - 5);
 
   const positions = new Float32Array(n * n * 3);
   const uvs = new Float32Array(n * n * 2);
@@ -150,7 +151,7 @@ export function createTerrainMesh(terrain, renderer, { seed = 1 } = {}) {
       const altitude = THREE.MathUtils.clamp((rel - 6) / 8, 0, 1);
       rock.copy(ROCK).lerp(ROCK_DARK, patchNoise(x, z, 4, seed + 3) * 0.8);
       c.lerp(rock, Math.max(steep, altitude * 0.85));
-      const snow = THREE.MathUtils.smoothstep(heights[i], maxH - 6, maxH - 2) * (1 - steep * 0.6);
+      const snow = THREE.MathUtils.smoothstep(heights[i], snowLine, snowLine + 3) * (1 - steep * 0.6);
       c.lerp(SNOW, snow);
       colors.set([c.r, c.g, c.b], i * 3);
     }

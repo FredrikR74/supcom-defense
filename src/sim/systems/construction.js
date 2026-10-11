@@ -102,18 +102,31 @@ function startBuildOrder(world, e, order) {
   setJob(e, { kind: 'structure', targetId: target.id }, structures[target.type], units[e.type].buildPower);
 }
 
-/** Assistera en annan byggare (hjälp med dess bygge) eller en fabrik (hjälp med dess enhet). */
+/**
+ * Assist (guard) för byggare: hjälp den assisterade med dess bygge, hjälp en
+ * fabrik med dess enhet, eller reparera den assisterade när den är skadad.
+ */
 function startGuardOrder(world, e, order) {
+  const power = units[e.type].buildPower;
+  if (!(power > 0)) return;
   const dest = guardDestination(world, e, order);
   if (!dest || !inReach(e, dest.x, dest.z, dest.reach)) return;
-  const power = units[e.type].buildPower;
 
-  if (dest.site && !dest.site.built) {
+  if (dest.mode === 'build' && !dest.site.built) {
     setJob(e, { kind: 'structure', targetId: dest.site.id }, structures[dest.site.type], power);
-  } else if (dest.target.buildJob?.kind === 'unit') {
+  } else if (dest.mode === 'factory') {
     const type = dest.target.buildJob.type;
     setJob(e, { kind: 'factoryAssist', targetId: dest.target.id }, units[type], power);
+  } else if (dest.mode === 'repair') {
+    setRepairJob(world, e, dest.target);
   }
+}
+
+/** Reparationsjobb på `target` (se startRepairOrder). */
+function setRepairJob(world, e, target) {
+  setJob(e, { kind: 'repair', targetId: target.id }, getDef(target.type), units[e.type].buildPower);
+  const mult = world.config.repairCostMult;
+  e.demand = { mass: e.demand.mass * mult, energy: e.demand.energy * mult };
 }
 
 function startProductionJob(e) {
@@ -163,9 +176,7 @@ function startRepairOrder(world, e, order) {
     return;
   }
   if (!inReach(e, target.x, target.z, workReach(e, target))) return;
-  setJob(e, { kind: 'repair', targetId: target.id }, getDef(target.type), units[e.type].buildPower);
-  const mult = world.config.repairCostMult;
-  e.demand = { mass: e.demand.mass * mult, energy: e.demand.energy * mult };
+  setRepairJob(world, e, target);
 }
 
 /**

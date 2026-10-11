@@ -15,26 +15,26 @@ export function createInstancedBatch(type, { capacity = 2048, material = null, s
   model.scale.y = scaleY;
   model.updateMatrixWorld(true);
 
-  // Ben ('leg0'...) ritas som egna delar som vrids per instans efter gångfasen;
-  // allt annat bakas in i modellens läge.
-  const legs = [];
-  model.traverse((o) => {
-    if (/^leg\d$/.test(o.name)) legs.push({ group: o, parts: [], matrix: new THREE.Matrix4() });
-  });
-  const legOf = (o) => legs.find((l) => l.group === o.parent);
+  // Rörliga delar (namngivna grupper direkt under modellen: torn, bål, ben)
+  // ritas som egna delar med en egen pose per instans; allt annat bakas in i
+  // modellens läge.
+  const movable = model.children
+    .filter((o) => o.isGroup && o.name)
+    .map((o) => ({ name: o.name, group: o, parts: [], matrix: new THREE.Matrix4() }));
+  const movableOf = (o) => movable.find((m) => m.group === o.parent);
 
   const parts = [];
   const bodyParts = [];
   model.traverse((o) => {
     if (!o.isMesh) return;
-    const leg = legOf(o);
-    // Bendelar bakas relativt benets led, kroppsdelar relativt modellen.
-    const geometry = o.geometry.clone().applyMatrix4(leg ? o.matrix : o.matrixWorld);
+    const part = movableOf(o);
+    // Rörliga delar bakas relativt sin led, kroppsdelar relativt modellen.
+    const geometry = o.geometry.clone().applyMatrix4(part ? o.matrix : o.matrixWorld);
     const mesh = new THREE.InstancedMesh(geometry, material ?? o.material, capacity);
     mesh.count = 0;
     mesh.frustumCulled = false;
     parts.push(mesh);
-    (leg ? leg.parts : bodyParts).push(mesh);
+    (part ? part.parts : bodyParts).push(mesh);
     group.add(mesh);
   });
   const top = new THREE.Box3().setFromObject(model).max.y;
@@ -74,18 +74,28 @@ export function createInstancedBatch(type, { capacity = 2048, material = null, s
       ids.length = 0;
     },
 
-    /** `walk` = { phase, amp } för enheter med ben (se poseLeg), annars stilla. */
-    add(id, x, y, z, heading, walk = null) {
+    /**
+     * Lägger till en instans. Rörliga delar får sin pose från `pose`, en modell
+     * av samma typ (t.ex. en egen enhets tornvinkel och gång), eller för
+     * insektsben från `walk` = { phase, amp } (se poseLeg); annars vilopose.
+     */
+    add(id, x, y, z, heading, walk = null, pose = null) {
       if (count >= capacity) return;
       quat.setFromAxisAngle(up, heading);
       matrix.compose(pos.set(x, y, z), quat, scale);
       for (const p of bodyParts) p.setMatrixAt(count, matrix);
-      for (const leg of legs) {
-        poseLeg(leg.group, walk?.phase ?? 0, walk?.amp ?? 0);
-        leg.group.updateMatrix();
-        // instans · modellens skala · benets led och pose
-        leg.matrix.multiplyMatrices(matrix, model.matrix).multiply(leg.group.matrix);
-        for (const p of leg.parts) p.setMatrixAt(count, leg.matrix);
+      for (const m of movable) {
+        const source = pose?.userData.movable?.[m.name];
+        if (source) {
+          source.updateMatrix();
+          m.matrix.multiplyMatrices(matrix, model.matrix).multiply(source.matrix);
+        } else {
+          if (/^leg\d$/.test(m.name)) poseLeg(m.group, walk?.phase ?? 0, walk?.amp ?? 0);
+          m.group.updateMatrix();
+          // instans · modellens skala · delens led och pose
+          m.matrix.multiplyMatrices(matrix, model.matrix).multiply(m.group.matrix);
+        }
+        for (const p of m.parts) p.setMatrixAt(count, m.matrix);
       }
       iconPositions.set([x, y + 1, z], count * 3);
       ids[count] = id;

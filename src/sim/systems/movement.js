@@ -1,7 +1,7 @@
 import { TICK_SECONDS } from '../constants.js';
 import { guardDestination } from '../guard.js';
 import { flowTarget } from '../pathing.js';
-import { steer } from '../unitPath.js';
+import { steer, PATH_BUDGET_PER_TICK } from '../unitPath.js';
 import { getEntity, getDef, needsRepair } from '../entities.js';
 import units from '../../data/units.js';
 
@@ -51,6 +51,7 @@ function destination(world, e, order) {
  * skjuta på. Egna enheter går runt hinder med A* (se unitPath.js).
  */
 export function movementSystem(world) {
+  world.pathBudget = PATH_BUDGET_PER_TICK;
   for (const e of world.entities) {
     if (e.kind !== 'unit') continue;
     e.prevX = e.x;
@@ -72,6 +73,7 @@ export function movementSystem(world) {
         break;
       }
       const goal = order.type === 'attackCore' ? dest : steer(world, e, order, dest);
+      if (goal.wait) break;
       if (goal.stuck) {
         if (order.type === 'move') e.orders.shift(); // så nära som det går
         break;

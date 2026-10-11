@@ -24,6 +24,21 @@ export function selectInRect(entities, toScreen, rect, owner) {
   return inside.filter((e) => selectionPriority(e) === best).map((e) => e.id);
 }
 
+/** Två klick på samma typ inom så här många ms räknas som ett dubbelklick. */
+const DOUBLE_CLICK_MS = 350;
+
+/**
+ * Id:n för `owner`s entiteter av typen `type` som syns på skärmen
+ * (`width` × `height` pixlar), som när man dubbelklickar på en enhet i FA.
+ */
+export function selectSameTypeOnScreen(entities, toScreen, width, height, owner, type) {
+  return entities.filter((e) => {
+    if (e.owner !== owner || e.type !== type) return false;
+    const p = toScreen(e);
+    return p.x >= 0 && p.x <= width && p.y >= 0 && p.y <= height;
+  }).map((e) => e.id);
+}
+
 /**
  * FA:s General.SelectionPriority: stridsenheter 1 (standard), ACU och ingenjörer 3,
  * byggnader 5. En lådmarkering med blandat innehåll tar bara den lägsta.
@@ -39,6 +54,7 @@ export function selectionPriority(e) {
  */
 export function createSelectionInput(canvas, boxEl, view, world, selection, ui = {}) {
   let drag = null; // { x0, y0, x1, y1, shift, active }
+  let lastClick = { type: null, time: -Infinity };
 
   const local = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -105,7 +121,13 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
         return;
       }
       if (target?.owner === PLAYER_ID && needsRepair(target) && ids.some((id) => id !== targetId)) {
-        queueCommand(world, { type: 'repair', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
+        // Byggare reparerar; övriga assisterar (följer och skyddar) en skadad enhet.
+        const isBuilder = (id) => (getDef(world.entities.find((ent) => ent.id === id)?.type)?.buildPower ?? 0) > 0;
+        queueCommand(world, { type: 'repair', owner: PLAYER_ID, ids: ids.filter(isBuilder), targetId, queue: e.shiftKey });
+        if (target.kind === 'unit') {
+          const others = ids.filter((id) => id !== targetId && !isBuilder(id));
+          if (others.length > 0) queueCommand(world, { type: 'assist', owner: PLAYER_ID, ids: others, targetId, queue: e.shiftKey });
+        }
         return;
       }
       const helpers = ids.filter((id) => id !== targetId);
@@ -149,7 +171,18 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
       const id = view.pickEntityAtNdc(ndc.x, ndc.y);
       const picked = world.entities.find((ent) => ent.id === id);
       if (picked?.owner === PLAYER_ID) {
-        select([picked.id], drag.shift);
+        // Dubbelklick: alla egna av samma typ som syns i bild.
+        const now = performance.now();
+        const double = lastClick.type === picked.type && now - lastClick.time < DOUBLE_CLICK_MS;
+        lastClick = double ? { type: null, time: -Infinity } : { type: picked.type, time: now };
+        if (double) {
+          if (!drag.shift) selection.clear();
+          const ids = selectSameTypeOnScreen(world.entities, (ent) => view.entityScreenPos(ent),
+            canvas.clientWidth, canvas.clientHeight, PLAYER_ID, picked.type);
+          for (const id of ids) selection.add(id);
+        } else {
+          select([picked.id], drag.shift);
+        }
         ui.inspectId = null;
       } else if (picked) {
         // Fiende eller vrak: visa den i infopanelen, men markera den inte.

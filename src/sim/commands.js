@@ -1,4 +1,4 @@
-import { getEntity, removeEntity } from './entities.js';
+import { getEntity, removeEntity, getDef } from './entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
 import { setDifficulty } from './director.js';
@@ -60,7 +60,9 @@ function applyMove(world, { owner, ids, x, z, queue }) {
 function applyAttack(world, { owner, ids, targetId, queue }) {
   const target = getEntity(world, targetId);
   if (!target || target.owner === owner || target.owner === 0) return;
-  for (const e of ownUnits(world, ids, owner, (u) => Boolean(units[u.type].weapon))) {
+  // Luftvärn anfaller bara flyg.
+  const canAttack = (u) => Boolean(units[u.type].weapon) && Boolean(units[u.type].weapon.antiAir) === Boolean(getDef(target.type)?.air);
+  for (const e of ownUnits(world, ids, owner, canAttack)) {
     giveOrder(e, { type: 'attack', targetId }, queue);
   }
 }
@@ -113,19 +115,19 @@ function applyBuild(world, { owner, ids, structure, x, z, queue }) {
 const isBuilder = (e) => (units[e.type].buildPower ?? 0) > 0;
 
 /**
- * `{ type: 'assist', owner, ids, targetId, queue }`:
- * - på en ofärdig byggnad: hjälp till att bygga den
- * - på en egen byggare eller fabrik: följ den och hjälp med det den bygger (guard)
+ * `{ type: 'assist', owner, ids, targetId, queue }` (assist/guard som i FA):
+ * - på en ofärdig byggnad: byggarna hjälper till att bygga den
+ * - på en egen enhet eller färdig fabrik: alla följer den. Byggare hjälper med
+ *   det den bygger eller producerar och reparerar den; beväpnade anfaller
+ *   fiender som kommer nära den (se guard.js)
  */
 function applyAssist(world, { owner, ids, targetId, queue }) {
   const target = getEntity(world, targetId);
   if (!target || target.owner !== owner) return;
 
-  const assistable = target.kind === 'unit'
-    ? isBuilder(target)
-    : target.built && Boolean(structures[target.type].produces);
-  if (assistable) {
-    for (const e of ownUnits(world, ids, owner, isBuilder)) {
+  const guardable = target.kind === 'unit' || (target.built && Boolean(structures[target.type].produces));
+  if (guardable) {
+    for (const e of ownUnits(world, ids, owner)) {
       if (e.id !== targetId) giveOrder(e, { type: 'guard', targetId }, queue);
     }
     return;
