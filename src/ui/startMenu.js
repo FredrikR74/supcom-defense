@@ -19,7 +19,7 @@ export function showStartMenu(el, maps, { difficulty = 50 } = {}) {
       <button class="menu-start">Start</button>
       <div class="menu-help">
         WASD / screen edge: pan · Wheel: zoom · Left-click: select · Right-click: move, attack, repair, reclaim<br />
-        Shift: queue · P: patrol · Delete: sell · Space: pause · +/−: game speed · M: sound
+        Shift: queue · P: patrol · Ctrl+1–9: set group · 1–9: select group · Delete: sell · Space: pause · +/−: game speed · M: sound
       </div>
     </div>`;
   const mapList = el.querySelector('.menu-maps');

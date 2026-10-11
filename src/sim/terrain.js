@@ -36,14 +36,59 @@ function createValueNoise(size, cell, rng) {
   };
 }
 
+/** Skrovlig bergsyta i 0..1: kanter där bruset korsar mitten blir åsar. */
+function createRidgedNoise(size, rng) {
+  const octaves = [
+    { amp: 1, sample: createValueNoise(size, 12, rng) },
+    { amp: 0.5, sample: createValueNoise(size, 6, rng) },
+    { amp: 0.25, sample: createValueNoise(size, 3, rng) },
+  ];
+  return (x, z) => {
+    let v = 0;
+    for (const o of octaves) v += (1 - Math.abs(o.sample(x, z) * 2 - 1)) * o.amp;
+    return v / 1.75;
+  };
+}
+
+const clamp01 = (t) => Math.min(1, Math.max(0, t));
+/** Bergsfoten är brant: över så här många rutor går berget från mark till full höjd. */
+const CLIFF = 3.5;
+
+/**
+ * Hur mycket berg som står i (x, z), 0..1. `ring` ({x, z, radius, width, gaps})
+ * är en bergsring runt basen; varje öppning ({angle, width}) är en passage där
+ * vinkeln är i grader från +z (söder) mot +x (öster). `peaks` ({x, z, radius})
+ * är fristående berg.
+ */
+function mountainMask(x, z, ring, peaks) {
+  let m = 0;
+  if (ring) {
+    const dx = x - ring.x;
+    const dz = z - ring.z;
+    const d = Math.hypot(dx, dz);
+    let r = clamp01((ring.width / 2 - Math.abs(d - ring.radius)) / CLIFF);
+    const angle = Math.atan2(dx, dz);
+    for (const gap of ring.gaps ?? []) {
+      const diff = Math.abs(Math.atan2(Math.sin(angle - gap.angle * Math.PI / 180), Math.cos(angle - gap.angle * Math.PI / 180)));
+      r *= clamp01((diff * d - gap.width / 2) / CLIFF);
+    }
+    m = Math.max(m, r);
+  }
+  for (const p of peaks ?? []) m = Math.max(m, clamp01((p.radius - Math.hypot(x - p.x, z - p.z)) / (CLIFF * 1.5)));
+  return m;
+}
+
 /**
  * Genererar kullig terräng. `plateau` ({x, z, radius, blend, height}) plattar till
  * en cirkel för basen och tonar över till kullarna inom `blend` enheter.
+ * `ring` och `peaks` lägger till berg (se mountainMask) med höjden `mountainHeight`;
+ * deras branta sidor gör dem oframkomliga.
  */
-export function generateTerrain({ size, seed, hillHeight = 8, plateau = null }) {
+export function generateTerrain({ size, seed, hillHeight = 8, plateau = null, ring = null, peaks = null, mountainHeight = 16 }) {
   const rng = createRng(seed);
   const octaves = OCTAVES.map((o) => ({ ...o, sample: createValueNoise(size, o.cell, rng) }));
   const totalAmp = OCTAVES.reduce((sum, o) => sum + o.amp, 0);
+  const ridged = ring || peaks ? createRidgedNoise(size, rng) : null;
 
   const n = size + 1;
   const heights = new Float32Array(n * n);
@@ -61,6 +106,10 @@ export function generateTerrain({ size, seed, hillHeight = 8, plateau = null }) 
           const t = smoothstep((d - plateau.radius) / plateau.blend);
           h = plateau.height + (h - plateau.height) * t;
         }
+      }
+      if (ridged) {
+        const m = mountainMask(x, z, ring, peaks);
+        if (m > 0) h += mountainHeight * m * (0.65 + 0.6 * ridged(x, z));
       }
       heights[z * n + x] = h;
     }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createWorld, tickWorld, PLAYER_ID, ENEMY_ID } from '../src/sim/world.js';
-import { addStructure, addUnit, getEntity, isIdleBuilder } from '../src/sim/entities.js';
+import { addStructure, addUnit, getEntity, isIdleBuilder, isIdleFactory } from '../src/sim/entities.js';
 import { queueCommand } from '../src/sim/commands.js';
 import { cellIndex, isBlockedCell } from '../src/sim/pathing.js';
 import { vetThresholds, addVetExperience, regenRate } from '../src/sim/veterancy.js';
@@ -75,6 +75,17 @@ describe('sysslolösa byggare', () => {
     const { world } = setup();
     expect(isIdleBuilder(addUnit(world, 'mantis', { x: 10, z: 10, owner: ENEMY_ID }))).toBe(false);
     expect(isIdleBuilder(getEntity(world, world.coreId))).toBe(false);
+  });
+
+  it('en färdig fabrik utan kö är sysslolös, men inte en ofärdig eller en som producerar', () => {
+    const { world } = setup();
+    const factory = addStructure(world, 'landFactory', { x: 60, z: 60, owner: PLAYER_ID });
+    expect(isIdleFactory(factory)).toBe(true);
+    cmd(world, { type: 'produce', id: factory.id, unit: 'engineer' });
+    ticks(world, 1);
+    expect(isIdleFactory(factory)).toBe(false);
+    expect(isIdleFactory(addStructure(world, 'landFactory', { x: 70, z: 60, owner: PLAYER_ID, built: false }))).toBe(false);
+    expect(isIdleFactory(getEntity(world, world.coreId))).toBe(false);
   });
 });
 

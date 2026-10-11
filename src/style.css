@@ -23,62 +23,138 @@ html, body {
   white-space: pre;
 }
 
-/* Resurspanel */
+/* Resurspanel: två block med fasta mått så att panelen aldrig byter bredd eller rad */
 #resources {
   position: fixed;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  padding: 6px 16px;
-  font: 13px/1 system-ui, sans-serif;
+  display: grid;
+  grid-template-columns: repeat(2, 250px);
+  padding: 7px 16px 8px;
+  font: 13px/1.2 system-ui, sans-serif;
   color: #e5e7eb;
-  background: linear-gradient(#1f2937ee, #111827ee);
+  background: linear-gradient(#1f2937f2, #111827f2);
   border: 1px solid #374151;
   border-top: none;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   pointer-events: none;
-  white-space: nowrap;
 }
 
 .resource {
-  display: flex;
-  gap: 8px;
+  --res: #a3e635;
+  --res-light: #d9f99d;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "head stored" "bar rates";
+  gap: 5px 10px;
   align-items: center;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.resource-energy { --res: #facc15; --res-light: #fef08a; }
+.resource + .resource {
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid #374151;
+}
+
+.resource-head {
+  grid-area: head;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.resource-icon {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: var(--res);
+  transform: rotate(45deg);
 }
 
 .resource-label {
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--res);
 }
 
-.resource-mass .resource-label { color: #a3e635; }
-.resource-energy .resource-label { color: #facc15; }
+.resource-deficit {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f87171;
+}
 
-.resource-stored { min-width: 92px; text-align: right; }
+.resource-stored { grid-area: stored; text-align: right; }
+.resource-max { color: #9ca3af; }
 
 .resource-bar {
-  width: 80px;
-  height: 6px;
+  grid-area: bar;
+  display: block;
+  height: 8px;
+  overflow: hidden;
   background: #0b0f14;
-  border: 1px solid #4b5563;
+  border: 1px solid #374151;
+  border-radius: 3px;
 }
 
-.resource-fill { display: block; height: 100%; }
-.resource-mass .resource-fill { background: #84cc16; }
-.resource-energy .resource-fill { background: #eab308; }
+.resource-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(var(--res-light), var(--res));
+}
 
-.resource-income { color: #4ade80; min-width: 40px; }
-.resource-spent { color: #f87171; min-width: 40px; }
+.resource-rates {
+  grid-area: rates;
+  display: grid;
+  grid-template-columns: 44px 44px;
+  font-size: 12px;
+  text-align: right;
+}
+.resource-income { color: #4ade80; }
+.resource-spent { color: #f87171; }
 
+/* Brist: lagret är tomt och efterfrågan större än inkomsten */
+.resource-stalled .resource-now { color: #f87171; }
+.resource-stalled .resource-bar { border-color: #ef4444; animation: stall-pulse 0.8s ease-in-out infinite alternate; }
+
+/* Byggeffektivitet under 100 %: en pill under panelen som inte påverkar dess mått */
 .resource-efficiency {
-  color: #f87171;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 5px;
+  padding: 2px 10px;
+  font-size: 12px;
   font-weight: 600;
+  color: #fecaca;
+  white-space: nowrap;
+  background: #7f1d1dee;
+  border: 1px solid #ef4444;
+  border-radius: 999px;
+}
+.resource-efficiency[hidden] { display: none; }
+
+/* Smala fönster: samma layout, bara mindre, så att hotpanelen uppe till höger får plats */
+@media (max-width: 1080px) {
+  #resources { grid-template-columns: repeat(2, 214px); padding: 5px 10px 6px; font-size: 12px; }
+  .resource + .resource { margin-left: 10px; padding-left: 10px; }
+  .resource-rates { grid-template-columns: 40px 40px; font-size: 11px; }
+}
+@media (max-width: 760px) {
+  #resources { left: 8px; transform: none; grid-template-columns: repeat(2, minmax(0, 1fr)); width: calc(100vw - 16px); box-sizing: border-box; }
+  .resource-rates { grid-template-columns: 34px 34px; }
 }
 
 /* Hover-info med HP-stapel */
@@ -172,12 +248,6 @@ html, body {
   border-radius: 8px;
 }
 
-/* Brist på en resurs: röd rad med underskottet */
-.resource-deficit { color: #f87171; font-weight: 600; }
-.resource-deficit:empty { display: none; }
-.resource-stalled .resource-stored { color: #f87171; }
-.resource-stalled .resource-bar { border-color: #ef4444; animation: stall-pulse 0.8s ease-in-out infinite alternate; }
-
 @keyframes stall-pulse {
   from { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
   to { box-shadow: 0 0 6px 1px rgba(239, 68, 68, 0.8); }
@@ -198,22 +268,6 @@ html, body {
 .hover-prod[hidden] { display: none; }
 .hover-prod .hp-fill { background: #67e8f9; }
 .hover-prod-text { font-variant-numeric: tabular-nums; color: #9ca3af; }
-
-/* Smala fönster: resurspanelen får radbryta och krympa i stället för att klippas */
-#resources {
-  max-width: calc(100vw - 16px);
-  flex-wrap: wrap;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
-@media (max-width: 900px) {
-  #resources { gap: 4px 12px; padding: 4px 8px; font-size: 12px; }
-  .resource { gap: 5px; }
-  .resource-bar { width: 44px; }
-  .resource-stored { min-width: 74px; }
-  .resource-income, .resource-spent { min-width: 34px; }
-}
 
 /* Hotpanel uppe till höger */
 #threat {
@@ -294,6 +348,11 @@ html, body {
 }
 
 #idle[hidden] { display: none; }
+
+/* Resurspanelen är fönsterbred i smala fönster: idle-knapparna flyttas under den */
+@media (max-width: 760px) {
+  #idle { top: 52px; }
+}
 
 .idle-button {
   padding: 5px 10px;

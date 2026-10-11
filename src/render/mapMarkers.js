@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { createIcon } from './icons.js';
+import { createModel } from './models.js';
 
 /**
  * Markörer för kartans statiska objekt (spawnpunkter, massfyndigheter):
@@ -14,16 +15,11 @@ export function createMapMarkers(map, terrain) {
     obj.position.set(x, getHeight(terrain, x, z) + yOffset, z);
   }
 
-  const spawnMaterial = new THREE.MeshStandardMaterial({
-    color: 0xef4444,
-    emissive: 0x7f1d1d,
-    transparent: true,
-    opacity: 0.8,
-  });
-  const spawnGeometry = new THREE.CylinderGeometry(1.5, 1.5, 6, 16, 1, true);
+  // Fiendens spawnpunkter: en Cybran Quantum Gateway, vänd mot kartans mitt.
   for (const s of map.spawns) {
-    const m = new THREE.Mesh(spawnGeometry, spawnMaterial);
-    place(m, s.x, s.z, 3);
+    const m = createModel('cybranGateway');
+    place(m, s.x, s.z);
+    m.rotation.y = Math.atan2(map.core.x - s.x, map.core.z - s.z);
     meshes.add(m);
     const icon = createIcon('spawn');
     place(icon, s.x, s.z, 1);

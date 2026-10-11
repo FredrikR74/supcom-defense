@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { createIcon } from './icons.js';
-import { isIdleBuilder } from '../sim/entities.js';
+import { isIdleBuilder, isIdleFactory } from '../sim/entities.js';
 import { createModel, createGhost, WRECK_MATERIAL, BUILD_WIRE_MATERIAL } from './models.js';
 import { createInstancedBatch } from './instancedUnits.js';
 
@@ -102,6 +102,28 @@ export function createEntityView(terrain) {
   }
   /** Fiende-id -> { x, y, z, top } där den ritades senast. */
   const instancedPos = new Map();
+  /** Fiende-id -> gångfas för benen: { x, z, phase, amp, frame }. */
+  const enemyWalks = new Map();
+  let walkFrame = 0;
+
+  /** Benens fas följer sträckan fienden gått; utslaget tonar ut när den står still. */
+  function enemyWalk(id, x, z, frameSeconds) {
+    let w = enemyWalks.get(id);
+    if (!w) {
+      w = { x, z, phase: (id * 1.7) % (Math.PI * 2), amp: 0 };
+      enemyWalks.set(id, w);
+    }
+    const dist = Math.hypot(x - w.x, z - w.z);
+    w.x = x;
+    w.z = z;
+    w.frame = walkFrame;
+    if (frameSeconds > 0) {
+      const moving = dist / frameSeconds > 0.3;
+      w.amp += ((moving ? 1 : 0) - w.amp) * Math.min(1, frameSeconds * 6);
+      w.phase += dist * 7;
+    }
+    return w;
+  }
 
   function batchFor(type) {
     if (!batches.has(type)) {
@@ -306,7 +328,7 @@ export function createEntityView(terrain) {
           const b = batchFor(e.type);
           const { x, z } = lerpPos(e, alpha);
           const y = groundY(x, z);
-          b.add(e.id, x, y, z, e.heading);
+          b.add(e.id, x, y, z, e.heading, enemyWalk(e.id, x, z, frameSeconds));
           instancedPos.set(e.id, { x, y, z, top: b.top });
           continue;
         }
@@ -333,7 +355,7 @@ export function createEntityView(terrain) {
         v.icon.position.set(x, y + 1, z);
         v.ring.position.set(x, y + 0.05, z);
         v.ring.visible = selection.has(e.id);
-        v.idleIcon.visible = e.owner === owner && isIdleBuilder(e);
+        v.idleIcon.visible = e.owner === owner && (isIdleBuilder(e) || isIdleFactory(e));
         if (v.idleIcon.visible) v.idleIcon.position.set(x, y + v.top + 1.2, z);
       }
       for (const [id, v] of views) {
@@ -346,6 +368,9 @@ export function createEntityView(terrain) {
         views.delete(id);
       }
       for (const b of batches.values()) b.end();
+      // Glöm gångfasen för fiender som inte finns längre.
+      for (const [id, w] of enemyWalks) if (w.frame !== walkFrame) enemyWalks.delete(id);
+      walkFrame++;
       for (const b of wreckBatches.values()) b.end();
       updateOrderLines(world, selection, alpha);
       updateRallyFlags(world, selection);

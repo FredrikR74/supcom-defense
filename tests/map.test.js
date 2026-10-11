@@ -45,3 +45,25 @@ describe.each(maps.map((m) => [m.name, m]))('kartan %s', (_name, map) => {
 it('kart-id:n är unika', () => {
   expect(new Set(maps.map((m) => m.id)).size).toBe(maps.length);
 });
+
+describe('Mountain Pass', () => {
+  const map = maps.find((m) => m.id === 'mountainPass');
+
+  it('bergsringen är tät: utan passagen når ingen fiende basen', () => {
+    const closed = { ...map, terrain: { ...map.terrain, ring: { ...map.terrain.ring, gaps: [] } } };
+    const w = createWorld({ map: closed });
+    for (const s of map.spawns) expect(Number.isFinite(w.flow.dist[cellIndex(w, s.x, s.z)])).toBe(false);
+  });
+
+  it('vägen in går genom passagen i söder', () => {
+    const w = createWorld({ map });
+    const { x, z } = map.core;
+    const r = map.terrain.ring.radius;
+    // Mitt i passagen är det körbart och har en väg till kärnan; rakt norrut är det berg.
+    const pass = cellIndex(w, x, z + r);
+    expect(isBlockedCell(w, pass)).toBe(false);
+    expect(Number.isFinite(w.flow.dist[pass])).toBe(true);
+    const north = Array.from({ length: 16 }, (_, k) => cellIndex(w, x, z - r - 8 + k));
+    expect(north.some((i) => isBlockedCell(w, i))).toBe(true);
+  });
+});

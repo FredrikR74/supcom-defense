@@ -1,10 +1,19 @@
 /**
- * Syntetiserat ljud (Web Audio, inga ljudfiler): skott, träffar och explosioner,
- * och talsyntes för meddelanden som "Construction complete". Ljud längre från
+ * Syntetiserat ljud (Web Audio): skott, träffar och explosioner. Talade
+ * meddelanden som "Construction complete" är inspelade på engelska i
+ * public/voice/ (se scripts/generateVoice.ps1) och spelas genom ett lätt
+ * radiofilter; saknas ett klipp används webbläsarens talsyntes. Ljud längre från
  * kamerans mittpunkt blir svagare. M slår av och på.
  */
 const SHOTS_PER_SECOND = 14;
 const HEARING_DISTANCE = 90;
+
+/** Repliker -> inspelade klipp i public/voice/. */
+const VOICE_CLIPS = {
+  'Construction complete': 'construction-complete.wav',
+  'Commander down': 'commander-down.wav',
+  'Commander online': 'commander-online.wav',
+};
 
 export function createSound() {
   let ctx = null;
@@ -14,6 +23,8 @@ export function createSound() {
   let shotBudget = SHOTS_PER_SECOND;
   let lastRefill = 0;
   const lastSpoken = new Map();
+  /** Replik -> avkodat klipp, när det har laddats. */
+  const voiceBuffers = new Map();
 
   /** Måste anropas från en användarhandling (t.ex. Start-knappen) för att få spela ljud. */
   function init() {
@@ -26,6 +37,33 @@ export function createSound() {
     noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = noise.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    for (const [text, file] of Object.entries(VOICE_CLIPS)) {
+      fetch(`${import.meta.env.BASE_URL}voice/${file}`)
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.statusText))))
+        .then((data) => ctx.decodeAudioData(data))
+        .then((buffer) => voiceBuffers.set(text, buffer))
+        .catch(() => {}); // talsyntesen tar över
+    }
+  }
+
+  /** Spelar ett inspelat klipp genom ett radiofilter (bandpass och lite komprimering). */
+  function playVoice(buffer) {
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = 280;
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 4200;
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -24;
+    compressor.ratio.value = 4;
+    const g = ctx.createGain();
+    g.gain.value = 2.2;
+    src.connect(highpass).connect(lowpass).connect(compressor).connect(g).connect(master);
+    src.start(t);
   }
 
   function volumeAt(x, z, listener) {
@@ -66,13 +104,26 @@ export function createSound() {
   }
 
   function speak(text) {
-    if (muted || !('speechSynthesis' in window)) return;
+    if (muted) return;
     const now = performance.now();
     if (now - (lastSpoken.get(text) ?? -Infinity) < 3000) return;
     lastSpoken.set(text, now);
+    const buffer = voiceBuffers.get(text);
+    if (buffer && ctx) {
+      playVoice(buffer);
+      return;
+    }
+    if (!('speechSynthesis' in window)) return;
     const u = new SpeechSynthesisUtterance(text);
+    // Alltid engelska, även när systemet är på ett annat språk.
+    u.lang = 'en-US';
+    const voice = englishVoice();
+    if (voice) {
+      u.voice = voice;
+      u.lang = voice.lang;
+    }
     u.rate = 0.95;
-    u.pitch = 0.8;
+    u.pitch = 0.9;
     window.speechSynthesis.speak(u);
   }
 
@@ -107,4 +158,27 @@ export function createSound() {
       }
     },
   };
+}
+
+/** Föredragna röster, bäst först: naturliga manliga röster låter mest som FA:s annonsör. */
+const PREFERRED_VOICES = [/natural.*(guy|ryan|davis|andrew|christopher|eric)/i, /natural/i,
+  /google uk english male/i, /(david|mark|george|daniel|alex)/i, /google us english/i];
+
+let cachedVoice = null;
+
+/** En engelsk röst för talade meddelanden, eller null om webbläsaren inte har någon. */
+function englishVoice() {
+  if (cachedVoice) return cachedVoice;
+  const english = window.speechSynthesis.getVoices().filter((v) => /^en[-_]/i.test(v.lang));
+  if (english.length === 0) return null; // rösterna laddas asynkront; försök igen nästa gång
+  for (const pattern of PREFERRED_VOICES) {
+    const match = english.find((v) => pattern.test(v.name));
+    if (match) return (cachedVoice = match);
+  }
+  return (cachedVoice = english.find((v) => /en[-_](us|gb)/i.test(v.lang)) ?? english[0]);
+}
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  // Börja ladda rösterna direkt så att den första repliken redan får rätt röst.
+  window.speechSynthesis.getVoices();
 }

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { createPanelTextures, boxProjectUVs } from './surfaceDetail.js';
 
 export const PLAYER_COLOR = 0x3b82f6;
 export const ENEMY_COLOR = 0xb91c1c;
@@ -18,7 +20,7 @@ const MATERIALS = {
     color: PLAYER_COLOR, metalness: 0.45, roughness: 0.4, emissive: 0x1d4ed8, emissiveIntensity: 0.3, flatShading: true,
   }),
   /** Cybran: mörkt, nästan svart metall med röda lagfärgsfält. */
-  cybran: new THREE.MeshStandardMaterial({ color: 0x4a504c, metalness: 0.6, roughness: 0.45, flatShading: true }),
+  cybran: new THREE.MeshStandardMaterial({ color: 0x353a38, metalness: 0.65, roughness: 0.5, flatShading: true }),
   cybranDark: new THREE.MeshStandardMaterial({ color: 0x1f2321, metalness: 0.5, roughness: 0.6, flatShading: true }),
   enemyPanel: new THREE.MeshStandardMaterial({
     color: ENEMY_COLOR, metalness: 0.4, roughness: 0.45, emissive: 0x7f1d1d, emissiveIntensity: 0.4, flatShading: true,
@@ -71,6 +73,7 @@ function mergeByMaterial(parts) {
       if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
     }
     g.clearGroups();
+    boxProjectUVs(g);
     if (!byMaterial.has(o.material)) byMaterial.set(o.material, []);
     byMaterial.get(o.material).push(g);
   });
@@ -103,6 +106,12 @@ function taper(rTop, rBottom, h, material, x, y, z, segments = 16) {
   return m;
 }
 
+/** Vrider en del (radianer kring x, y och z) och returnerar den. */
+function rotated(mesh, x = 0, y = 0, z = 0) {
+  mesh.rotation.set(x, y, z);
+  return mesh;
+}
+
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** Balk från punkt `a` till `b` ([x, y, z]) med tjockleken `t`, fyrkantig eller rund. */
@@ -121,193 +130,353 @@ function strut(a, b, t, material, round = false) {
 }
 
 /**
- * Cybran-insektsben: från höfterna i `hips` ([x, z]) upp och ut till ett knä
- * och sedan ner till en klo i marken.
+ * Cybran-insektsben i tre led: från höften rakt ut, upp till knät, ut och ner
+ * till vristen och en spetsig fot i marken. Varje knä har ett rött ljus.
+ * Varje ben är en egen grupp ('leg0'...) med leden i höften, så att det kan
+ * svängas när enheten går (se poseLeg).
  */
-function insectLegs(hips, { hipY, kneeOut, kneeY, footOut, t }) {
-  const { cybranDark, cybran } = MATERIALS;
-  const parts = [];
-  for (const [x, z] of hips) {
+function insectLegs(hips, { hipY, reach, kneeY, t }) {
+  const { cybranDark, cybran, enemyGlow } = MATERIALS;
+  return hips.map(([x, z], i) => {
     const side = Math.sign(x);
-    const hip = [x, hipY, z];
-    const knee = [x + side * kneeOut, kneeY, z * 1.15];
-    const foot = [x + side * footOut, 0, z * 1.3];
-    parts.push(
-      strut(hip, knee, t, cybran),
-      strut(knee, foot, t * 0.85, cybranDark),
-      chamferBox(t * 1.4, t * 1.4, t * 1.4, cybranDark, ...knee, t * 0.3),
-    );
-  }
-  return parts;
+    const spread = Math.sign(z) * 0.35;
+    // Punkter relativt höften.
+    const out = (d, y) => [side * d * reach, y - hipY, spread * d * reach];
+    const coxa = out(0.25, hipY + 0.02);
+    const knee = out(0.55, kneeY);
+    const ankle = out(0.95, kneeY * 0.45);
+    const foot = out(1.05, 0);
+    const leg = namedGroup(`leg${i}`, [
+      strut([0, 0, 0], coxa, t * 1.3, cybranDark),
+      strut(coxa, knee, t * 1.15, cybran),
+      strut(knee, ankle, t * 0.85, cybran),
+      strut(ankle, foot, t * 0.5, cybranDark),
+      chamferBox(t * 1.6, t * 1.6, t * 1.6, cybranDark, ...knee, t * 0.4),
+      chamferBox(t * 1.1, t * 1.1, t * 1.1, cybranDark, ...ankle, t * 0.3),
+      chamferBox(t * 0.5, t * 0.5, t * 0.5, enemyGlow, knee[0], knee[1] + t * 0.8, knee[2], t * 0.1),
+    ], x, hipY, z);
+    leg.userData.side = side;
+    // Diagonala par går i takt (vänster fram + höger bak), som en insekt.
+    leg.userData.phaseOffset = (i === 0 || i === 3) ? 0 : Math.PI;
+    return leg;
+  });
+}
+
+/**
+ * Gångpose för ett insektsben: svänger fram och bak kring höften och lyfter
+ * foten när benet förs framåt. `amp` 0 = stilla, 1 = full gång.
+ */
+export function poseLeg(leg, phase, amp) {
+  const p = phase + leg.userData.phaseOffset;
+  leg.rotation.y = Math.sin(p) * 0.4 * amp;
+  leg.rotation.z = leg.userData.side * Math.max(0, Math.cos(p)) * 0.3 * amp;
 }
 
 /** Modeller med origo på marken i mitten och framsidan mot +z. */
 const MODELS = {
   /**
-   * Quantum Gateway: åttkantig sockel i tre steg och två pyloner som håller en
-   * upprätt ring med en glödande portal.
+   * UEF Quantum Gateway: kvadratisk, industriell plattform med fyra höga torn i
+   * hörnen, en fackverksram mellan tornen och en emitter som hänger över den
+   * glödande teleportplattan, med ramp, rör och lampor runt om.
    */
   core() {
     const { armor, armorDark, teamPanel, glow } = MATERIALS;
-    const octagon = (r, h, material, y) => {
-      const m = taper(r, r * 1.04, h, material, 0, y, 0, 8);
-      m.rotation.y = Math.PI / 8;
-      return m;
-    };
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.22, 8, 32), armor);
-    ring.position.y = 2.6;
-    const innerRing = new THREE.Mesh(new THREE.TorusGeometry(1.18, 0.06, 6, 32), armorDark);
-    innerRing.position.y = 2.6;
-    const portalMaterial = glow.clone();
-    portalMaterial.side = THREE.DoubleSide;
-    const portal = new THREE.Mesh(new THREE.CircleGeometry(1.15, 32), portalMaterial);
-    portal.position.y = 2.6;
-
     const parts = [
-      octagon(2.0, 0.4, armorDark, 0.2),
-      octagon(1.9, 0.08, teamPanel, 0.44),
-      octagon(1.75, 0.2, armor, 0.58),
-      ring, innerRing, portal,
+      chamferBox(4, 0.3, 4, armorDark, 0, 0.15, 0, 0.08), // grund
+      chamferBox(3.6, 0.2, 3.6, armor, 0, 0.4, 0, 0.06), // däck
+      chamferBox(3.66, 0.05, 3.66, teamPanel, 0, 0.32, 0, 0.01),
+      taper(1.15, 1.25, 0.12, armorDark, 0, 0.56, 0, 32), // plattans kant
+      taper(1.0, 1.0, 0.04, glow, 0, 0.63, 0, 32), // teleportplatta
+      prism([[1.8, 0.3], [2.25, 0.3], [2.25, 0.33], [1.8, 0.5]], 1.2, armor, 0, 0.02), // ramp
+      // Emittern ovanför plattan och strålen ner.
+      chamferBox(0.9, 0.35, 0.9, armorDark, 0, 2.55, 0, 0.06),
+      chamferBox(0.6, 0.05, 0.6, glow, 0, 2.36, 0, 0.02),
+      chamferBox(0.94, 0.06, 0.94, teamPanel, 0, 2.7, 0, 0.01),
+      strut([0, 0.65, 0], [0, 2.34, 0], 0.1, glow, true),
     ];
-    for (const side of [-1, 1]) {
-      const x = side * 1.6;
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const x = sx * 1.45;
+      const z = sz * 1.45;
       parts.push(
-        prism([[-0.5, 0.6], [0.5, 0.6], [0.35, 2.6], [0.15, 3.4], [-0.15, 3.4], [-0.35, 2.6]], 0.45, armor, x, 0.03),
-        chamferBox(0.03, 1.2, 0.3, teamPanel, x + side * 0.24, 1.7, 0, 0.01),
-        chamferBox(0.14, 0.1, 0.14, glow, x, 3.47, 0, 0.02),
+        chamferBox(0.75, 2.6, 0.75, armor, x, 1.8, z, 0.06), // torn
+        chamferBox(0.6, 0.3, 0.6, armorDark, x, 3.25, z, 0.05), // tornets tak
+        chamferBox(0.05, 1.6, 0.25, teamPanel, x + sx * 0.385, 1.8, z, 0.01),
+        chamferBox(0.25, 1.6, 0.05, teamPanel, x, 1.8, z + sz * 0.385, 0.01),
+        chamferBox(0.12, 0.12, 0.12, glow, x, 3.45, z, 0.02), // lampa
+        chamferBox(0.04, 0.3, 0.14, glow, x - sx * 0.385, 2.6, z, 0.01), // fönster
+        strut([x - sx * 0.3, 2.9, z - sz * 0.3], [sx * 0.4, 2.55, sz * 0.4], 0.12, armorDark), // stag till emittern
       );
     }
-    for (const [x, z] of [[-1.25, -1.25], [1.25, -1.25], [-1.25, 1.25], [1.25, 1.25]]) {
+    // Fackverksram mellan tornens toppar.
+    for (const s of [-1, 1]) {
       parts.push(
-        chamferBox(0.3, 0.3, 0.3, armorDark, x, 0.83, z, 0.04),
-        chamferBox(0.12, 0.05, 0.12, glow, x, 1.0, z, 0.01),
+        chamferBox(2.2, 0.18, 0.18, armor, 0, 3.0, s * 1.45, 0.03),
+        chamferBox(0.18, 0.18, 2.2, armor, s * 1.45, 3.0, 0, 0.03),
+      );
+      for (const t of [-0.6, 0, 0.6]) {
+        parts.push(strut([t - 0.3, 3.0, s * 1.45], [t + 0.3, 2.8, s * 1.45], 0.05, armorDark));
+        parts.push(strut([s * 1.45, 3.0, t - 0.3], [s * 1.45, 2.8, t + 0.3], 0.05, armorDark));
+      }
+    }
+    // Rör och lampor längs däcket.
+    for (const s of [-1, 1]) {
+      parts.push(
+        rotated(cylinder(0.07, 2.0, armorDark, s * 1.65, 0.6, 0, 8), Math.PI / 2),
+        chamferBox(0.1, 0.06, 0.1, glow, s * 0.9, 0.53, 1.6, 0.01),
       );
     }
     return mergeByMaterial(parts);
   },
 
   /**
-   * UEF ACU: bastant tvåbent robot med ryggsäck, axelskydd och Zephyr-kanonen på
-   * högerarmen. Benen ('legL', 'legR') har leden i höften och svängs när den går.
+   * Cybran Quantum Gateway (fiendens spawnpunkter): åttkantig, mörk sockel med en
+   * glödande röd grop, sex vassa spikar som kröker in över den, och en svävande
+   * röd kärna i en taggig bur.
+   */
+  cybranGateway() {
+    const { cybran, cybranDark, enemyPanel, enemyGlow } = MATERIALS;
+    const octagon = (r, h, material, y, flare = 1.05) =>
+      rotated(taper(r, r * flare, h, material, 0, y, 0, 8), 0, Math.PI / 8);
+    const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.36, 0), enemyGlow);
+    orb.position.y = 2.1;
+    const parts = [
+      octagon(2.0, 0.28, cybranDark, 0.14),
+      octagon(1.92, 0.05, enemyPanel, 0.3, 1),
+      octagon(1.6, 0.18, cybran, 0.41),
+      octagon(1.05, 0.08, cybranDark, 0.54),
+      taper(0.9, 0.9, 0.03, enemyGlow, 0, 0.59, 0, 24), // grop
+      orb,
+      strut([0, 0.6, 0], [0, 1.75, 0], 0.08, enemyGlow, true),
+    ];
+    for (const [rx, ry] of [[0, 0], [Math.PI / 2, 0], [Math.PI / 2, Math.PI / 2]]) {
+      const cage = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.035, 4, 12), cybranDark);
+      cage.position.y = 2.1;
+      cage.rotation.set(rx, ry, 0);
+      parts.push(cage);
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      const at = (r, y) => [Math.sin(a) * r, y, Math.cos(a) * r];
+      const curve = [at(1.5, 0.45), at(1.8, 1.4), at(1.6, 2.4), at(1.05, 3.1), at(0.5, 3.35)];
+      const foot = prism([[-0.35, 0.3], [0.35, 0.3], [0.2, 0.75], [-0.25, 0.65]], 0.5, cybranDark, 0, 0.03);
+      foot.position.set(...at(1.5, 0));
+      foot.rotation.y = a + Math.PI / 2;
+      parts.push(foot);
+      for (let k = 0; k < curve.length - 1; k++) {
+        parts.push(strut(curve[k], curve[k + 1], 0.26 - k * 0.055, k % 2 ? cybranDark : cybran));
+      }
+      parts.push(strut(at(1.95, 1.2), at(1.78, 2.3), 0.05, enemyPanel));
+      parts.push(strut(at(1.55, 1.3), at(1.4, 2.3), 0.04, enemyGlow));
+      // Små taggar mellan spikarna.
+      const b = a + Math.PI / 6;
+      const mid = (r, y) => [Math.sin(b) * r, y, Math.cos(b) * r];
+      parts.push(strut(mid(1.7, 0.3), mid(2.05, 0.95), 0.08, cybran));
+      parts.push(chamferBox(0.08, 0.08, 0.08, enemyGlow, ...mid(1.35, 0.55), 0.01));
+    }
+    return mergeByMaterial(parts);
+  },
+
+  /**
+   * UEF ACU: tung, upprätt stridsrobot. Brett, rundat hjärtformat bröstskydd
+   * med ventilspringor i två kolumner och en mittrygg, en liten hjälm med
+   * ansiktsgaller högt mellan axlarna, stora axelskydd i lagfärg med en rund
+   * ventil, räfflade överarmar och underarmar som är vågräta vapenkapslar
+   * framåt: en dubbelpipig till höger och Zephyr-kanonen med runda mynningar
+   * till vänster. Smal, segmenterad midja och kraftiga ben med vinklade
+   * pansarplåtar. Benen ('legL', 'legR') har leden i höften.
    */
   acu() {
     const { armor, armorDark, teamPanel, glow } = MATERIALS;
-    const HIP_Y = 1.05;
+    const HIP_Y = 1.0;
 
     const leg = (name, x) => {
-      const foot = prism([[-0.22, 0], [0.3, 0], [0.36, 0.08], [0.18, 0.16], [-0.18, 0.16]], 0.34, armorDark);
-      foot.position.y = -HIP_Y;
+      const side = Math.sign(x);
       return namedGroup(name, [
-        chamferBox(0.3, 0.5, 0.38, armor, 0, -0.22, 0.02), // lår
-        chamferBox(0.26, 0.16, 0.3, armorDark, 0, -0.5, 0.08), // knä
-        chamferBox(0.26, 0.45, 0.32, armor, 0, -0.73, 0), // smalben
-        chamferBox(0.12, 0.3, 0.03, teamPanel, 0, -0.72, 0.17, 0.01),
-        foot,
+        chamferBox(0.18, 0.18, 0.2, armorDark, 0, 0, 0, 0.03), // höftled
+        chamferBox(0.16, 0.4, 0.18, armorDark, 0, -0.22, 0, 0.03), // lårben
+        prism([[-0.1, -0.02], [0.19, -0.02], [0.21, -0.38], [0.1, -0.47], [-0.08, -0.4]], 0.26, armor, 0, 0.03), // lårplåt
+        rotated(chamferBox(0.03, 0.36, 0.28, armor, side * 0.15, -0.2, 0.04, 0.01), 0, 0, side * 0.12), // utsvängd sidoplåt
+        chamferBox(0.02, 0.2, 0.18, teamPanel, side * 0.175, -0.2, 0.04, 0.005),
+        chamferBox(0.12, 0.025, 0.02, armorDark, 0, -0.16, 0.2, 0.004),
+        chamferBox(0.12, 0.025, 0.02, armorDark, 0, -0.22, 0.205, 0.004),
+        chamferBox(0.2, 0.15, 0.18, armorDark, 0, -0.5, 0.04, 0.03), // knä
+        prism([[0.06, -0.42], [0.21, -0.46], [0.2, -0.58], [0.06, -0.6]], 0.21, armor, 0, 0.02), // knäskydd
+        prism([[-0.11, -0.55], [0.15, -0.55], [0.17, -0.72], [0.11, -0.88], [-0.1, -0.88]], 0.25, armor, 0, 0.03), // smalben
+        chamferBox(0.15, 0.1, 0.15, armorDark, 0, -0.9, 0, 0.02), // vrist
+        prism([[-0.15, -1.0], [0.26, -1.0], [0.29, -0.94], [0.14, -0.88], [-0.13, -0.89]], 0.28, armorDark, 0, 0.02), // fot
       ], x, HIP_Y, 0);
     };
 
-    const torso = prism([[-0.3, 0.18], [0.24, 0.18], [0.4, 0.34], [0.36, 0.64], [-0.3, 0.68], [-0.4, 0.4]], 0.95, armor, 0, 0.04);
-    const chestPlate = chamferBox(0.5, 0.24, 0.04, teamPanel, 0, 0.46, 0.445, 0.01);
-    chestPlate.rotation.x = -0.12;
-    const exhausts = [-0.2, 0.2].flatMap((x) => [
-      cylinder(0.07, 0.25, armor, x, 0.78, -0.48, 8),
-      cylinder(0.05, 0.03, glow, x, 0.92, -0.48, 8),
-    ]);
-    const shoulders = [-0.62, 0.62].flatMap((x) => [
-      chamferBox(0.36, 0.26, 0.5, armor, x, 0.58, 0, 0.05),
-      chamferBox(0.3, 0.03, 0.4, teamPanel, x, 0.72, 0, 0.01),
-    ]);
-    const barrel = cylinder(0.07, 0.5, armor, -0.68, 0.05, 0.85, 10);
-    barrel.rotation.x = Math.PI / 2;
-    const muzzle = cylinder(0.05, 0.03, glow, -0.68, 0.05, 1.1, 10);
-    muzzle.rotation.x = Math.PI / 2;
-    const antenna = cylinder(0.015, 0.3, armorDark, 0.12, 1.05, -0.06, 4);
+    // Hjärtformat bröstskydd: två ovala halvor, springor i chevron och en mittrygg.
+    const chestHalves = [-1, 1].map((side) => {
+      const half = taper(0.2, 0.2, 0.06, armor, 0, 0, 0, 12);
+      half.rotation.x = Math.PI / 2;
+      half.scale.set(1, 1, 1.12);
+      half.position.set(side * 0.13, 0.66, 0.335);
+      return half;
+    });
+    const slots = [];
+    for (let i = 0; i < 4; i++) {
+      for (const side of [-1, 1]) {
+        slots.push(rotated(chamferBox(0.15, 0.026, 0.02, armorDark, side * 0.14, 0.57 + i * 0.065, 0.37, 0.004), 0, 0, -side * 0.12));
+      }
+    }
+
+    const arms = [-1, 1].flatMap((side) => {
+      const x = side * 0.5;
+      return [
+        // Axelskydd med lagfärgad, avtrappad topp och en rund ventil.
+        chamferBox(0.34, 0.26, 0.42, armor, side * 0.48, 0.84, 0, 0.06),
+        chamferBox(0.3, 0.09, 0.36, teamPanel, side * 0.49, 1.0, -0.01, 0.03),
+        chamferBox(0.03, 0.16, 0.36, teamPanel, side * 0.655, 0.84, 0, 0.008),
+        taper(0.075, 0.075, 0.03, armorDark, side * 0.45, 1.05, 0.11, 12),
+        taper(0.04, 0.04, 0.035, armor, side * 0.45, 1.053, 0.11, 10),
+        // Räfflad överarm och armbåge.
+        chamferBox(0.14, 0.3, 0.15, armor, x, 0.6, 0, 0.03),
+        ...[0.52, 0.6, 0.68].map((y) => chamferBox(0.17, 0.035, 0.18, armorDark, x, y, 0, 0.008)),
+        chamferBox(0.16, 0.16, 0.16, armorDark, x, 0.42, 0.02, 0.03),
+      ];
+    });
+
+    // Höger underarm: dubbelpipig vapenkapsel framåt.
+    const rightGun = [
+      chamferBox(0.22, 0.22, 0.62, armor, -0.52, 0.38, 0.28, 0.04),
+      chamferBox(0.2, 0.02, 0.5, teamPanel, -0.52, 0.495, 0.26, 0.005),
+      chamferBox(0.02, 0.14, 0.5, teamPanel, -0.635, 0.38, 0.26, 0.005),
+      ...[0.12, 0.2, 0.28].map((z) => chamferBox(0.02, 0.1, 0.03, armorDark, -0.405, 0.38, z, 0.004)),
+      ...[0.33, 0.43].flatMap((y) => [
+        strut([-0.52, y, 0.58], [-0.52, y, 0.78], 0.075, armorDark, true),
+        strut([-0.52, y, 0.78], [-0.52, y, 0.795], 0.055, glow, true),
+      ]),
+    ];
+    // Vänster underarm: Zephyr-kanonen, en grov kapsel med två runda mynningar.
+    const leftGun = [
+      chamferBox(0.27, 0.27, 0.6, armor, 0.53, 0.38, 0.27, 0.05),
+      chamferBox(0.24, 0.02, 0.48, teamPanel, 0.53, 0.52, 0.25, 0.005),
+      chamferBox(0.02, 0.16, 0.48, teamPanel, 0.67, 0.38, 0.25, 0.005),
+      strut([0.53, 0.4, 0.56], [0.53, 0.4, 0.66], 0.2, armorDark, true),
+      strut([0.53, 0.4, 0.66], [0.53, 0.4, 0.668], 0.09, glow, true),
+      strut([0.53, 0.27, 0.56], [0.53, 0.27, 0.62], 0.09, armorDark, true),
+      strut([0.53, 0.27, 0.62], [0.53, 0.27, 0.63], 0.06, glow, true),
+    ];
 
     const upper = namedGroup('torso', [
-      chamferBox(0.62, 0.25, 0.42, armorDark, 0, -0.1, 0), // bäcken
-      chamferBox(0.5, 0.26, 0.34, armorDark, 0, 0.1, 0.02), // midja
-      torso,
-      chestPlate,
-      chamferBox(0.7, 0.5, 0.3, armorDark, 0, 0.45, -0.42, 0.05), // ryggsäck
-      ...exhausts,
-      chamferBox(0.36, 0.26, 0.36, armor, 0, 0.8, 0.04, 0.05), // huvud
-      chamferBox(0.28, 0.07, 0.03, glow, 0, 0.82, 0.23, 0.01), // visir
-      antenna,
-      ...shoulders,
-      // Högerarm: Zephyr Anti Matter Cannon.
-      chamferBox(0.26, 0.4, 0.28, armor, -0.66, 0.3, 0),
-      chamferBox(0.3, 0.3, 0.7, armorDark, -0.68, 0.05, 0.25, 0.05),
-      chamferBox(0.31, 0.06, 0.5, teamPanel, -0.68, 0.2, 0.25, 0.01),
-      barrel,
-      muzzle,
-      // Vänsterarm med hand.
-      chamferBox(0.26, 0.4, 0.28, armor, 0.66, 0.3, 0),
-      chamferBox(0.26, 0.45, 0.3, armor, 0.66, -0.02, 0.1),
-      chamferBox(0.22, 0.18, 0.2, armorDark, 0.66, -0.3, 0.14),
-    ], 0, 1.2, 0);
+      chamferBox(0.4, 0.16, 0.28, armorDark, 0, 0, 0, 0.03), // bäcken
+      chamferBox(0.26, 0.07, 0.22, armorDark, 0, 0.13, 0, 0.02), // midja, två segment
+      chamferBox(0.28, 0.07, 0.23, armor, 0, 0.21, 0, 0.02),
+      prism([[-0.22, 0.3], [0.16, 0.3], [0.26, 0.45], [0.27, 0.75], [0.18, 0.92], [-0.22, 0.92], [-0.27, 0.6]], 0.7, armor, 0, 0.04),
+      ...chestHalves,
+      ...slots,
+      chamferBox(0.05, 0.34, 0.04, armor, 0, 0.66, 0.365, 0.01), // mittrygg
+      chamferBox(0.44, 0.36, 0.18, armorDark, 0, 0.65, -0.28, 0.04), // ryggsäck
+      cylinder(0.05, 0.16, armor, -0.12, 0.88, -0.31, 8),
+      cylinder(0.05, 0.16, armor, 0.12, 0.88, -0.31, 8),
+      // Liten hjälm med ansiktsgaller, högt mellan axlarna.
+      chamferBox(0.12, 0.08, 0.12, armorDark, 0, 0.95, 0, 0.02), // hals
+      prism([[-0.08, 0.95], [0.11, 0.95], [0.15, 1.05], [0.08, 1.21], [-0.07, 1.19], [-0.1, 1.02]], 0.17, armor, 0, 0.02),
+      ...[1.0, 1.035, 1.07].map((y) => chamferBox(0.08, 0.012, 0.015, armorDark, 0, y, 0.16, 0.003)),
+      chamferBox(0.1, 0.018, 0.015, glow, 0, 1.105, 0.143, 0.003), // visir
+      ...arms,
+      ...rightGun,
+      ...leftGun,
+    ], 0, HIP_Y, 0);
 
-    return [leg('legR', -0.32), leg('legL', 0.32), upper];
+    return [leg('legR', -0.2), leg('legL', 0.2), upper];
   },
 
   /**
-   * Cybran Mantis (Assault Bot): kilformad kropp på fyra insektsben, med en
-   * laserkanon på varje sida.
+   * Cybran Mantis: hukande, framåtlutad kropp med pansarplåtar som pilar bakåt,
+   * en ryggkam, ett sensorhuvud med tre röda ögon och två tunga laserarmar.
    */
   mantis() {
     const { cybran, cybranDark, enemyPanel, enemyGlow } = MATERIALS;
-    const topPanel = chamferBox(0.3, 0.03, 0.4, enemyPanel, 0, 0.81, 0.16, 0.01);
-    topPanel.rotation.x = 0.19;
     const parts = [
-      prism([[-0.5, 0.5], [0.15, 0.44], [0.5, 0.56], [0.42, 0.72], [-0.1, 0.82], [-0.48, 0.74]], 0.55, cybran, 0, 0.03),
-      topPanel,
-      chamferBox(0.22, 0.05, 0.03, enemyGlow, 0, 0.63, 0.55, 0.01), // ögon
-      ...insectLegs([[-0.25, 0.3], [0.25, 0.3], [-0.25, -0.3], [0.25, -0.3]],
-        { hipY: 0.55, kneeOut: 0.28, kneeY: 0.74, footOut: 0.4, t: 0.1 }),
+      // Kropp: kilformad, låg fram och hög bak.
+      prism([[-0.5, 0.48], [0.2, 0.42], [0.48, 0.52], [0.4, 0.68], [-0.05, 0.8], [-0.5, 0.74]], 0.5, cybran, 0, 0.03),
+      prism([[-0.45, 0.78], [0.1, 0.8], [-0.25, 0.92], [-0.55, 0.86]], 0.12, cybranDark, 0, 0.02), // ryggkam
+      chamferBox(0.04, 0.03, 0.42, enemyGlow, 0, 0.83, -0.12, 0.01),
+      rotated(chamferBox(0.3, 0.02, 0.36, enemyPanel, 0, 0.775, 0.18, 0.005), 0.26),
+      // Huvud med tre ögon.
+      prism([[0.36, 0.5], [0.6, 0.52], [0.62, 0.6], [0.44, 0.66], [0.32, 0.64]], 0.26, cybranDark, 0, 0.02),
+      ...[-0.07, 0, 0.07].map((x) => chamferBox(0.035, 0.03, 0.02, enemyGlow, x, 0.59, 0.625, 0.005)),
+      // Bakre motorkåpa med ventiler.
+      chamferBox(0.36, 0.18, 0.16, cybranDark, 0, 0.62, -0.56, 0.03),
+      chamferBox(0.26, 0.03, 0.02, enemyGlow, 0, 0.63, -0.645, 0.005),
     ];
+    const legs = insectLegs([[-0.2, 0.25], [0.2, 0.25], [-0.2, -0.28], [0.2, -0.28]], { hipY: 0.55, reach: 0.6, kneeY: 0.82, t: 0.07 });
     for (const side of [-1, 1]) {
-      const x = side * 0.33;
+      const plate = prism([[-0.45, 0], [0.3, 0], [0.18, 0.16], [-0.5, 0.12]], 0.04, enemyPanel, 0, 0.01);
+      plate.position.set(side * 0.27, 0.62, 0);
+      plate.rotation.z = side * 0.5;
+      const x = side * 0.36;
       parts.push(
-        chamferBox(0.02, 0.06, 0.6, enemyPanel, side * 0.29, 0.66, -0.05, 0.005),
-        chamferBox(0.12, 0.12, 0.25, cybranDark, x, 0.66, 0.15, 0.02),
-        strut([x, 0.66, 0.2], [x, 0.66, 0.75], 0.07, cybranDark, true),
-        strut([x, 0.66, 0.75], [x, 0.66, 0.79], 0.05, enemyGlow, true),
+        plate,
+        // Laserarm: axelled, kåpa, rör och glödande mynning.
+        chamferBox(0.14, 0.14, 0.14, cybranDark, side * 0.3, 0.6, 0.18, 0.03),
+        prism([[-0.02, 0.5], [0.32, 0.52], [0.4, 0.57], [0.32, 0.63], [-0.02, 0.63]], 0.12, cybran, x, 0.02),
+        strut([x, 0.55, 0.25], [x, 0.53, 0.78], 0.06, cybranDark, true),
+        strut([x, 0.53, 0.66], [x, 0.53, 0.72], 0.085, cybran, true),
+        strut([x, 0.53, 0.78], [x, 0.53, 0.81], 0.05, enemyGlow, true),
       );
     }
-    return mergeByMaterial(parts);
+    return [...mergeByMaterial(parts), ...legs];
   },
 
-  /** Cybran Mole (Land Scout): liten, lätt spindel med en sensormast. */
+  /**
+   * Cybran Mole (Land Scout): liten, rund spindel på tunna ben med en
+   * sensorparabol på en mast och två antenner.
+   */
   mole() {
     const { cybran, cybranDark, enemyPanel, enemyGlow } = MATERIALS;
-    const sensor = cylinder(0.08, 0.03, enemyGlow, 0, 0.97, -0.2, 10);
-    sensor.rotation.x = Math.PI / 2 - 0.4;
+    const dish = taper(0.17, 0.03, 0.07, cybranDark, 0, 0, 0, 10);
+    dish.position.set(0, 1.0, -0.12);
+    dish.rotation.x = 0.6;
+    const dishGlow = taper(0.04, 0.04, 0.04, enemyGlow, 0, 1.03, -0.1, 8);
+    dishGlow.rotation.x = 0.6;
     return mergeByMaterial([
-      prism([[-0.35, 0.38], [0.25, 0.36], [0.38, 0.46], [0.25, 0.56], [-0.32, 0.54]], 0.36, cybran, 0, 0.02),
-      chamferBox(0.02, 0.05, 0.4, enemyPanel, -0.19, 0.47, -0.03, 0.005),
-      chamferBox(0.02, 0.05, 0.4, enemyPanel, 0.19, 0.47, -0.03, 0.005),
-      chamferBox(0.14, 0.04, 0.03, enemyGlow, 0, 0.47, 0.39, 0.01),
-      strut([0, 0.55, -0.15], [0, 0.95, -0.2], 0.035, cybranDark, true),
-      sensor,
-      ...insectLegs([[-0.16, 0.2], [0.16, 0.2], [-0.16, -0.2], [0.16, -0.2]],
-        { hipY: 0.4, kneeOut: 0.18, kneeY: 0.55, footOut: 0.27, t: 0.06 }),
-    ]);
+      taper(0.2, 0.26, 0.12, cybran, 0, 0.42, 0, 8), // underrede
+      taper(0.13, 0.22, 0.12, cybran, 0, 0.54, 0, 8), // kupol
+      taper(0.235, 0.235, 0.025, enemyPanel, 0, 0.485, 0, 8),
+      prism([[0.15, 0.4], [0.32, 0.43], [0.3, 0.5], [0.15, 0.54]], 0.16, cybranDark, 0, 0.015), // nos
+      chamferBox(0.1, 0.03, 0.02, enemyGlow, 0, 0.47, 0.32, 0.005),
+      strut([0, 0.58, -0.08], [0, 0.98, -0.12], 0.035, cybranDark, true),
+      dish,
+      dishGlow,
+      strut([-0.08, 0.58, -0.12], [-0.16, 0.9, -0.3], 0.015, cybranDark, true),
+      strut([0.08, 0.58, -0.12], [0.16, 0.9, -0.3], 0.015, cybranDark, true),
+    ]).concat(insectLegs([[-0.14, 0.12], [0.14, 0.12], [-0.14, -0.12], [0.14, -0.12]], { hipY: 0.42, reach: 0.42, kneeY: 0.6, t: 0.045 }));
   },
 
-  /** Cybran Medusa (Mobile Light Artillery): bred kropp på fyra ben med ett grovt granatkastarrör. */
+  /**
+   * Cybran Medusa (Mobile Light Artillery): bred, tung kropp på fyra kraftiga
+   * ben och ett granatkastartorn med grovt rör, rekylkåpa och ammunitionstrummor.
+   */
   medusa() {
     const { cybran, cybranDark, enemyPanel, enemyGlow } = MATERIALS;
-    return mergeByMaterial([
-      prism([[-0.55, 0.5], [0.4, 0.48], [0.55, 0.6], [0.4, 0.74], [-0.5, 0.76]], 0.6, cybran, 0, 0.03),
-      chamferBox(0.02, 0.07, 0.7, enemyPanel, -0.31, 0.62, -0.05, 0.005),
-      chamferBox(0.02, 0.07, 0.7, enemyPanel, 0.31, 0.62, -0.05, 0.005),
-      chamferBox(0.2, 0.05, 0.03, enemyGlow, 0, 0.63, 0.56, 0.01),
-      taper(0.22, 0.27, 0.15, cybranDark, 0, 0.83, -0.08, 10),
-      chamferBox(0.36, 0.03, 0.2, enemyPanel, 0, 0.92, -0.08, 0.01),
-      strut([0, 0.85, -0.12], [0, 1.4, 0.42], 0.16, cybranDark, true),
-      strut([0, 1.4, 0.42], [0, 1.44, 0.46], 0.13, enemyGlow, true),
-      ...insectLegs([[-0.28, 0.32], [0.28, 0.32], [-0.28, -0.32], [0.28, -0.32]],
-        { hipY: 0.55, kneeOut: 0.3, kneeY: 0.76, footOut: 0.44, t: 0.11 }),
-    ]);
+    const parts = [
+      prism([[-0.55, 0.46], [0.36, 0.44], [0.55, 0.56], [0.42, 0.72], [-0.42, 0.76], [-0.6, 0.64]], 0.62, cybran, 0, 0.03),
+      chamferBox(0.66, 0.05, 0.5, cybranDark, 0, 0.47, 0, 0.02), // buksköld
+      prism([[0.3, 0.5], [0.58, 0.54], [0.56, 0.62], [0.36, 0.68]], 0.3, cybranDark, 0, 0.02), // nos
+      ...[-0.06, 0.06].map((x) => chamferBox(0.04, 0.03, 0.02, enemyGlow, x, 0.59, 0.6, 0.005)),
+      // Torn: sockel, kåpa, rör med rekylhylsa och glödande mynning.
+      taper(0.24, 0.3, 0.1, cybranDark, 0, 0.8, -0.1, 8),
+      taper(0.31, 0.31, 0.025, enemyPanel, 0, 0.765, -0.1, 8),
+      prism([[-0.32, 0.84], [0.12, 0.84], [0.2, 0.96], [-0.1, 1.08], [-0.34, 1.0]], 0.36, cybran, 0, 0.02),
+      strut([0, 0.98, -0.05], [0, 1.5, 0.45], 0.15, cybranDark, true),
+      strut([0, 1.02, -0.01], [0, 1.2, 0.16], 0.22, cybran, true),
+      strut([0, 1.5, 0.45], [0, 1.54, 0.49], 0.12, enemyGlow, true),
+      chamferBox(0.04, 0.03, 0.3, enemyGlow, 0, 1.085, -0.15, 0.01),
+    ];
+    for (const side of [-1, 1]) {
+      const drum = taper(0.1, 0.1, 0.16, cybranDark, side * 0.27, 0.9, -0.32, 8);
+      drum.rotation.z = Math.PI / 2;
+      const plate = prism([[-0.5, 0], [0.35, 0], [0.25, 0.14], [-0.55, 0.1]], 0.04, enemyPanel, 0, 0.01);
+      plate.position.set(side * 0.31, 0.56, 0);
+      plate.rotation.z = side * 0.55;
+      parts.push(drum, plate);
+    }
+    const legs = insectLegs([[-0.26, 0.28], [0.26, 0.28], [-0.26, -0.3], [0.26, -0.3]], { hipY: 0.55, reach: 0.68, kneeY: 0.85, t: 0.085 });
+    return [...mergeByMaterial(parts), ...legs];
   },
 
   /**
@@ -358,100 +527,177 @@ const MODELS = {
     return [...mergeByMaterial(hull), turret];
   },
 
-  /** UEF T1 Engineer: liten bandvagn med förarhytt och en kranarm med byggnozzel. */
+  /**
+   * UEF T1 Engineer: låg, långsträckt bandvagn med en liten pansrad hytt, en
+   * tvådelad kranarm med byggnozzel och ett motorblock baktill.
+   */
   engineer() {
     const { armor, armorDark, tread, teamPanel, glow } = MATERIALS;
     const parts = [
-      prism([[-0.5, 0.16], [0.36, 0.16], [0.48, 0.28], [0.4, 0.42], [-0.44, 0.46]], 0.48, armor, 0, 0.03),
-      chamferBox(0.36, 0.16, 0.2, armorDark, 0, 0.52, 0.2, 0.03), // hytt
-      chamferBox(0.28, 0.05, 0.02, glow, 0, 0.54, 0.31, 0.005),
-      taper(0.1, 0.12, 0.1, armorDark, 0, 0.5, -0.15, 10), // kranfot
-      strut([0, 0.55, -0.15], [0, 0.88, 0.32], 0.08, armor),
-      chamferBox(0.1, 0.1, 0.1, glow, 0, 0.88, 0.36, 0.02), // nozzel
+      prism([[-0.5, 0.12], [0.38, 0.12], [0.54, 0.22], [0.44, 0.32], [-0.46, 0.34]], 0.42, armor, 0, 0.025), // skrov
+      prism([[0, 0.32], [0.3, 0.32], [0.36, 0.38], [0.22, 0.48], [0, 0.48]], 0.22, armorDark, -0.08, 0.02), // hytt
+      rotated(chamferBox(0.16, 0.02, 0.07, glow, -0.08, 0.44, 0.3, 0.004), 0.62), // fönster
+      chamferBox(0.3, 0.08, 0.2, armorDark, -0.06, 0.37, -0.32, 0.02), // motor
+      ...[-0.38, -0.32, -0.26].map((z) => box(0.26, 0.012, 0.025, armor, -0.06, 0.415, z)),
+      strut([-0.2, 0.34, -0.42], [-0.22, 0.75, -0.46], 0.012, armorDark, true), // antenn
+      // Kranarm: vridbar fot, två led och en nozzel.
+      taper(0.08, 0.1, 0.08, armorDark, 0.12, 0.38, -0.22, 10),
+      strut([0.12, 0.42, -0.22], [0.12, 0.72, -0.02], 0.06, armor),
+      chamferBox(0.08, 0.08, 0.08, armorDark, 0.12, 0.72, -0.02, 0.015),
+      strut([0.12, 0.72, -0.02], [0.12, 0.6, 0.32], 0.05, armor),
+      strut([0.12, 0.6, 0.32], [0.12, 0.55, 0.38], 0.07, armorDark, true), // nozzel
+      strut([0.12, 0.55, 0.38], [0.12, 0.54, 0.39], 0.05, glow, true),
     ];
     for (const side of [-1, 1]) {
+      const x = side * 0.3;
       parts.push(
-        prism([[-0.5, 0.08], [-0.42, 0], [0.42, 0], [0.5, 0.1], [0.44, 0.2], [-0.44, 0.2]], 0.18, tread, side * 0.32),
-        chamferBox(0.02, 0.08, 0.6, teamPanel, side * 0.245, 0.32, -0.04, 0.005),
+        prism([[-0.52, 0.07], [-0.44, 0], [0.44, 0], [0.52, 0.08], [0.46, 0.17], [-0.46, 0.17]], 0.16, tread, x),
+        prism([[-0.5, 0.15], [0.5, 0.15], [0.54, 0.2], [0.46, 0.23], [-0.48, 0.23]], 0.18, armor, x, 0.015), // stänkskärm
+        chamferBox(0.04, 0.012, 0.8, teamPanel, x, 0.24, 0, 0.003),
       );
     }
     return mergeByMaterial(parts);
   },
 
   /**
-   * UEF Land Factory: hall baktill, låga sidoväggar, en portal med byggarmar
-   * framtill och en upplyst byggplatta i mitten. Öppen framåt (+z).
+   * UEF Land Factory: byggnadsblock på båda sidor och en hall baktill runt en
+   * öppen byggplats, en ramp ut framåt, en traverskran med byggarm över platsen
+   * och detaljer på taken (ventiler, skorstenar, antenn och lampor).
    */
   landFactory() {
     const { armor, armorDark, teamPanel, glow } = MATERIALS;
     const parts = [
-      chamferBox(4, 0.3, 4, armorDark, 0, 0.15, 0, 0.06), // grund
-      chamferBox(2.3, 0.04, 2.1, armor, 0, 0.32, 0.7, 0.01), // byggplatta
-      box(2.4, 0.03, 0.06, glow, 0, 0.34, -0.4),
-      box(2.4, 0.03, 0.06, glow, 0, 0.34, 1.8),
-      box(0.06, 0.03, 2.2, glow, -1.2, 0.34, 0.7),
-      box(0.06, 0.03, 2.2, glow, 1.2, 0.34, 0.7),
-      // Hallen med port och lagfärgsrand.
-      prism([[-1.95, 0.3], [-0.55, 0.3], [-0.55, 1.3], [-0.85, 1.75], [-1.95, 1.75]], 3.6, armor, 0, 0.04),
-      chamferBox(2.0, 0.8, 0.04, armorDark, 0, 0.72, -0.5, 0.01),
-      chamferBox(3.2, 0.16, 0.04, teamPanel, 0, 1.18, -0.5, 0.01),
-      // Portalen över byggplattan.
-      chamferBox(3.74, 0.3, 0.36, armor, 0, 2.2, 1.55, 0.04),
-      chamferBox(3.0, 0.12, 0.03, teamPanel, 0, 2.2, 1.74, 0.01),
+      chamferBox(4, 0.25, 4, armorDark, 0, 0.125, 0, 0.05), // grund
+      // Byggplats med golvribbor och glödande körfält.
+      chamferBox(2.2, 0.08, 2.8, armorDark, 0, 0.29, 0.3, 0.02),
+      prism([[1.6, 0.25], [2.05, 0.25], [2.05, 0.27], [1.6, 0.33]], 2.2, armor, 0, 0.01), // ramp
+      box(0.05, 0.03, 2.8, glow, -0.95, 0.34, 0.3),
+      box(0.05, 0.03, 2.8, glow, 0.95, 0.34, 0.3),
     ];
+    for (let z = -0.8; z <= 1.4; z += 0.37) parts.push(chamferBox(1.7, 0.03, 0.08, armor, 0, 0.345, z, 0.01));
+
+    // Vänster block: lågt fram, högt bak.
+    parts.push(
+      prism([[-1.95, 0.25], [1.95, 0.25], [1.95, 0.65], [1.4, 1.05], [0.15, 1.05], [-0.35, 1.9], [-1.95, 1.9]], 0.9, armor, -1.55, 0.04),
+      chamferBox(0.03, 0.18, 3.0, teamPanel, -2.01, 0.85, 0, 0.01),
+      chamferBox(0.5, 0.14, 0.5, armorDark, -1.55, 1.97, -1.2, 0.02),
+      cylinder(0.12, 0.55, armor, -1.75, 2.15, -0.6, 10),
+      cylinder(0.12, 0.55, armor, -1.35, 2.15, -0.6, 10),
+      cylinder(0.09, 0.03, armorDark, -1.75, 2.43, -0.6, 10),
+      cylinder(0.09, 0.03, armorDark, -1.35, 2.43, -0.6, 10),
+      chamferBox(0.08, 0.08, 0.08, glow, -1.55, 1.1, 1.85, 0.02),
+    );
+    // Höger block: lägre, med antenn och radarskål.
+    const dish = taper(0.28, 0.05, 0.08, armorDark, 1.55, 2.0, -1.2, 12);
+    dish.rotation.x = -0.5;
+    parts.push(
+      prism([[-1.95, 0.25], [1.95, 0.25], [1.95, 0.55], [1.55, 0.88], [-0.55, 0.88], [-0.9, 1.5], [-1.95, 1.5]], 0.9, armor, 1.55, 0.04),
+      chamferBox(0.03, 0.15, 3.0, teamPanel, 2.01, 0.7, 0, 0.01),
+      strut([1.55, 1.5, -1.2], [1.55, 1.85, -1.2], 0.08, armorDark, true),
+      dish,
+      strut([1.8, 1.5, -1.6], [1.8, 2.4, -1.6], 0.03, armorDark, true),
+      chamferBox(0.06, 0.06, 0.06, glow, 1.8, 2.42, -1.6, 0.01),
+      chamferBox(0.08, 0.08, 0.08, glow, 1.55, 0.92, 1.85, 0.02),
+    );
+    // Hallen baktill med port, lagfärgsrand och rör på baksidan.
+    parts.push(
+      prism([[-1.95, 0.25], [-0.95, 0.25], [-0.95, 1.55], [-1.25, 1.95], [-1.95, 1.95]], 2.2, armor, 0, 0.04),
+      chamferBox(1.6, 1.0, 0.04, armorDark, 0, 0.8, -0.93, 0.01),
+      chamferBox(1.9, 0.12, 0.03, teamPanel, 0, 1.45, -0.93, 0.01),
+      chamferBox(0.6, 0.12, 0.4, armorDark, -0.5, 2.0, -1.6, 0.02),
+      chamferBox(0.6, 0.12, 0.4, armorDark, 0.5, 2.0, -1.6, 0.02),
+    );
+    for (const y of [0.55, 0.85, 1.15]) {
+      const pipe = cylinder(0.06, 2.0, armorDark, 0, y, -2.0, 8);
+      pipe.rotation.z = Math.PI / 2;
+      parts.push(pipe);
+    }
+    // Traverskran över byggplatsen.
+    parts.push(
+      chamferBox(0.22, 1.05, 0.22, armor, -1.55, 1.58, 0.65, 0.03),
+      chamferBox(0.22, 1.27, 0.22, armor, 1.55, 1.47, 0.65, 0.03),
+      chamferBox(3.3, 0.22, 0.3, armor, 0, 2.2, 0.65, 0.04),
+      chamferBox(2.6, 0.08, 0.03, teamPanel, 0, 2.2, 0.82, 0.01),
+      chamferBox(0.5, 0.26, 0.42, armorDark, 0, 2.0, 0.65, 0.04), // vagn
+      strut([0, 1.88, 0.65], [0, 1.25, 0.65], 0.1, armorDark),
+      chamferBox(0.16, 0.12, 0.16, glow, 0, 1.2, 0.65, 0.03),
+    );
+    // Byggarmar från sidoblocken.
     for (const side of [-1, 1]) {
-      const x = side * 1.72;
       parts.push(
-        prism([[-0.55, 0.3], [1.9, 0.3], [1.9, 0.6], [1.5, 0.9], [-0.55, 1.2]], 0.32, armor, x, 0.03), // sidovägg
-        chamferBox(0.3, 1.9, 0.3, armor, x, 1.2, 1.55, 0.04), // pelare
-        chamferBox(0.1, 0.08, 0.1, glow, x, 2.4, 1.55, 0.02),
-        chamferBox(0.5, 0.12, 0.5, armorDark, side * 0.9, 1.81, -1.4, 0.02), // ventiler
-        cylinder(0.15, 0.5, armor, side * 1.4, 2.0, -1.5, 10),
-        strut([side * 0.8, 2.05, 1.55], [side * 0.5, 1.4, 0.9], 0.1, armorDark), // byggarm
-        chamferBox(0.12, 0.12, 0.12, glow, side * 0.5, 1.36, 0.88, 0.02),
+        strut([side * 1.1, side < 0 ? 1.05 : 0.88, -0.2], [side * 0.75, 1.35, 0.15], 0.09, armorDark),
+        strut([side * 0.75, 1.35, 0.15], [side * 0.55, 1.05, 0.45], 0.07, armorDark),
+        chamferBox(0.1, 0.1, 0.1, glow, side * 0.53, 1.02, 0.48, 0.02),
       );
     }
     return mergeByMaterial(parts);
   },
 
-  /** UEF Mass Extractor: åttkantig fot, fyra kolvar och en borrkärna med glödande massa. */
+  /**
+   * UEF Mass Extractor: åttkantig fot, fyra pumpkolvar med slangar, en borrkärna
+   * med lagfärgsband och ett glödande massautlopp under ett galler.
+   */
   massExtractor() {
     const { armor, armorDark, teamPanel, massGlow } = MATERIALS;
-    const base = taper(0.92, 0.98, 0.3, armorDark, 0, 0.15, 0, 8);
-    base.rotation.y = Math.PI / 8;
+    const octagon = (r, h, material, y, flare = 1.06) => {
+      const m = taper(r, r * flare, h, material, 0, y, 0, 8);
+      m.rotation.y = Math.PI / 8;
+      return m;
+    };
     const parts = [
-      base,
-      taper(0.42, 0.42, 1.0, armor, 0, 0.8, 0, 8), // kärna
-      taper(0.44, 0.44, 0.14, teamPanel, 0, 0.75, 0, 8),
-      taper(0.3, 0.38, 0.1, armorDark, 0, 1.35, 0, 8),
-      cylinder(0.24, 0.1, massGlow, 0, 1.42, 0, 12),
+      octagon(0.92, 0.25, armorDark, 0.125),
+      octagon(0.8, 0.12, armor, 0.31),
+      octagon(0.42, 0.95, armor, 0.84, 1.08), // kärna
+      octagon(0.45, 0.12, teamPanel, 0.72, 1),
+      octagon(0.45, 0.06, armorDark, 1.0, 1),
+      octagon(0.34, 0.1, armorDark, 1.36, 1.15),
+      taper(0.24, 0.24, 0.08, massGlow, 0, 1.42, 0, 12),
     ];
-    for (const [x, z] of [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55]]) {
+    for (const a of [-0.12, 0, 0.12]) parts.push(box(0.5, 0.02, 0.03, armorDark, 0, 1.47, a)); // galler
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + i * Math.PI / 2;
+      const x = Math.sin(a) * 0.62;
+      const z = Math.cos(a) * 0.62;
       parts.push(
-        cylinder(0.12, 0.8, armor, x, 0.6, z, 8), // kolv
-        cylinder(0.15, 0.08, armorDark, x, 1.02, z, 8),
-        strut([x, 0.95, z], [x * 0.5, 1.15, z * 0.5], 0.07, armorDark),
+        cylinder(0.13, 0.5, armorDark, x, 0.6, z, 8), // cylinder
+        cylinder(0.08, 0.45, armor, x, 1.05, z, 8), // kolvstång
+        cylinder(0.15, 0.08, armorDark, x, 1.3, z, 8),
+        strut([x, 1.25, z], [x * 0.55, 1.3, z * 0.55], 0.08, armor),
+        strut([x * 1.15, 0.38, z * 1.15], [x * 1.05, 0.75, z * 1.05], 0.05, armorDark, true), // slang
       );
     }
     return mergeByMaterial(parts);
   },
 
-  /** UEF T1 Power Generator: pansrad kropp med glödande fönster och två kyltorn. */
+  /**
+   * UEF T1 Power Generator: pansrad kropp med glödande fönster och galler, två
+   * kyltorn med kylflänsar och rör som leder ner i kroppen.
+   */
   powerGenerator() {
     const { armor, armorDark, teamPanel, energyGlow } = MATERIALS;
     const parts = [
-      chamferBox(1.8, 0.3, 1.8, armorDark, 0, 0.15, 0, 0.05),
-      prism([[-0.7, 0.3], [0.7, 0.3], [0.7, 0.8], [0.45, 1.05], [-0.7, 1.05]], 1.3, armor, 0, 0.04),
-      chamferBox(1.1, 0.12, 0.03, teamPanel, 0, 0.62, 0.74, 0.01),
+      chamferBox(1.8, 0.25, 1.8, armorDark, 0, 0.125, 0, 0.05),
+      prism([[-0.7, 0.25], [0.7, 0.25], [0.75, 0.75], [0.48, 1.02], [-0.7, 1.02]], 1.3, armor, 0, 0.04),
+      chamferBox(1.1, 0.1, 0.03, teamPanel, 0, 0.42, 0.76, 0.01),
+      chamferBox(0.7, 0.26, 0.03, armorDark, 0, 0.62, 0.77, 0.01), // galler
     ];
+    for (let i = 0; i < 4; i++) parts.push(box(0.64, 0.025, 0.02, energyGlow, 0, 0.53 + i * 0.06, 0.785));
     for (const side of [-1, 1]) {
       const x = side * 0.35;
       parts.push(
-        chamferBox(0.03, 0.25, 0.6, energyGlow, side * 0.67, 0.62, -0.1, 0.01), // fönster
-        taper(0.2, 0.28, 1.1, armor, x, 1.6, -0.3, 12), // kyltorn
-        taper(0.25, 0.27, 0.08, armorDark, x, 1.3, -0.3, 12),
-        cylinder(0.17, 0.06, energyGlow, x, 2.16, -0.3, 12),
+        chamferBox(0.03, 0.25, 0.6, energyGlow, side * 0.67, 0.62, -0.15, 0.01), // fönster
+        taper(0.19, 0.29, 1.15, armor, x, 1.6, -0.3, 12), // kyltorn
+        taper(0.27, 0.29, 0.1, armorDark, x, 1.12, -0.3, 12),
+        taper(0.23, 0.24, 0.06, teamPanel, x, 1.5, -0.3, 12),
+        taper(0.2, 0.2, 0.05, armorDark, x, 2.17, -0.3, 12),
+        cylinder(0.15, 0.04, energyGlow, x, 2.2, -0.3, 12),
+        strut([x, 1.3, 0.0], [x, 1.02, 0.25], 0.07, armorDark, true), // rör
       );
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        parts.push(box(0.025, 0.5, 0.1, armorDark, x + Math.sin(a) * 0.27, 1.45, -0.3 + Math.cos(a) * 0.27));
+        parts[parts.length - 1].rotation.y = a;
+      }
     }
     return mergeByMaterial(parts);
   },
@@ -479,6 +725,35 @@ const MODELS = {
     return [...mergeByMaterial([base, taper(0.36, 0.4, 0.1, armor, 0, 0.45, 0, 8)]), turret];
   },
 };
+
+/**
+ * Ytdetaljer för alla modeller: paneltexturer (UEF raka plåtar, Cybran avfasade)
+ * med bumpkarta, och en miljökarta så att metallen får reflexer. Anropas en gång
+ * med spelets renderer, eftersom texturerna ritas på en canvas.
+ */
+export function applySurfaceDetail(renderer) {
+  const environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  const uef = createPanelTextures({ seed: 7 });
+  const cybran = createPanelTextures({ seed: 13, cut: true });
+  const detail = {
+    armor: uef, armorDark: uef, teamPanel: uef, concrete: uef, tread: uef,
+    cybran, cybranDark: cybran, enemyPanel: cybran,
+  };
+  for (const [name, material] of Object.entries(MATERIALS)) {
+    material.envMap = environment;
+    material.envMapIntensity = 0.55;
+    const textures = detail[name];
+    if (textures) {
+      material.map = textures.map;
+      material.bumpMap = textures.bump;
+      material.bumpScale = 1.5;
+    }
+    material.needsUpdate = true;
+  }
+  WRECK_MATERIAL.envMap = environment;
+  WRECK_MATERIAL.envMapIntensity = 0.3;
+  WRECK_MATERIAL.needsUpdate = true;
+}
 
 /** Trådmodell för byggnader under uppbyggnad (FA:s "wireframe" som fylls i). */
 export const BUILD_WIRE_MATERIAL = new THREE.MeshBasicMaterial({

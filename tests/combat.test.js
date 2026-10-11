@@ -253,3 +253,23 @@ describe('kills, attackorder och motanfall', () => {
     expect(tank.orders).toEqual([]);
   });
 });
+
+describe('sikte på rörliga mål (FA:s LeadTarget)', () => {
+  it('en Striker träffar en Mole som springer förbi på tvären', () => {
+    const world = createWorld({ map: firstDefense });
+    const tank = addUnit(world, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
+    const mole = addUnit(world, 'mole', { x: 34, z: 47, owner: ENEMY_ID });
+    mole.orders = [{ type: 'move', x: 50, z: 47 }];
+    for (let i = 0; i < 30 && getEntity(world, mole.id); i++) tickWorld(world);
+    expect(getEntity(world, mole.id)).toBeNull();
+    expect(tank.hp).toBe(tank.maxHp);
+  });
+
+  it('leadPoint siktar framför ett mål i rörelse', async () => {
+    const { leadPoint } = await import('../src/sim/systems/combat.js');
+    const target = { x: 10, z: 0, prevX: 9.5, prevZ: 0 };
+    const p = leadPoint({ x: 0, z: 0 }, target, 12.5);
+    expect(p.x).toBeGreaterThan(10); // direktskjutande siktar framför målet
+    expect(p.z).toBe(0);
+  });
+});

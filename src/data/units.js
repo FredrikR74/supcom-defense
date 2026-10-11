@@ -52,14 +52,17 @@ export default {
     weapon: { damage: 8, rateOfFire: 10 / 3, range: 9, projectileSpeed: 12.5, muzzleHeight: 0.75 },
   },
 
-  /** Cybran T1 Land Scout (URL0101). Obeväpnad (har cloak i FA, inte med här). */
+  /**
+   * Cybran T1 Land Scout (URL0101). Obeväpnad: FA:s enda "vapen" är en Target
+   * Tracker med 0 skada (cloak finns inte med här).
+   */
   mole: {
     name: 'Land Scout',
     unitName: 'Mole',
     faction: 'Cybran',
     techCategory: 'TECH1',
     maxHp: 15,
-    speed: 5,
+    speed: 4.8,
     radius: 0.45,
     cost: { mass: 8, energy: 60 },
   },

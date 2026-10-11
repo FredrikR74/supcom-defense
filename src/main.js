@@ -10,6 +10,7 @@ import { createBuildInput } from './input/buildInput.js';
 import { createSelectionInput } from './input/selection.js';
 import { createDebugOverlay } from './ui/debug.js';
 import { createResourcePanel } from './ui/resourcePanel.js';
+import { createControlGroups } from './input/controlGroups.js';
 import { createHoverInfo } from './ui/hoverInfo.js';
 import { createCommandPanel } from './ui/commandPanel.js';
 import { createThreatPanel } from './ui/threatPanel.js';
@@ -97,8 +98,28 @@ function startGame({ map, difficulty }) {
     },
   });
 
+  const controlGroups = createControlGroups(world, selection);
+
   window.addEventListener('keydown', (e) => {
     if (e.target instanceof HTMLInputElement) return;
+    // Kontrollgrupper: Ctrl+siffra sparar (Alt+siffra om webbläsaren tar Ctrl+siffra
+    // till flikbyte), siffran väljer, Shift+siffra lägger till, dubbeltryck centrerar.
+    const digit = /^Digit(\d)$/.exec(e.code)?.[1];
+    if (digit !== undefined) {
+      if (e.ctrlKey || e.altKey) {
+        e.preventDefault();
+        const n = controlGroups.save(digit);
+        threatPanel.toast(n > 0 ? `Group ${digit} set (${n})` : `Group ${digit} cleared`);
+      } else {
+        const group = controlGroups.recall(digit, { add: e.shiftKey });
+        if (group?.double) {
+          const cx = group.entities.reduce((sum, u) => sum + u.x, 0) / group.entities.length;
+          const cz = group.entities.reduce((sum, u) => sum + u.z, 0) / group.entities.length;
+          view.centerOn(cx, cz);
+        }
+      }
+      return;
+    }
     if (e.code === 'Delete') sellSelected();
     if (e.code === 'KeyP') startPatrol();
     if (e.code === 'Escape') ui.mode = null;

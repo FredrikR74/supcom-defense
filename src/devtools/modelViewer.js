@@ -1,17 +1,18 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { createModel } from '../render/models.js';
+import { createModel, applySurfaceDetail, poseLeg } from '../render/models.js';
 
 /**
  * Modellvisare för utveckling (/models.html): en modell i taget på en platta,
  * samma ljus som i spelet, och "Walk" för att se gånganimationen.
  */
 const TYPES = ['acu', 'striker', 'engineer', 'mantis', 'mole', 'medusa',
-  'landFactory', 'massExtractor', 'powerGenerator', 'pointDefense', 'wall', 'core'];
+  'landFactory', 'massExtractor', 'powerGenerator', 'pointDefense', 'wall', 'core', 'cybranGateway'];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
+applySurfaceDetail(renderer);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0f14);
@@ -84,6 +85,11 @@ renderer.setAnimationLoop(() => {
     legL.rotation.x = swing;
     legR.rotation.x = -swing;
   }
+  for (let i = 0; i < 4; i++) {
+    const leg = model.getObjectByName(`leg${i}`);
+    if (leg) poseLeg(leg, phase, walking ? 1 : 0);
+  }
+  if (walking && !legL) phase += dt * 3.6 * 7; // Cybran: samma stegtakt som i spelet
   controls.update();
   renderer.render(scene, camera);
 });

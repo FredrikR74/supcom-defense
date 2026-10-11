@@ -97,6 +97,37 @@ export function targetingSystem(world) {
   }
 }
 
+/**
+ * Var ett direktskjutande vapen ska sikta för att träffa ett mål som rör sig
+ * (FA:s LeadTarget): punkten där målet, med sin fart från senaste ticket, och
+ * en projektil med farten `speed` från skytten möts. Står målet still, eller
+ * hinner projektilen aldrig ikapp, siktas det på där målet är nu.
+ */
+export function leadPoint(shooter, target, speed) {
+  const vx = target.prevX === undefined ? 0 : (target.x - target.prevX) / TICK_SECONDS;
+  const vz = target.prevZ === undefined ? 0 : (target.z - target.prevZ) / TICK_SECONDS;
+  if (vx === 0 && vz === 0) return { x: target.x, z: target.z };
+  // |d + v·t| = speed·t  =>  (v·v - s²)t² + 2(d·v)t + d·d = 0
+  const dx = target.x - shooter.x;
+  const dz = target.z - shooter.z;
+  const a = vx * vx + vz * vz - speed * speed;
+  const b = 2 * (dx * vx + dz * vz);
+  const c = dx * dx + dz * dz;
+  let t;
+  if (Math.abs(a) < 1e-9) {
+    t = b < 0 ? -c / b : -1;
+  } else {
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) return { x: target.x, z: target.z };
+    const r = Math.sqrt(disc);
+    const t1 = (-b - r) / (2 * a);
+    const t2 = (-b + r) / (2 * a);
+    t = Math.min(t1, t2) > 0 ? Math.min(t1, t2) : Math.max(t1, t2);
+  }
+  if (!(t > 0)) return { x: target.x, z: target.z };
+  return { x: target.x + vx * t, z: target.z + vz * t };
+}
+
 /** Vrider torn, räknar ner omladdning och skjuter projektiler mot målen. */
 export function weaponsSystem(world) {
   for (const e of world.entities) {
@@ -112,7 +143,9 @@ export function weaponsSystem(world) {
       continue;
     }
 
-    const want = Math.atan2(target.x - e.x, target.z - e.z);
+    // Direktskjutande vapen leder målet; artilleri skjuter mot där målet står.
+    const aim = weapon.ballistic ? { x: target.x, z: target.z } : leadPoint(e, target, weapon.projectileSpeed);
+    const want = Math.atan2(aim.x - e.x, aim.z - e.z);
     let aimed = true;
     if (weapon.turnRate) {
       const current = e.turretHeading ?? e.heading ?? 0;
@@ -137,8 +170,8 @@ export function weaponsSystem(world) {
       z: e.z,
       prevX: e.x,
       prevZ: e.z,
-      tx: target.x,
-      tz: target.z,
+      tx: aim.x,
+      tz: aim.z,
       sx: e.x,
       sz: e.z,
       ballistic: Boolean(weapon.ballistic),
@@ -193,7 +226,7 @@ export function projectileSystem(world) {
       const shooter = wasAlive && hit.hp <= 0 ? getEntity(world, p.sourceId) : null;
       if (shooter) shooter.kills = (shooter.kills ?? 0) + 1;
     }
-    emit(world, { type: hit ? 'hit' : 'miss', owner: p.owner, x: p.x, z: p.z, y: p.y });
+    emit(world, { type: hit ? 'hit' : 'miss', owner: p.owner, x: p.x, z: p.z, y: p.y, ballistic: p.ballistic });
   }
   world.projectiles = remaining;
 }

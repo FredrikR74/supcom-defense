@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { createCameraRig } from './cameraRig.js';
 import { createTerrainMesh } from './terrainMesh.js';
+import { createTerrainProps } from './terrainProps.js';
 import { createMapMarkers } from './mapMarkers.js';
 import { createEntityView } from './entityView.js';
 import { createPathDebug } from './pathDebug.js';
 import { createCombatView } from './combatView.js';
 import { createHealthBars } from './healthBars.js';
-import { createGhost, setGhostState } from './models.js';
+import { createGhost, setGhostState, applySurfaceDetail } from './models.js';
 import { PLAYER_ID } from '../sim/constants.js';
 import { raycastTerrain, isInsideMap, getHeight } from '../sim/terrain.js';
 
@@ -18,6 +19,7 @@ export function createRenderer(canvas, world) {
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  applySurfaceDetail(renderer);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b0f14);
@@ -31,13 +33,14 @@ export function createRenderer(canvas, world) {
   rig.target.z = map.core.z;
   rig.apply();
 
-  scene.add(new THREE.HemisphereLight(0xdde8ff, 0x2a2418, 0.6));
+  scene.add(new THREE.HemisphereLight(0xdde8ff, 0x3a3428, 0.9));
   // Låg sol från nordväst ger tydlig skuggning av kullarna.
   const sun = new THREE.DirectionalLight(0xfff2dd, 2.2);
   sun.position.set(-100, 60, -40);
   scene.add(sun);
 
-  scene.add(createTerrainMesh(terrain, renderer));
+  scene.add(createTerrainMesh(terrain, renderer, { seed: map.seed }));
+  scene.add(createTerrainProps(map, terrain));
   const markers = createMapMarkers(map, terrain);
   scene.add(markers.meshes, markers.icons);
   const entities = createEntityView(terrain);

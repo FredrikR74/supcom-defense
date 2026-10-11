@@ -71,6 +71,9 @@ export function createTerrainForMap(map) {
     seed: map.seed,
     hillHeight: map.terrain.hillHeight,
     plateau: { ...map.terrain.plateau, x: map.core.x, z: map.core.z },
+    ring: map.terrain.ring ? { ...map.terrain.ring, x: map.core.x, z: map.core.z } : null,
+    peaks: map.terrain.peaks ?? null,
+    mountainHeight: map.terrain.mountainHeight,
   });
 }
 
