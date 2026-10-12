@@ -103,6 +103,24 @@ describe('trupper', () => {
     squads.forEach((s, i) => expect(flowDist(w, s.x, s.z)).toBeLessThan(start[i] / 2));
   }, 30000);
 
+  it('fastnar inte i passet på Mountain Pass (ankaret och de främsta väntade på varandra)', () => {
+    const map = maps.find((m) => m.id === 'mountainPassTest');
+    const w = createWorld({ map, config: { difficulty: 70 } });
+    const last = new Map();
+    let stalled = 0;
+    for (let t = 0; t < 10 * 160; t++) {
+      tickWorld(w);
+      if (t % 10) continue;
+      for (const e of w.entities) {
+        if (e.owner !== ENEMY_ID || e.kind !== 'unit') continue;
+        const prev = last.get(e.id);
+        if (!prev || Math.hypot(prev.x - e.x, prev.z - e.z) > 0.5) last.set(e.id, { x: e.x, z: e.z, tick: w.tick });
+        else if (w.tick - prev.tick >= 150 && !e.targetId) stalled++;
+      }
+    }
+    expect(stalled).toBe(0);
+  }, 60000);
+
   it('strider tillsammans och formerar sig igen efteråt', () => {
     const w = world();
     const squad = spawnSquad(w, Array(6).fill('mantis'), 0);

@@ -279,7 +279,10 @@ function stepSquad(world, squad) {
       return;
     }
     order.goal = slotGoal(world, squad, e, m.slot);
-    if (order.goal.mode !== 'slot' || Math.hypot(order.goal.x - e.x, order.goal.z - e.z) > LAG_DISTANCE) lagging++;
+    // Den som väntar framför ankaret ('hold') är inte efter; räknades den som
+    // det kunde ankaret och de främsta vänta på varandra för evigt i ett pass.
+    const { mode } = order.goal;
+    if (mode === 'flow' || (mode === 'slot' && Math.hypot(order.goal.x - e.x, order.goal.z - e.z) > LAG_DISTANCE)) lagging++;
   });
 
   if (squad.state === 'muster') {
