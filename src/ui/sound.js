@@ -40,6 +40,9 @@ export const SAMPLE_SETS = {
   laserLarge: [0, 1, 2, 3, 4].map((i) => `laserLarge_00${i}`),
   impact: ['impactMetal_000', 'impactMetal_002', 'impactMetal_004'],
   explosion: ['explosionCrunch_000', 'explosionCrunch_002', 'explosionCrunch_003'],
+  // För skott: bara explosionsklippen med fyllig bas (explosionCrunch_002 är
+  // mest brus i början och lät "bara brus" som ACU-skott).
+  cannon: ['explosionCrunch_000', 'explosionCrunch_003'],
   bigExplosion: ['explosionCrunch_001', 'explosionCrunch_004'],
   rumble: ['lowFrequency_explosion_000', 'lowFrequency_explosion_001'],
 };
@@ -58,22 +61,22 @@ const SAMPLE_RMS = 0.12;
  */
 const SHOT_SAMPLES = {
   plasma: [
-    { set: 'explosion', rate: 1.9, level: 0.4, length: 0.16 },
+    { set: 'cannon', rate: 1.9, level: 0.4, length: 0.16 },
     { set: 'laserLarge', rate: 0.55, level: 0.12, length: 0.12, lowpass: 1800 },
   ],
   heavy: [
-    { set: 'explosion', rate: 1.35, level: 0.6, length: 0.3 },
+    { set: 'cannon', rate: 1.35, level: 0.6, length: 0.3 },
     { set: 'rumble', rate: 1.5, level: 0.45, length: 0.35 },
   ],
   laser: [{ set: 'laserSmall', rate: 1, level: 0.8 }],
   artillery: [
-    { set: 'explosion', rate: 1.1, level: 0.9, length: 0.35 },
+    { set: 'cannon', rate: 1.1, level: 0.9, length: 0.35 },
     { set: 'rumble', rate: 1.3, level: 0.7, length: 0.5 },
     { synth: 'thump', level: 1 },
   ],
-  rifle: [{ set: 'explosion', rate: 2.4, level: 0.28, length: 0.07 }],
+  rifle: [{ set: 'cannon', rate: 2.4, level: 0.28, length: 0.07 }],
   flak: [
-    { set: 'explosion', rate: 2.1, level: 0.3, length: 0.1 },
+    { set: 'cannon', rate: 2.1, level: 0.3, length: 0.1 },
     { set: 'impact', rate: 0.8, level: 0.15, length: 0.1 },
   ],
 };
@@ -110,7 +113,7 @@ export const WEAPON_SOUNDS = {
   // och artilleriet, sedan vanliga skott och träffar.
   striker: { kind: 'plasma', pitch: 1, gain: 2.7 },
   pointDefense: { kind: 'plasma', pitch: 0.75, gain: 3.4 },
-  acu: { kind: 'heavy', pitch: 1, gain: 1.1 },
+  acu: { kind: 'heavy', pitch: 1, gain: 1.3 },
   mantis: { kind: 'laser', pitch: 1, gain: 2.5 },
   mole: { kind: 'laser', pitch: 1.25, gain: 1.7 },
   hunter: { kind: 'laser', pitch: 1.2, gain: 2 },
@@ -419,7 +422,7 @@ export function createSound() {
     if (!out) return;
     const t = ctx.currentTime;
     if (playSample('impact', out, t, { rate: rand(1, 1.3), level: 1.7, length: 0.25 })) {
-      playSample('explosion', out, t, { rate: 3, level: 0.55, length: 0.05 });
+      playSample('cannon', out, t, { rate: 3, level: 0.55, length: 0.05 });
       return;
     }
     const p = rand(0.85, 1.15);
