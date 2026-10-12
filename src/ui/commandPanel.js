@@ -22,7 +22,8 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
 
   /**
    * Fabrikens kö i ordning, där flera av samma typ i rad visas som en ruta med
-   * antal (som i FA). Vänsterklick lägger till fler av samma typ, högerklick tar
+   * antal (som i FA). Ordningen bevaras: bara intilliggande av samma typ slås
+   * ihop, och pilar visar i vilken ordning de kommer ut. Vänsterklick lägger till fler av samma typ, högerklick tar
    * bort från slutet av gruppen; med Ctrl/Shift 5 åt gången.
    */
   function queueStrip(factory) {
@@ -35,7 +36,14 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       if (last?.type === type) last.count++;
       else groups.push({ type, start: i, count: 1 });
     });
-    groups.forEach(({ type, start, count }) => {
+    groups.forEach(({ type, start, count }, g) => {
+      // Pilar visar i vilken ordning enheterna kommer ut.
+      if (g > 0) {
+        const arrow = document.createElement('span');
+        arrow.className = 'queue-arrow';
+        arrow.textContent = '›';
+        strip.appendChild(arrow);
+      }
       const def = units[type];
       const chip = document.createElement('span');
       chip.className = 'queue-chip' + (start === 0 ? ' queue-current' : '');
