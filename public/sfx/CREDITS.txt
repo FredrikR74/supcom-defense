@@ -23,3 +23,9 @@ artilleryGun.wav — "GUNArtl_69thFieldArtilleryGun01_InMotionAudio_FREESampleSu
 
 All other sound effects — "Sci-fi Sounds" by Kenney (www.kenney.nl)
   License: Creative Commons 0 (CC0), see LICENSE-kenney.txt
+
+deathExplosion.wav — "Long Decay Explosion (2).wav" by JohanDeecke
+  https://freesound.org/people/johandeecke/sounds/369530/
+  License: Creative Commons Attribution 3.0 (CC BY 3.0)
+  https://creativecommons.org/licenses/by/3.0/
+  Changes: converted to mono 16-bit 48 kHz, fade-out, normalized.

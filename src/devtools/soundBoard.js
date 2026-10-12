@@ -51,7 +51,6 @@ section('Weapons (in game)', Object.entries(WEAPON_SOUNDS).map(([type, w]) => ({
 })));
 
 section('Impacts (in game)', [
-  { label: 'Hit', sub: 'direct fire', onClick: () => play({ type: 'hit', ballistic: false }) },
   { label: 'Artillery impact', sub: 'shell lands', onClick: () => play({ type: 'miss', ballistic: true }) },
 ]);
 

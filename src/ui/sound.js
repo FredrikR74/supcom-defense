@@ -1,18 +1,20 @@
 /**
- * Ljud (Web Audio): skott, träffar och explosioner är inspelningar ur Kenneys
- * Sci-fi Sounds (CC0, public/sfx/), med syntes som reserv om ett ljud inte
- * kunnat laddas (t.ex. webbläsare utan Ogg Vorbis). Talade
- * meddelanden som "Commander down" är inspelade på engelska i
- * public/voice/ (se scripts/generateVoice.ps1) och spelas genom ett lätt
- * radiofilter; saknas ett klipp används webbläsarens talsyntes. M slår av och på.
+ * Ljud (Web Audio): skott, artillerinedslag och explosioner är inspelningar
+ * från Freesound och Kenneys Sci-fi Sounds (public/sfx/, se CREDITS.txt), med
+ * syntes som reserv om ett ljud inte kunnat laddas. Direktträffar som inte
+ * dödar har inget ljud. Talade meddelanden som "Commander down" är inspelade
+ * på engelska i public/voice/ (se scripts/generateVoice.ps1) och spelas genom
+ * ett lätt radiofilter; saknas ett klipp används webbläsarens talsyntes.
+ * M slår av och på.
  *
  * Varje ljud går genom en egen kedja: avståndsfilter (ljud långt bort blir
  * dovare, inte bara tystare) och stereo efter var det är i bild, och sedan till
- * en kanal med egen EQ (skott, träffar, explosioner) och en rumsklang. Varje
+ * en kanal med egen EQ (skott, explosioner) och en rumsklang. Varje
  * vapentyp har ett tak för samtidiga ljud, skott av samma typ nära varandra
  * slås ihop till salvor, och när många ljud spelas samtidigt sänks varje nytt
- * ljud mjukt (automatisk mixning). En limiter på slutet tar bara topparna. Små slumpvariationer i tonhöjd och styrka gör att
- * många likadana enheter inte låter som en maskin.
+ * ljud mjukt (automatisk mixning). En limiter på slutet tar bara topparna.
+ * Små slumpvariationer i tonhöjd och styrka gör att många likadana enheter
+ * inte låter som en maskin.
  */
 const HEARING_DISTANCE = 90;
 /** Sidled (världsenheter från kamerans mitt) där ljudet ligger helt i en högtalare. */
@@ -22,28 +24,30 @@ const PAN_DISTANCE = 40;
  * gröt. Blir det fler väljs de som spelas slumpvis, så att inte alltid samma
  * enheter tystnar.
  */
-const BUDGETS = { shot: 26, hit: 14, explosion: 10 };
+const BUDGETS = { shot: 26, explosion: 10 };
 /**
  * Automatisk mixning: `load` räknar hur många ljud som startat nyligen (avklingar
  * med tidskonstanten LOAD_SECONDS), och varje nytt ljud sänks med
  * 1 / sqrt(1 + load / LOAD_KNEE). Då behöver limitern bara ta toppar och
  * pumpar inte hela mixen upp och ner i stora strider.
  */
+/** Nivå för dödsexplosionen (uppmätt mot de andra ljuden, se sounds.html). */
+const DEATH_LEVEL = 0.75;
 const LOAD_SECONDS = 0.35;
 const LOAD_KNEE = 2;
 
 /**
  * Tak per ljudtyp, som FA:s ljudmotor: högst så många samtidiga ljud av varje
- * vapentyp (och av träffar och explosioner). Kommer ett till tonas det äldsta
+ * vapentyp (och av explosioner). Kommer ett till tonas det äldsta
  * snabbt ut. `seconds` är hur länge ett ljud räknas som pågående.
  */
 const VOICE_LIMITS = {
   mantis: 4, hunter: 4, mole: 3, striker: 4, pointDefense: 3, acu: 2,
   medusa: 3, lobo: 3, mechMarine: 3, snoop: 2, archer: 3,
-  hit: 4, explosion: 5,
+  explosion: 5,
 };
 const DEFAULT_VOICE_LIMIT = 2;
-const VOICE_SECONDS = { shot: 0.35, hit: 0.25, explosion: 1.2 };
+const VOICE_SECONDS = { shot: 0.35, explosion: 1.2 };
 /**
  * Salvor: skjuter flera av samma typ inom VOLLEY_SECONDS och VOLLEY_DISTANCE
  * från varandra spelas ett enda ljud, som blir fylligare (upp till VOLLEY_MAX
@@ -63,6 +67,7 @@ export const SAMPLE_SETS = {
   tankFire: ['tankFire.wav'],
   laserShot: ['laserShot.wav'],
   artilleryGun: ['artilleryGun.wav'],
+  death: ['deathExplosion.wav'],
   // Kenney Sci-fi Sounds
   laserLarge: [0, 1, 2, 3, 4].map((i) => `laserLarge_00${i}`),
   impact: ['impactMetal_000', 'impactMetal_002', 'impactMetal_004'],
@@ -136,7 +141,7 @@ function shuffled(list) {
  */
 export const WEAPON_SOUNDS = {
   // Nivåerna är uppmätta (se sounds.html): explosioner starkast, sedan ACU:n
-  // och artilleriet, sedan vanliga skott och träffar.
+  // och artilleriet, sedan vanliga skott.
   striker: { kind: 'tank', pitch: 1, gain: 0.72 },
   pointDefense: { kind: 'plasma', pitch: 0.75, gain: 3.4 },
   acu: { kind: 'heavy', pitch: 1, gain: 0.73 },
@@ -162,7 +167,7 @@ export function createSound() {
   let loadTime = 0;
   /** Ljudtyp -> pågående ljud [{ start, end, gain, base, count, x, z }], äldst först. */
   const voices = new Map();
-  /** Kanaler med egen EQ: skott, träffar och explosioner (se init). */
+  /** Kanaler med egen EQ: skott och explosioner (se init). */
   const buses = {};
   /** Noder som ljudtestsidan kan läsa av (t.ex. limiterns dämpning). */
   const nodes = {};
@@ -196,10 +201,9 @@ export function createSound() {
     master.gain.value = 0.5;
     master.connect(limiter);
 
-    // Kanaler med egen EQ, så att skott, träffar och explosioner får varsin
+    // Kanaler med egen EQ, så att skott och explosioner får varsin
     // plats i frekvensbilden i stället för att slåss om samma register:
     // - skott: utan djupbas, dämpad gäll diskant, lite lägre
-    // - träffar: mellanregistret
     // - explosioner: basen och lite mindre diskant
     const chain = (level, filters) => {
       const input = ctx.createGain();
@@ -218,7 +222,6 @@ export function createSound() {
       return input;
     };
     buses.shot = chain(1, [['highpass', 110], ['peaking', 3500, -4, 1], ['lowpass', 9000]]);
-    buses.hit = chain(1, [['highpass', 250], ['peaking', 3000, -2, 1], ['lowpass', 7000]]);
     buses.explosion = chain(1, [['lowshelf', 120, 3], ['highshelf', 4500, -3]]);
 
     // Rumsklang: impulssvar av avklingande stereobrus.
@@ -491,30 +494,16 @@ export function createSound() {
     }
   }
 
-  /** Träff: ett kort metalliskt klick, eller ett artillerinedslag. */
+  /** Artillerigranat som slår ner (Kenneys korta explosioner). */
   function impact(ev, listener) {
-    if (ev.ballistic) {
-      explosion({ ...ev, size: 0.5 }, listener, 1.5);
-      return;
-    }
-    if (ev.type !== 'hit') return; // direktskott som missar hörs inte
-    const out = output(ev.x, ev.z, listener, rand(0.85, 1), 0.6, { bus: 'hit', key: 'hit' });
-    if (!out) return;
-    const t = ctx.currentTime;
-    if (playSample('impact', out, t, { rate: rand(1, 1.3), level: 1.7, length: 0.25 })) {
-      playSample('cannon', out, t, { rate: 3, level: 0.55, length: 0.05 });
-      return;
-    }
-    const p = rand(0.85, 1.15);
-    burst(out, t, { filter: 'bandpass', from: 3200 * p, to: 1500, q: 2, length: 0.07, level: 0.12 });
-    tone(out, t, { type: 'sine', from: 1900 * p, to: 1250 * p, length: 0.09, level: 0.035 });
+    explosion({ ...ev, size: 0.5 }, listener, 1.5, 'explosion');
   }
 
   /**
    * Explosion i lager: en skarp smäll, en djup basduns, ett brusande efterljud
    * som stängs, och knaster av skräp. Byggnader smäller större och längre.
    */
-  function explosion(ev, listener, volume = 1) {
+  function explosion(ev, listener, volume = 1, clip = 'death') {
     const size = Math.max(0.3, ev.size ?? 1) * (ev.kind === 'structure' ? 1.8 : 1);
     const out = output(ev.x, ev.z, listener, volume * rand(0.85, 1.1) * Math.min(1.6, 0.7 + size * 0.4), 1.4,
       { bus: 'explosion', key: 'explosion' });
@@ -523,7 +512,10 @@ export function createSound() {
     const big = size >= 1.5;
     // Större explosioner spelas långsammare (djupare); byggnader får ett muller under.
     const rate = Math.max(0.6, 1.25 - size * 0.25);
-    if (playSample(big ? 'bigExplosion' : 'explosion', out, t, { rate, level: 0.9 })) {
+    // Dödsexplosionen (JohanDeecke) för enheter och byggnader; artillerigranater
+    // har Kenneys kortare explosioner.
+    const set = clip === 'death' ? 'death' : big ? 'bigExplosion' : 'explosion';
+    if (playSample(set, out, t, { rate, level: clip === 'death' ? DEATH_LEVEL : 0.9 })) {
       if (big) playSample('rumble', out, t, { rate: 0.9, level: 0.9 });
       return;
     }
@@ -623,8 +615,9 @@ export function createSound() {
         if (ev.x === undefined) continue;
         if (ev.type === 'fire') {
           if (take('shot')) shot(ev, listener);
-        } else if (ev.type === 'hit' || ev.type === 'miss') {
-          if (ev.ballistic ? take('explosion') : take('hit')) impact(ev, listener);
+        } else if ((ev.type === 'hit' || ev.type === 'miss') && ev.ballistic) {
+          // Bara artillerigranater som slår ner hörs; direktträffar har inget ljud.
+          if (take('explosion')) impact(ev, listener);
         } else if (ev.type === 'death') {
           if (take('explosion')) explosion(ev, listener);
         }
