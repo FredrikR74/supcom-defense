@@ -10,7 +10,7 @@ const costText = (cost) => `${cost.mass} M · ${cost.energy} E`;
  * och repetering för markerade fabriker, och Sell för markerade byggnader.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
-export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, onRepeat, onSell, onPatrol }) {
+export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol }) {
   let signature = '';
   /** Enhetstyp -> framstegsstapel i dess produktionsknapp; uppdateras varje frame. */
   let progressBars = new Map();
@@ -21,19 +21,26 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
   const batch = (e) => (e.ctrlKey || e.shiftKey ? 5 : 1);
 
   /**
-   * Fabrikens hela kö som rutor i ordning. Som i FA: vänsterklick lägger till fler
-   * av samma typ, högerklick tar bort; med Ctrl/Shift 5 åt gången.
+   * Fabrikens kö i ordning, där flera av samma typ i rad visas som en ruta med
+   * antal (som i FA). Vänsterklick lägger till fler av samma typ, högerklick tar
+   * bort från slutet av gruppen; med Ctrl/Shift 5 åt gången.
    */
   function queueStrip(factory) {
     const strip = document.createElement('div');
     strip.className = 'cmd-queue';
     strip.title = 'Left-click: add · Right-click: remove · Shift/Ctrl: 5 at a time';
+    const groups = [];
     factory.productionQueue.forEach((type, i) => {
+      const last = groups[groups.length - 1];
+      if (last?.type === type) last.count++;
+      else groups.push({ type, start: i, count: 1 });
+    });
+    groups.forEach(({ type, start, count }) => {
       const def = units[type];
       const chip = document.createElement('span');
-      chip.className = 'queue-chip' + (i === 0 ? ' queue-current' : '');
-      chip.textContent = def.unitName ?? def.name;
-      if (i === 0) {
+      chip.className = 'queue-chip' + (start === 0 ? ' queue-current' : '');
+      chip.textContent = (def.unitName ?? def.name) + (count > 1 ? ` ×${count}` : '');
+      if (start === 0) {
         queueBar = document.createElement('span');
         queueBar.className = 'queue-progress';
         chip.appendChild(queueBar);
@@ -42,10 +49,18 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       chip.addEventListener('click', (e) => onProduce(type, batch(e)));
       chip.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        onCancelProduce(factory.id, i, batch(e));
+        // Ta bort de sista i gruppen, så att den som byggs tas sist.
+        const n = Math.min(batch(e), count);
+        onCancelProduce(factory.id, start + count - n, n);
       });
       strip.appendChild(chip);
     });
+    if (factory.paused) {
+      const paused = document.createElement('span');
+      paused.className = 'queue-paused';
+      paused.textContent = 'Paused';
+      strip.appendChild(paused);
+    }
     if (factory.repeat) {
       const loop = document.createElement('span');
       loop.className = 'queue-repeat';
@@ -80,6 +95,7 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       const queued = (type) => factories.reduce(
         (n, e) => n + e.productionQueue.filter((t) => t === type).length, 0);
       const repeat = factories.length > 0 && factories.every((f) => f.repeat);
+      const paused = factories.length > 0 && factories.every((f) => f.paused);
       const sellable = selected.filter((e) => e.kind === 'structure' && getDef(e.type).cost && !getDef(e.type).unsellable);
 
       // Framsteget ändras varje frame, så det uppdateras utan att panelen byggs om.
@@ -99,7 +115,7 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       const queueFactory = factories[0] ?? null;
       const sig = JSON.stringify([
         hasUnits, ui.mode, queueFactory?.id, queueFactory?.productionQueue,
-        [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat,
+        [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat, paused,
         sellable.length, ui.placing?.type,
       ]);
       if (sig === signature) {
@@ -135,6 +151,7 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       }
       if (factories.length) {
         buttons.appendChild(button('Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
+        buttons.appendChild(button('Pause', paused ? 'Paused' : 'Running', () => onPause(!paused), { active: paused }));
       }
       if (hasUnits) {
         buttons.appendChild(button('Patrol', 'P', () => onPatrol(), { active: ui.mode === 'patrol' }));
@@ -142,8 +159,10 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       if (sellable.length) {
         buttons.appendChild(button('Sell', 'Delete', () => onSell()));
       }
-      if (buttons.childElementCount) el.appendChild(buttons);
+      // Kön ligger ovanför knapparna: panelen sitter i skärmens nederkant, så när
+      // kön växer flyttar sig inte knapparna under muspekaren.
       if (queueFactory?.productionQueue.length) el.appendChild(queueStrip(queueFactory));
+      if (buttons.childElementCount) el.appendChild(buttons);
       el.hidden = el.childElementCount === 0;
       updateProgress();
     },

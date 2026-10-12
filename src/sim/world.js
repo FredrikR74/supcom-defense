@@ -6,7 +6,9 @@ import { applyCommands } from './commands.js';
 import { movementSystem } from './systems/movement.js';
 import { constructionDemand, constructionProgress } from './systems/construction.js';
 import { separationSystem } from './systems/separation.js';
-import { targetingSystem, weaponsSystem, projectileSystem, retaliationSystem, deathSystem } from './systems/combat.js';
+import {
+  targetingSystem, patrolEngageSystem, weaponsSystem, projectileSystem, retaliationSystem, deathSystem,
+} from './systems/combat.js';
 import { regenSystem } from './veterancy.js';
 import { spawnAcu, acuSystem } from './acu.js';
 import { computeSteepCells, updatePathing } from './pathing.js';
@@ -82,6 +84,27 @@ export function createTerrainForMap(map) {
 }
 
 /**
+ * Lagerkapacitet: grundlagret (ACU:ns) plus klara Mass/Energy Storage. Bara
+ * skillnaden mot förra ticket läggs på, så grundlagret ändras inte.
+ */
+function updateStorage(world, player) {
+  const bonus = { mass: 0, energy: 0 };
+  for (const e of world.entities) {
+    if (e.kind !== 'structure' || e.owner !== player.id || !e.built) continue;
+    const storage = getDef(e.type).storage;
+    if (storage) for (const r of Object.keys(bonus)) bonus[r] += storage[r] ?? 0;
+  }
+  const economy = player.economy;
+  const previous = economy.storageBonus ?? { mass: 0, energy: 0 };
+  for (const r of Object.keys(bonus)) {
+    const res = economy[r];
+    res.max += bonus[r] - previous[r];
+    res.stored = Math.min(res.stored, res.max);
+  }
+  economy.storageBonus = bonus;
+}
+
+/**
  * Produktion från klara byggnader och från enheter (ACU:n), byggares efterfrågan
  * och byggnaders löpande förbrukning (upkeep). En byggnad med upkeep producerar
  * bara i proportion till hur mycket av sin upkeep den fick förra ticket, så en
@@ -90,6 +113,7 @@ export function createTerrainForMap(map) {
 function economySystem(world) {
   for (const player of Object.values(world.players)) {
     if (!player.economy) continue;
+    updateStorage(world, player);
     const producers = [];
     const consumers = [];
     const upkeeps = [];
@@ -120,6 +144,7 @@ export function tickWorld(world) {
     updatePathing(world);
   }
   targetingSystem(world);
+  patrolEngageSystem(world);
   if (world.map) squadSystem(world);
   movementSystem(world);
   separationSystem(world);

@@ -828,6 +828,61 @@ const MODELS = {
     return mergeByMaterial(parts);
   },
 
+  /**
+   * UEF Mass Storage: låg pansrad fot med fyra stöd och en åttkantig kupol med
+   * glödande massfönster runt om och ett lagfärgat band.
+   */
+  massStorage() {
+    const { armor, armorDark, teamPanel, massGlow } = MATERIALS;
+    const octagon = (rTop, rBottom, h, material, y) => {
+      const m = taper(rTop, rBottom, h, material, 0, y, 0, 8);
+      m.rotation.y = Math.PI / 8;
+      return m;
+    };
+    const parts = [
+      chamferBox(1.8, 0.2, 1.8, armorDark, 0, 0.1, 0, 0.05),
+      octagon(0.78, 0.86, 0.35, armor, 0.37),
+      octagon(0.8, 0.8, 0.08, teamPanel, 0.58),
+      octagon(0.55, 0.74, 0.4, armor, 0.82),
+      octagon(0.3, 0.55, 0.18, armorDark, 1.1),
+      cylinder(0.22, 0.06, massGlow, 0, 1.21, 0, 12),
+    ];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const glass = box(0.2, 0.18, 0.03, massGlow, Math.sin(a) * 0.66, 0.84, Math.cos(a) * 0.66);
+      glass.rotation.y = a;
+      parts.push(glass);
+    }
+    for (const [x, z] of [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]]) {
+      parts.push(chamferBox(0.22, 0.3, 0.22, armorDark, x, 0.3, z, 0.03));
+    }
+    return mergeByMaterial(parts);
+  },
+
+  /**
+   * UEF Energy Storage: fyrkantig fot med en hög cylindrisk ackumulator med
+   * glödande band, kylflänsar och en lagfärgad topp.
+   */
+  energyStorage() {
+    const { armor, armorDark, teamPanel, energyGlow } = MATERIALS;
+    const parts = [
+      chamferBox(1.8, 0.2, 1.8, armorDark, 0, 0.1, 0, 0.05),
+      chamferBox(1.4, 0.25, 1.4, armor, 0, 0.32, 0, 0.05),
+      cylinder(0.55, 1.3, armor, 0, 1.1, 0, 16),
+      cylinder(0.6, 0.08, teamPanel, 0, 1.78, 0, 16),
+      taper(0.25, 0.5, 0.2, armorDark, 0, 1.92, 0, 16),
+      cylinder(0.15, 0.08, energyGlow, 0, 2.05, 0, 12),
+    ];
+    for (const y of [0.75, 1.1, 1.45]) parts.push(cylinder(0.57, 0.06, energyGlow, 0, y, 0, 16));
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + (i / 4) * Math.PI * 2;
+      const fin = box(0.06, 1.0, 0.3, armorDark, Math.sin(a) * 0.62, 1.05, Math.cos(a) * 0.62);
+      fin.rotation.y = a;
+      parts.push(fin);
+    }
+    return mergeByMaterial(parts);
+  },
+
   /** Mur: betongblock med mörk kant upptill. */
   wall() {
     return mergeByMaterial([

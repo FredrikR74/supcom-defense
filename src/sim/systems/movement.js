@@ -87,6 +87,12 @@ export function movementSystem(world) {
       if (goal.wait) break;
       if (goal.stuck) {
         if (order.type === 'move') e.orders.shift(); // så nära som det går
+        // En patrullpunkt som inte går att nå (t.ex. mitt i en byggnad som byggts
+        // där): så nära som det går räcker, vänd mot nästa punkt.
+        if (order.type === 'patrol') {
+          order.index = (order.index + 1) % order.points.length;
+          order.path = null;
+        }
         break;
       }
 

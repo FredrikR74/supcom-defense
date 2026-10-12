@@ -1,6 +1,6 @@
 /**
  * Syntetiserat ljud (Web Audio): skott, träffar och explosioner. Talade
- * meddelanden som "Construction complete" är inspelade på engelska i
+ * meddelanden som "Commander down" är inspelade på engelska i
  * public/voice/ (se scripts/generateVoice.ps1) och spelas genom ett lätt
  * radiofilter; saknas ett klipp används webbläsarens talsyntes. Ljud längre från
  * kamerans mittpunkt blir svagare. M slår av och på.
@@ -10,7 +10,6 @@ const HEARING_DISTANCE = 90;
 
 /** Repliker -> inspelade klipp i public/voice/. */
 const VOICE_CLIPS = {
-  'Construction complete': 'construction-complete.wav',
   'Commander down': 'commander-down.wav',
   'Commander online': 'commander-online.wav',
 };
@@ -143,8 +142,7 @@ export function createSound() {
       shotBudget = Math.min(SHOTS_PER_SECOND, shotBudget + ((now - lastRefill) / 1000) * SHOTS_PER_SECOND);
       lastRefill = now;
       for (const ev of events) {
-        if (ev.type === 'built' && ev.owner === playerId) speak('Construction complete');
-        else if (ev.type === 'acuDeath') speak('Commander down');
+        if (ev.type === 'acuDeath') speak('Commander down');
         else if (ev.type === 'acuRespawn') speak('Commander online');
         if (ev.x === undefined) continue;
         const gain = volumeAt(ev.x, ev.z, listener);

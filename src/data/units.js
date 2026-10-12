@@ -1,4 +1,6 @@
-const BASIC_STRUCTURES = ['landFactory', 'massExtractor', 'powerGenerator', 'wall', 'pointDefense'];
+const BASIC_STRUCTURES = [
+  'landFactory', 'massExtractor', 'powerGenerator', 'massStorage', 'energyStorage', 'wall', 'pointDefense',
+];
 
 /**
  * Enhetsdefinitioner. `name` är FA:s beskrivning och `unitName` FA:s egennamn,
@@ -36,6 +38,8 @@ export default {
     /** Veterancy i FA: egna trösklar (massa dödad per nivå) och läkning per nivå. */
     veteranMass: [1000, 1250, 1750, 2500, 3500],
     veteranHealingMult: [0.1, 0.2, 0.3, 0.4, 0.5],
+    /** FA: AI.GuardScanRadius = 31,5 (halverad som räckvidderna), se combat.js. */
+    guardScanRadius: 15.75,
     /** Zephyr Anti Matter Cannon: 100 skada, 1 skott/s, räckvidd 22. */
     weapon: { damage: 100, rateOfFire: 1, range: 11, projectileSpeed: 25, muzzleHeight: 1.3 },
   },

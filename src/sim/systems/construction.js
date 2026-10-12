@@ -130,7 +130,7 @@ function setRepairJob(world, e, target) {
 }
 
 function startProductionJob(e) {
-  if (!e.built || !e.productionQueue?.length) return;
+  if (!e.built || e.paused || !e.productionQueue?.length) return;
   const type = e.productionQueue[0];
   setJob(e, { kind: 'unit', type, targetId: e.id }, units[type], structures[e.type].buildPower);
 }
@@ -197,9 +197,13 @@ function startReclaimOrder(world, e, order) {
 /** Hur långt en patrullerande byggare letar efter något att reparera eller återvinna. */
 const PATROL_SCAN_EXTRA = 8;
 
-/** Patrullerande byggare tar närmaste skadade egna byggnad (inte enheter) eller vrak på vägen. */
+/**
+ * Patrullerande byggare tar närmaste skadade egna byggnad (inte enheter) eller
+ * vrak på vägen. En beväpnad byggare (ACU:n) som har en fiende att skjuta på
+ * strider först (se patrolEngageSystem i combat.js).
+ */
 function patrolScan(world, e) {
-  if (!(units[e.type].buildPower > 0)) return;
+  if (!(units[e.type].buildPower > 0) || e.targetId) return;
   const radius = units[e.type].buildRange + PATROL_SCAN_EXTRA;
   let best = null;
   let bestDist = radius;
@@ -209,7 +213,7 @@ function patrolScan(world, e) {
     if (!repair && t.kind !== 'wreck') continue;
     const d = Math.hypot(t.x - e.x, t.z - e.z) - t.radius;
     if (d < bestDist) {
-      best = { type: repair ? 'repair' : 'reclaim', targetId: t.id };
+      best = { type: repair ? 'repair' : 'reclaim', targetId: t.id, fromPatrol: true };
       bestDist = d;
     }
   }

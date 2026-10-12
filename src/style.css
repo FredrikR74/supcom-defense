@@ -447,6 +447,13 @@ html, body {
 
 .queue-chip:hover { border-color: #f87171; }
 .queue-current { border-color: #67e8f9; }
+.queue-paused {
+  align-self: center;
+  padding: 3px 6px;
+  font: 700 11px system-ui, sans-serif;
+  color: #fbbf24;
+  text-transform: uppercase;
+}
 
 .queue-progress {
   position: absolute;

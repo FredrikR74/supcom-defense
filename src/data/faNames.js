@@ -18,6 +18,8 @@ export default [
   { name: 'Mobile Anti-Air Gun', unitName: 'Archer', faction: 'UEF', tech: 1, verified: true },
   { name: 'Mass Extractor', faction: 'UEF', tech: 1, verified: true },
   { name: 'Power Generator', faction: 'UEF', tech: 1, verified: true },
+  { name: 'Mass Storage', faction: 'UEF', tech: 1, verified: true },
+  { name: 'Energy Storage', faction: 'UEF', tech: 1, verified: true },
   { name: 'Wall Section', faction: 'UEF', tech: 1, verified: true },
   { name: 'Point Defense', unitName: 'DM1 Plasma Cannon', faction: 'UEF', tech: 1, verified: true },
   { name: 'Quantum Gateway', faction: 'UEF', tech: 3, verified: true },

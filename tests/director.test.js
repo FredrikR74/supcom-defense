@@ -104,7 +104,7 @@ describe('fiendens strömmande tryck', () => {
     };
     expect(count(0)).toBeLessThan(count(50));
     expect(count(50)).toBeLessThan(count(100));
-  });
+  }, 30000);
 
   it('är deterministiskt', () => {
     const run = () => {

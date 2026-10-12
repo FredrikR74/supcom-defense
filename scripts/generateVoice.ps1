@@ -2,7 +2,6 @@
 # till public/voice/. Kör från projektroten: powershell -File scripts/generateVoice.ps1
 Add-Type -AssemblyName System.Speech
 $lines = @{
-  'construction-complete' = 'Construction complete.'
   'commander-down'        = 'Commander down.'
   'commander-online'      = 'Commander online.'
 }

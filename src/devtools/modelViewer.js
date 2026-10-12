@@ -7,7 +7,7 @@ import { createModel, applySurfaceDetail, poseLeg } from '../render/models.js';
  * samma ljus som i spelet, och "Walk" för att se gånganimationen.
  */
 const TYPES = ['acu', 'engineer', 'snoop', 'mechMarine', 'striker', 'lobo', 'archer', 'mantis', 'mole', 'medusa',
-  'landFactory', 'massExtractor', 'powerGenerator', 'pointDefense', 'wall', 'core', 'cybranGateway'];
+  'landFactory', 'massExtractor', 'powerGenerator', 'massStorage', 'energyStorage', 'pointDefense', 'wall', 'core', 'cybranGateway'];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));

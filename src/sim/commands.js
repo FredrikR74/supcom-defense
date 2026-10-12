@@ -20,6 +20,7 @@ const HANDLERS = {
   cancelProduce: applyCancelProduce,
   setRally: applySetRally,
   setRepeat: applySetRepeat,
+  setPaused: applySetPaused,
   setDifficulty: (world, { value }) => setDifficulty(world, value),
   attack: applyAttack,
   repair: (world, cmd) => applyWork(world, cmd, 'repair'),
@@ -213,6 +214,11 @@ function applySetRally(world, { owner, ids, x, z, queue }) {
     if (!queue) f.rallyPoints.length = 0;
     f.rallyPoints.push({ x, z });
   }
+}
+
+/** `{ type: 'setPaused', owner, ids, value }`: en pausad fabrik står still med sin kö kvar (som i FA). */
+function applySetPaused(world, { owner, ids, value }) {
+  for (const f of ownFactories(world, ids, owner)) f.paused = Boolean(value);
 }
 
 /** `{ type: 'setRepeat', owner, ids, value }`: repeterad kö lägger färdiga enheter sist igen. */

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createWorld, tickWorld, PLAYER_ID, ENEMY_ID } from '../src/sim/world.js';
 import { addStructure, addUnit, getEntity } from '../src/sim/entities.js';
 import { cellIndex, updatePathing } from '../src/sim/pathing.js';
-import { targetingSystem } from '../src/sim/systems/combat.js';
+import { targetingSystem, guardScanRadius } from '../src/sim/systems/combat.js';
 import { spawnEnemy } from '../src/sim/enemies.js';
 import { queueCommand } from '../src/sim/commands.js';
 import units from '../src/data/units.js';
@@ -205,17 +205,40 @@ describe('kills, attackorder och motanfall', () => {
     expect(pd.kills).toBe(2);
   });
 
-  it('en beskjuten enhet utom räckhåll åker dit och anfaller', () => {
+  it('som i FA: en stillastående enhet som beskjuts utom räckhåll står kvar, och klungan reagerar inte', () => {
     const w = setup();
     const tank = addUnit(w, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
-    // Point Defense når längre än stridsvagnen.
-    const pd = addStructure(w, 'pointDefense', { x: 40.5, z: 52.5, owner: ENEMY_ID });
-    // Vänta tills tornet har vridit sig och första skottet har träffat.
-    for (let i = 0; i < 60 && tank.orders.length === 0; i++) tickWorld(w);
-    expect(tank.orders[0]).toMatchObject({ type: 'attack', targetId: pd.id });
-    ticks(w, 40);
-    expect(Math.hypot(tank.x - pd.x, tank.z - pd.z)).toBeLessThanOrEqual(units.striker.weapon.range + pd.radius);
-    expect(pd.hp).toBeLessThan(pd.maxHp);
+    const friend = addUnit(w, 'striker', { x: 42, z: 40, owner: PLAYER_ID });
+    // Point Defense når längre än stridsvagnarna.
+    addStructure(w, 'pointDefense', { x: 40.5, z: 52.5, owner: ENEMY_ID });
+    ticks(w, 60);
+    expect(tank.hp).toBeLessThan(tank.maxHp);
+    expect(tank.orders).toEqual([]);
+    expect(friend.orders).toEqual([]);
+    expect(Math.hypot(tank.x - 40, tank.z - 40)).toBeLessThan(1);
+  });
+
+  it('som i FA: en patrullerande enhet anfaller fiender inom sin GuardScanRadius och patrullerar sedan vidare', () => {
+    const w = setup();
+    const tank = addUnit(w, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
+    queueCommand(w, { type: 'patrol', owner: PLAYER_ID, ids: [tank.id], x: 30, z: 40 });
+    tickWorld(w);
+    // Utom räckvidd (9) men inom GuardScanRadius (1,1 × 9 = 9,9).
+    const m = enemyAt(w, 40, 50.2);
+    m.orders.length = 0;
+    m.hp = 30;
+    tickWorld(w);
+    expect(tank.orders[0]).toMatchObject({ type: 'attack', targetId: m.id });
+    ticks(w, 60);
+    expect(getEntity(w, m.id)).toBeNull();
+    expect(tank.orders.map((o) => o.type)).toEqual(['patrol']);
+  });
+
+  it('GuardScanRadius som i FAF: 1,1 × räckvidden, 0,8 × för luftvärn, ACU:n 31,5 (halverat)', () => {
+    expect(guardScanRadius('striker')).toBeCloseTo(1.1 * units.striker.weapon.range);
+    expect(guardScanRadius('archer')).toBeCloseTo(0.8 * units.archer.weapon.range);
+    expect(guardScanRadius('acu')).toBe(15.75);
+    expect(guardScanRadius('engineer')).toBe(0);
   });
 
   it('en enhet med flyttorder fortsätter dit spelaren skickat den', () => {

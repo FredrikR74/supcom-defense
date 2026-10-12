@@ -10,6 +10,7 @@
  * - `buildTime`: i sekunder vid byggkraft 1, så en byggare med byggkraft 10
  *   bygger på buildTime / 10 sekunder
  * - `benign`: skjuts inte på automatiskt (FA-kategorin BENIGN, t.ex. murar)
+ * - `storage`: ökar spelarens lagerkapacitet när byggnaden är klar (FA:s Economy.Storage*)
  */
 export default {
   /**
@@ -58,6 +59,26 @@ export default {
     cost: { mass: 75, energy: 750 },
     buildTime: 125,
     production: { mass: 0, energy: 20 },
+  },
+  /** UEB1106. Lagrar 500 mass. */
+  massStorage: {
+    name: 'Mass Storage',
+    techCategory: 'TECH1',
+    size: 2,
+    maxHp: 800,
+    cost: { mass: 200, energy: 1500 },
+    buildTime: 250,
+    storage: { mass: 500, energy: 0 },
+  },
+  /** UEB1105. Lagrar 10 000 energi. */
+  energyStorage: {
+    name: 'Energy Storage',
+    techCategory: 'TECH1',
+    size: 2,
+    maxHp: 500,
+    cost: { mass: 250, energy: 1200 },
+    buildTime: 200,
+    storage: { mass: 0, energy: 10000 },
   },
   /** UEB5101. */
   wall: {

@@ -71,6 +71,7 @@ function startGame({ map, difficulty }) {
     onCancelProduce: (id, index, count = 1) =>
       queueCommand(world, { type: 'cancelProduce', owner: PLAYER_ID, id, index, count }),
     onRepeat: (value) => queueCommand(world, { type: 'setRepeat', owner: PLAYER_ID, ids: selectedIds(), value }),
+    onPause: (value) => queueCommand(world, { type: 'setPaused', owner: PLAYER_ID, ids: selectedIds(), value }),
     onPatrol: startPatrol,
     onSell: sellSelected,
   });

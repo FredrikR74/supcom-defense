@@ -256,23 +256,91 @@ export function projectileSystem(world) {
 }
 
 /**
- * En beväpnad enhet som blir beskjuten utom räckhåll åker dit och anfaller,
- * om den står still eller är på väg mot kärnan. En enhet med en flyttorder
- * fortsätter dit spelaren skickat den.
+ * Fiendens AI: en fiende på väg mot kärnan som blir beskjuten utom räckhåll åker
+ * dit och anfaller. Spelarens enheter gör inte så, precis som i FA: en enhet
+ * utan order skjuter bara på det som är inom räckvidd och flyttar sig inte
+ * (FAF nollställer GuardScanRadius för enheter som inte patrullerar eller
+ * attack-movar), och enheterna i en klunga varnar inte varandra.
  */
 export function retaliationSystem(world) {
   for (const e of world.entities) {
     if (e.kind !== 'unit' || e.lastAttackerId == null) continue;
     const attackerId = e.lastAttackerId;
     e.lastAttackerId = null;
+    const first = e.orders[0]?.type;
+    if (first !== 'attackCore' && first !== 'squad') continue;
     const weapon = activeWeapon(e);
     if (!weapon || e.targetId) continue; // obeväpnad, eller har redan något att skjuta på
     const attacker = getEntity(world, attackerId);
     if (!attacker || attacker.hp <= 0 || edgeDistance(e, attacker) <= weapon.range) continue;
     if (!canTarget(weapon, attacker, weapon.range)) continue; // t.ex. luftvärn mot markenheter
-    const order = { type: 'attack', targetId: attacker.id };
-    if (e.orders.length === 0) e.orders.push(order);
-    else if (e.orders[0].type === 'attackCore' || e.orders[0].type === 'squad') e.orders.unshift(order);
+    e.orders.unshift({ type: 'attack', targetId: attacker.id });
+  }
+}
+
+/**
+ * FA:s GuardScanRadius (lua/system/blueprints-units.lua): 1,1 × vapnets
+ * räckvidd, 0,8 × för luftvärn på marken, eller värdet i enhetens data.
+ */
+export function guardScanRadius(type) {
+  const def = getDef(type);
+  if (def?.guardScanRadius != null) return def.guardScanRadius;
+  const weapon = def?.weapon;
+  if (!weapon) return 0;
+  return (weapon.antiAir && !def.air ? 0.8 : 1.1) * weapon.range;
+}
+
+/** En patrullerande enhet jagar inte längre än så här många gånger sin GuardScanRadius. */
+const PATROL_CHASE_MULT = 1.5;
+
+/**
+ * Patrull som i FA: en beväpnad patrullerande enhet som ser en fiende inom sin
+ * GuardScanRadius går och anfaller den och fortsätter sedan patrullera. Strid
+ * går före reparation och återvinning på patrullen, så ACU:n slutar återvinna
+ * och skjuter när fiender kommer.
+ */
+export function patrolEngageSystem(world) {
+  let hash = null;
+  let maxRadius = 0;
+  for (const e of world.entities) {
+    if (e.kind !== 'unit' || !e.orders.length) continue;
+    const weapon = activeWeapon(e);
+    if (!weapon) continue;
+    const first = e.orders[0];
+    // Jaga inte för långt från patrullen.
+    if (first.type === 'attack' && first.fromPatrol) {
+      const t = getEntity(world, first.targetId);
+      if (!t || edgeDistance(e, t) > guardScanRadius(e.type) * PATROL_CHASE_MULT) e.orders.shift();
+      continue;
+    }
+    const onPatrol = first.type === 'patrol' || first.fromPatrol;
+    if (!onPatrol) continue;
+    if (e.targetId) {
+      // Fiende inom räckvidd: släpp återvinning/reparation och stå och skjut.
+      while (e.orders[0]?.fromPatrol) e.orders.shift();
+      continue;
+    }
+    const scan = guardScanRadius(e.type);
+    if (scan <= 0) continue;
+    if (!hash) ({ hash, maxRadius } = buildHash(world));
+    let best = null;
+    let bestPrio = Infinity;
+    let bestDist = Infinity;
+    for (const t of hash.queryRadius(e.x, e.z, scan + maxRadius)) {
+      if (!areEnemies(e, t) || t.hp <= 0) continue;
+      const prio = targetPriority(t);
+      if (prio === null) continue;
+      const d = edgeDistance(e, t);
+      if (d > scan || Boolean(weapon.antiAir) !== Boolean(getDef(t.type)?.air)) continue;
+      if (prio < bestPrio || (prio === bestPrio && d < bestDist)) {
+        best = t;
+        bestPrio = prio;
+        bestDist = d;
+      }
+    }
+    if (!best) continue;
+    while (e.orders[0]?.fromPatrol) e.orders.shift();
+    e.orders.unshift({ type: 'attack', targetId: best.id, fromPatrol: true });
   }
 }
 

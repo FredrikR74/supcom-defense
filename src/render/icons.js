@@ -37,6 +37,8 @@ const DRAW = {
   landFactory: structureIcon('#e5e7eb', 0.9),
   massExtractor: structureIcon('#a3e635', 0.8),
   powerGenerator: structureIcon('#facc15', 0.8),
+  massStorage: structureIcon('#a3e635', 0.6),
+  energyStorage: structureIcon('#facc15', 0.6),
   wall: structureIcon(null, 0.5),
   pointDefense: structureIcon('#ef4444', 0.7),
   acu: (ctx, s) => {
