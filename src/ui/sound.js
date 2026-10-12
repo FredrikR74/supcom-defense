@@ -1,5 +1,7 @@
 /**
- * Syntetiserat ljud (Web Audio): skott, träffar och explosioner. Talade
+ * Ljud (Web Audio): skott, träffar och explosioner är inspelningar ur Kenneys
+ * Sci-fi Sounds (CC0, public/sfx/), med syntes som reserv om ett ljud inte
+ * kunnat laddas (t.ex. webbläsare utan Ogg Vorbis). Talade
  * meddelanden som "Commander down" är inspelade på engelska i
  * public/voice/ (se scripts/generateVoice.ps1) och spelas genom ett lätt
  * radiofilter; saknas ett klipp används webbläsarens talsyntes. M slår av och på.
@@ -15,6 +17,34 @@ const HEARING_DISTANCE = 90;
 const PAN_DISTANCE = 40;
 /** Högst så många ljud av varje slag per sekund, så att stora strider inte blir gröt. */
 const BUDGETS = { shot: 16, hit: 10, explosion: 8 };
+
+/**
+ * Ljudklipp i public/sfx/ (Kenney Sci-fi Sounds, CC0). Varje grupp har flera
+ * varianter som väljs slumpvis; nivåerna normaliseras när de laddas.
+ */
+const SAMPLE_SETS = {
+  laserSmall: [0, 1, 2, 3, 4].map((i) => `laserSmall_00${i}`),
+  laserLarge: [0, 1, 2, 3, 4].map((i) => `laserLarge_00${i}`),
+  impact: ['impactMetal_000', 'impactMetal_002', 'impactMetal_004'],
+  explosion: ['explosionCrunch_000', 'explosionCrunch_002', 'explosionCrunch_003'],
+  bigExplosion: ['explosionCrunch_001', 'explosionCrunch_004'],
+  rumble: ['lowFrequency_explosion_000', 'lowFrequency_explosion_001'],
+};
+/** Normaliserad nivå (RMS) som alla klipp skalas till. */
+const SAMPLE_RMS = 0.12;
+
+/**
+ * Vilket klipp varje slags vapen använder, med tonhöjd (uppspelningshastighet)
+ * och nivå. Saknas ett slag här används syntesen.
+ */
+const SHOT_SAMPLES = {
+  plasma: { set: 'laserLarge', rate: 1.25, level: 0.45, length: 0.35 },
+  heavy: { set: 'laserLarge', rate: 0.7, level: 0.8 },
+  laser: { set: 'laserSmall', rate: 1, level: 0.5 },
+  artillery: { set: 'rumble', rate: 1.6, level: 0.6, length: 0.45 },
+  rifle: { set: 'laserSmall', rate: 1.6, level: 0.35, length: 0.12 },
+  flak: { set: 'impact', rate: 0.8, level: 0.4, length: 0.15 },
+};
 
 /** Repliker -> inspelade klipp i public/voice/. */
 const VOICE_CLIPS = {
@@ -58,6 +88,8 @@ export function createSound() {
   const lastSpoken = new Map();
   /** Replik -> avkodat klipp, när det har laddats. */
   const voiceBuffers = new Map();
+  /** Grupp -> [{ buffer, norm }], när klippen har laddats. */
+  const samples = new Map();
 
   /** Måste anropas från en användarhandling (t.ex. Start-knappen) för att få spela ljud. */
   function init() {
@@ -87,6 +119,15 @@ export function createSound() {
     const data = noise.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
 
+    for (const [set, names] of Object.entries(SAMPLE_SETS)) {
+      Promise.all(names.map((name) => fetch(`${import.meta.env.BASE_URL}sfx/${name}.ogg`)
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.statusText))))
+        .then((buf) => ctx.decodeAudioData(buf))
+        .then((buffer) => ({ buffer, norm: SAMPLE_RMS / rms(buffer) }))))
+        .then((loaded) => samples.set(set, loaded))
+        .catch(() => {}); // syntesen tar över
+    }
+
     for (const [text, file] of Object.entries(VOICE_CLIPS)) {
       fetch(`${import.meta.env.BASE_URL}voice/${file}`)
         .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.statusText))))
@@ -94,6 +135,45 @@ export function createSound() {
         .then((buffer) => voiceBuffers.set(text, buffer))
         .catch(() => {}); // talsyntesen tar över
     }
+  }
+
+  /** RMS över den hörbara delen av ett klipp. */
+  function rms(buffer) {
+    const d = buffer.getChannelData(0);
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < d.length; i++) {
+      if (Math.abs(d[i]) < 0.01) continue;
+      sum += d[i] * d[i];
+      n++;
+    }
+    return n ? Math.max(0.02, Math.sqrt(sum / n)) : 1;
+  }
+
+  /**
+   * Spelar ett slumpvalt klipp ur gruppen `set` till `out`. `rate` ändrar
+   * tonhöjd och längd, `length` (sekunder) kortar av klippet med en snabb
+   * uttoning. Returnerar false om klippen inte har laddats.
+   */
+  function playSample(set, out, t, { rate = 1, level = 1, length = null }) {
+    const list = samples.get(set);
+    if (!list?.length) return false;
+    const { buffer, norm } = list[Math.floor(Math.random() * list.length)];
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = rate * rand(0.93, 1.07);
+    const g = ctx.createGain();
+    const peak = Math.min(4, norm) * level;
+    g.gain.setValueAtTime(peak, t);
+    const end = Math.min(buffer.duration / src.playbackRate.value, length ?? Infinity);
+    if (length != null) {
+      g.gain.setValueAtTime(peak, t + end * 0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + end);
+    }
+    src.connect(g).connect(out);
+    src.start(t);
+    src.stop(t + end + 0.02);
+    return true;
   }
 
   function impulseResponse(seconds, decay) {
@@ -193,6 +273,8 @@ export function createSound() {
     const out = output(ev.x, ev.z, listener, w.gain * rand(0.85, 1.1), 0.8);
     if (!out) return;
     const t = ctx.currentTime;
+    const sample = SHOT_SAMPLES[w.kind];
+    if (sample && playSample(sample.set, out, t, { ...sample, rate: sample.rate * w.pitch })) return;
     const p = w.pitch * rand(0.92, 1.08);
     switch (w.kind) {
       case 'plasma':
@@ -246,6 +328,7 @@ export function createSound() {
     const out = output(ev.x, ev.z, listener, rand(0.6, 0.9), 0.6);
     if (!out) return;
     const t = ctx.currentTime;
+    if (playSample('impact', out, t, { rate: rand(1.1, 1.5), level: 0.35, length: 0.2 })) return;
     const p = rand(0.85, 1.15);
     burst(out, t, { filter: 'bandpass', from: 3200 * p, to: 1500, q: 2, length: 0.07, level: 0.12 });
     tone(out, t, { type: 'sine', from: 1900 * p, to: 1250 * p, length: 0.09, level: 0.035 });
@@ -260,6 +343,13 @@ export function createSound() {
     const out = output(ev.x, ev.z, listener, volume * rand(0.85, 1.1) * Math.min(1.6, 0.7 + size * 0.4), 1.4);
     if (!out) return;
     const t = ctx.currentTime;
+    const big = size >= 1.5;
+    // Större explosioner spelas långsammare (djupare); byggnader får ett muller under.
+    const rate = Math.max(0.6, 1.25 - size * 0.25);
+    if (playSample(big ? 'bigExplosion' : 'explosion', out, t, { rate, level: 0.9 })) {
+      if (big) playSample('rumble', out, t, { rate: 0.9, level: 0.9 });
+      return;
+    }
     const len = 0.5 + size * 0.35;
     const p = rand(0.85, 1.15);
     // Smäll
