@@ -58,7 +58,12 @@ const VOLLEY_MAX = 2;
  * varianter som väljs slumpvis; nivåerna normaliseras när de laddas.
  */
 export const SAMPLE_SETS = {
-  laserSmall: ['laserSmall_004'],
+  // Från Freesound (se public/sfx/CREDITS.txt)
+  acuBlast: ['blast.ogg'],
+  tankFire: ['tankFire.wav'],
+  laserShot: ['laserShot.wav'],
+  artilleryGun: ['artilleryGun.wav'],
+  // Kenney Sci-fi Sounds
   laserLarge: [0, 1, 2, 3, 4].map((i) => `laserLarge_00${i}`),
   impact: ['impactMetal_000', 'impactMetal_002', 'impactMetal_004'],
   explosion: ['explosionCrunch_000', 'explosionCrunch_002', 'explosionCrunch_003'],
@@ -72,29 +77,22 @@ export const SAMPLE_SETS = {
 const SAMPLE_RMS = 0.12;
 
 /**
- * Skottljud i lager: klipp (`set`) och syntetiska lager (`synth`). De flesta av
- * Kenneys lasrar är för tecknade, så kanonerna byggs av korta uppväxlade bitar
- * av explosionerna (mer smäll än "pew"). Cybrans vapen använder den djupaste
- * lasern (laserSmall_004) som den är. `rate` ändrar
- * tonhöjd, `length` kortar av klippet och `lowpass` tar bort det gälla.
- * Mullerklippet är nästan bara bas under 60 Hz och hörs dåligt i vanliga
- * högtalare, så artilleriet har en duns i mellanregistret ovanpå.
- * Saknas klippen används syntesen.
+ * Skottljud i lager: klipp (`set`) och syntetiska lager (`synth`). ACU:n,
+ * Strikers, Cybrans lasrar och artilleriet har egna klipp från Freesound;
+ * övriga vapen bygger på Kenneys klipp. `rate` ändrar tonhöjd, `length`
+ * kortar av klippet och `lowpass` tar bort det gälla. Saknas klippen används
+ * syntesen.
  */
 const SHOT_SAMPLES = {
+  // Freesound-klippen (valda för respektive vapen)
+  heavy: [{ set: 'acuBlast', rate: 1, level: 1 }],
+  tank: [{ set: 'tankFire', rate: 1, level: 1, length: 1.2 }],
+  laser: [{ set: 'laserShot', rate: 1, level: 1 }],
+  artillery: [{ set: 'artilleryGun', rate: 1, level: 1, length: 1.4 }],
+  // Kenney-klippen
   plasma: [
     { set: 'cannon', rate: 1.9, level: 0.4, length: 0.16 },
     { set: 'laserLarge', rate: 0.55, level: 0.12, length: 0.12, lowpass: 1800 },
-  ],
-  heavy: [
-    { set: 'cannon', rate: 1.35, level: 0.6, length: 0.3 },
-    { set: 'rumble', rate: 1.5, level: 0.45, length: 0.35 },
-  ],
-  laser: [{ set: 'laserSmall', rate: 1, level: 0.8 }],
-  artillery: [
-    { set: 'cannon', rate: 1.1, level: 0.9, length: 0.35 },
-    { set: 'rumble', rate: 1.3, level: 0.7, length: 0.5 },
-    { synth: 'thump', level: 1 },
   ],
   rifle: [{ set: 'cannon', rate: 2.4, level: 0.28, length: 0.07 }],
   flak: [
@@ -102,6 +100,11 @@ const SHOT_SAMPLES = {
     { set: 'impact', rate: 0.8, level: 0.15, length: 0.1 },
   ],
 };
+/**
+ * Hur länge ett skott räknas som pågående för taket per ljudtyp: klippen med
+ * lång efterklang (tankskott, artilleri) räknas längre, så att taket håller.
+ */
+const SHOT_VOICE_SECONDS = { heavy: 0.8, tank: 1, artillery: 1, laser: 0.4 };
 
 /** Repliker -> inspelade klipp i public/voice/. */
 const VOICE_CLIPS = {
@@ -123,24 +126,25 @@ function shuffled(list) {
 
 /**
  * Vilket ljud varje vapen gör (efter enhetstyp):
- * - plasma: UEF:s plasmakanoner, en kort ljus smäll med en sjunkande ton
- * - heavy: ACU:ns kanon, tyngre med bas
- * - laser: Cybrans lasrar (laserSmall_004)
- * - artillery: en djup duns (granaten låter när den slår ner)
- * - rifle: Mech Marines snabba knallar
- * - flak: luftvärnets torra smällar
+ * - heavy: ACU:ns kanon (mango777, "Blast")
+ * - tank: Strikers kanon (GaryQ, "Tank fire Mixed")
+ * - laser: Cybrans lasrar (djfroyd, "laser one-shot #1")
+ * - artillery: Medusa och Lobo (InMotionAudio, 69th Field Artillery Gun)
+ * - plasma: Point Defense, en kort smäll (Kenney)
+ * - rifle: Mech Marines snabba knallar (Kenney)
+ * - flak: luftvärnets torra smällar (Kenney)
  */
 export const WEAPON_SOUNDS = {
   // Nivåerna är uppmätta (se sounds.html): explosioner starkast, sedan ACU:n
   // och artilleriet, sedan vanliga skott och träffar.
-  striker: { kind: 'plasma', pitch: 1, gain: 3.2 },
+  striker: { kind: 'tank', pitch: 1, gain: 0.72 },
   pointDefense: { kind: 'plasma', pitch: 0.75, gain: 3.4 },
-  acu: { kind: 'heavy', pitch: 1, gain: 1.3 },
-  mantis: { kind: 'laser', pitch: 1, gain: 4.3 },
-  mole: { kind: 'laser', pitch: 1.25, gain: 2.9 },
-  hunter: { kind: 'laser', pitch: 1.2, gain: 3.4 },
-  medusa: { kind: 'artillery', pitch: 1, gain: 0.6 },
-  lobo: { kind: 'artillery', pitch: 1.15, gain: 0.65 },
+  acu: { kind: 'heavy', pitch: 1, gain: 0.73 },
+  mantis: { kind: 'laser', pitch: 1, gain: 1.25 },
+  mole: { kind: 'laser', pitch: 1.25, gain: 1 },
+  hunter: { kind: 'laser', pitch: 1.2, gain: 1.3 },
+  medusa: { kind: 'artillery', pitch: 1, gain: 0.7 },
+  lobo: { kind: 'artillery', pitch: 1.15, gain: 0.78 },
   mechMarine: { kind: 'rifle', pitch: 1, gain: 4.9 },
   snoop: { kind: 'rifle', pitch: 1.3, gain: 2.8 },
   archer: { kind: 'flak', pitch: 1, gain: 4 },
@@ -231,7 +235,7 @@ export function createSound() {
 
     const loading = [];
     for (const [set, names] of Object.entries(SAMPLE_SETS)) {
-      loading.push(Promise.all(names.map((name) => fetch(`${import.meta.env.BASE_URL}sfx/${name}.ogg`)
+      loading.push(Promise.all(names.map((name) => fetch(`${import.meta.env.BASE_URL}sfx/${name.includes('.') ? name : `${name}.ogg`}`)
         .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.statusText))))
         .then((buf) => ctx.decodeAudioData(buf))
         .then((buffer) => ({ buffer, norm: SAMPLE_RMS / rms(buffer) }))))
@@ -331,7 +335,7 @@ export function createSound() {
    * Utgång för ett ljud vid (x, z): styrka, avståndsfilter och stereo efter
    * kamerans mittpunkt, eller null om det är för långt bort för att höras.
    */
-  function output(x, z, listener, volume = 1, wet = 1, { bus = 'shot', key = null, volley = false } = {}) {
+  function output(x, z, listener, volume = 1, wet = 1, { bus = 'shot', key = null, volley = false, seconds = null } = {}) {
     const dx = x - listener.x;
     const d = Math.hypot(dx, z - listener.z);
     const near = 1 - d / HEARING_DISTANCE;
@@ -365,8 +369,7 @@ export function createSound() {
     const base = near * near * volume * mix;
     gain.gain.value = base;
     if (list) {
-      const seconds = VOICE_SECONDS[bus] ?? 0.4;
-      list.push({ start: now, end: now + seconds, gain, base, count: 1, x, z });
+      list.push({ start: now, end: now + (seconds ?? VOICE_SECONDS[bus] ?? 0.4), gain, base, count: 1, x, z });
     }
     const muffle = ctx.createBiquadFilter();
     muffle.type = 'lowpass';
@@ -422,7 +425,7 @@ export function createSound() {
   function shot(ev, listener) {
     const w = WEAPON_SOUNDS[ev.source] ?? { kind: ev.owner === 1 ? 'plasma' : 'laser', pitch: 1, gain: 0.8 };
     const out = output(ev.x, ev.z, listener, w.gain * rand(0.85, 1.1), 0.8,
-      { bus: 'shot', key: ev.source ?? w.kind, volley: true });
+      { bus: 'shot', key: ev.source ?? w.kind, volley: true, seconds: SHOT_VOICE_SECONDS[w.kind] });
     if (!out) return;
     const t = ctx.currentTime;
     const layers = SHOT_SAMPLES[w.kind] ?? [];

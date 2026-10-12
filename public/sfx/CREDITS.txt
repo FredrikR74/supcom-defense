@@ -1,0 +1,25 @@
+Sound credits
+=============
+
+laserShot.wav — "laser one-shot #1" by djfroyd
+  https://freesound.org/people/djfroyd/sounds/348164/
+  License: Creative Commons Attribution 3.0 (CC BY 3.0)
+  https://creativecommons.org/licenses/by/3.0/
+  Changes: trimmed to 0.5 s, converted to mono 16-bit, normalized.
+
+blast.ogg — "Blast.ogg" by mango777
+  https://freesound.org/people/mango777/sounds/547375/
+  License: Creative Commons 0 (CC0)
+
+tankFire.wav — "Tank fire Mixed.wav" by GaryQ
+  https://freesound.org/people/GaryQ/sounds/127845/
+  License: Creative Commons 0 (CC0)
+  Changes: trimmed to 2 s with fade-out, mono 16-bit, normalized.
+
+artilleryGun.wav — "GUNArtl_69thFieldArtilleryGun01_InMotionAudio_FREESampleSunday.wav" by InMotionAudio
+  https://freesound.org/people/inmotionaudio/sounds/702245/
+  License: Creative Commons 0 (CC0)
+  Changes: trimmed to 1.4 s with fade-out, mono 16-bit 48 kHz, normalized.
+
+All other sound effects — "Sci-fi Sounds" by Kenney (www.kenney.nl)
+  License: Creative Commons 0 (CC0), see LICENSE-kenney.txt
