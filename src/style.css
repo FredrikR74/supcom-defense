@@ -30,7 +30,7 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(2, 250px);
+  grid-template-columns: repeat(2, 250px) auto;
   padding: 7px 16px 8px;
   font: 13px/1.2 system-ui, sans-serif;
   color: #e5e7eb;
@@ -146,14 +146,30 @@ html, body {
 }
 .resource-efficiency[hidden] { display: none; }
 
+/* Antal egna enheter och byggnader, längst till höger i resurspanelen. */
+.resource-units {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  margin-left: 14px;
+  padding-left: 14px;
+  border-left: 1px solid #ffffff1f;
+  font-variant-numeric: tabular-nums;
+}
+.resource-units .resource-label { color: #cbd5e1; }
+.resource-units-count { font-weight: 700; font-size: 15px; color: #e5e7eb; }
+
 /* Smala fönster: samma layout, bara mindre, så att hotpanelen uppe till höger får plats */
 @media (max-width: 1080px) {
-  #resources { grid-template-columns: repeat(2, 214px); padding: 5px 10px 6px; font-size: 12px; }
+  #resources { grid-template-columns: repeat(2, 214px) auto; padding: 5px 10px 6px; font-size: 12px; }
   .resource + .resource { margin-left: 10px; padding-left: 10px; }
   .resource-rates { grid-template-columns: 40px 40px; font-size: 11px; }
 }
 @media (max-width: 760px) {
-  #resources { left: 8px; transform: none; grid-template-columns: repeat(2, minmax(0, 1fr)); width: calc(100vw - 16px); box-sizing: border-box; }
+  #resources { left: 8px; transform: none; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; width: calc(100vw - 16px); box-sizing: border-box; }
+  .resource-units { margin-left: 8px; padding-left: 8px; min-width: 36px; }
   .resource-rates { grid-template-columns: 34px 34px; }
 }
 

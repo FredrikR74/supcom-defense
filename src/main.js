@@ -29,6 +29,18 @@ const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
 const $ = (id) => document.getElementById(id);
 const sound = createSound();
 
+/** Antal egna enheter och byggnader (kärnan räknas inte), för räknaren i resurspanelen. */
+function ownCounts(world) {
+  let units = 0;
+  let structures = 0;
+  for (const e of world.entities) {
+    if (e.owner !== PLAYER_ID) continue;
+    if (e.kind === 'unit') units++;
+    else if (e.kind === 'structure' && e.id !== world.coreId) structures++;
+  }
+  return { units, structures };
+}
+
 /** Startar ett spel på `map` med svårighetsgraden `difficulty` (0–100). */
 function startGame({ map, difficulty }) {
   const canvas = $('game');
@@ -200,12 +212,12 @@ function startGame({ map, difficulty }) {
       if (ev.type === 'acuDeath') threatPanel.toast(`ACU destroyed! Respawning in ${ev.seconds} s`);
       if (ev.type === 'acuRespawn') threatPanel.toast('ACU respawned at the Quantum Gateway');
     }
-    measure('sound', () => sound.handleEvents(world.events, view.rig.target, PLAYER_ID));
+    measure('sound', () => sound.handleEvents(world.events, view.rig.target));
     view.render(world, alpha, selection, time.paused ? 0 : frameSeconds, measure);
 
     const hovered = measure('hover pick', () => ndc && !ui.placing && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y)));
     hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));
-    resources.update(world.players[PLAYER_ID].economy);
+    resources.update(world.players[PLAYER_ID].economy, ownCounts(world));
     measure('command panel', () => commandPanel.update(world, selection, ui));
     modeHint.hidden = ui.mode !== 'patrol';
     measure('threat panel', () => threatPanel.update(world, { respawnIn: acuRespawnIn(world) }));

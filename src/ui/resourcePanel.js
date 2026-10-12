@@ -8,6 +8,9 @@ const rate = (v) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1);
  * Efterfrågan (inte det som faktiskt dras) visas, så att man ser hur mycket som
  * fattas vid brist. En resurs som tagit slut blir röd och visar underskottet.
  * Alla fält har fasta mått, så panelen byter aldrig bredd när texterna ändras.
+ *
+ * Längst till höger: antal egna enheter och byggnader, som FA:s räknare (där
+ * byggnader också räknas mot enhetstaket).
  */
 export function createResourcePanel(el) {
   const rows = {};
@@ -34,13 +37,29 @@ export function createResourcePanel(el) {
       deficit: row.querySelector('.resource-deficit'),
     };
   }
+  const units = document.createElement('div');
+  units.className = 'resource-units';
+  units.innerHTML = '<span class="resource-label">Units</span><span class="resource-units-count"></span>';
+  el.appendChild(units);
+  const unitCount = units.querySelector('.resource-units-count');
+  let lastCount = '';
+
   const efficiency = document.createElement('div');
   efficiency.className = 'resource-efficiency';
   efficiency.hidden = true;
   el.appendChild(efficiency);
 
   return {
-    update(economy) {
+    /** `counts`: { units, structures } för spelaren. */
+    update(economy, counts) {
+      if (counts) {
+        const text = fmt(counts.units + counts.structures);
+        if (text !== lastCount) {
+          lastCount = text;
+          unitCount.textContent = text;
+          units.title = `${counts.units} units · ${counts.structures} structures`;
+        }
+      }
       for (const [r, ui] of Object.entries(rows)) {
         const res = economy[r];
         ui.now.textContent = fmt(res.stored);

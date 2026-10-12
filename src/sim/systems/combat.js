@@ -195,7 +195,7 @@ export function weaponsSystem(world) {
         damageRadius: weapon.damageRadius ?? 0,
       });
     }
-    emit(world, { type: 'fire', owner: e.owner, x: e.x, z: e.z, y: weapon.muzzleHeight ?? 1 });
+    emit(world, { type: 'fire', owner: e.owner, source: e.type, x: e.x, z: e.z, y: weapon.muzzleHeight ?? 1 });
   }
 }
 
@@ -359,6 +359,6 @@ export function deathSystem(world) {
     if (mass > 0) {
       addWreck(world, { type: e.type, x: e.x, z: e.z, heading: e.heading ?? 0, radius: e.radius, mass });
     }
-    emit(world, { type: 'death', owner: e.owner, x: e.x, z: e.z, size: e.radius });
+    emit(world, { type: 'death', owner: e.owner, kind: e.kind, x: e.x, z: e.z, size: e.radius });
   }
 }
