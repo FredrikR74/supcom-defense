@@ -23,7 +23,7 @@ const BUDGETS = { shot: 16, hit: 10, explosion: 8 };
  * varianter som väljs slumpvis; nivåerna normaliseras när de laddas.
  */
 export const SAMPLE_SETS = {
-  laserSmall: [0, 1, 2, 3, 4].map((i) => `laserSmall_00${i}`),
+  laserSmall: ['laserSmall_004'],
   laserLarge: [0, 1, 2, 3, 4].map((i) => `laserLarge_00${i}`),
   impact: ['impactMetal_000', 'impactMetal_002', 'impactMetal_004'],
   explosion: ['explosionCrunch_000', 'explosionCrunch_002', 'explosionCrunch_003'],
@@ -34,11 +34,14 @@ export const SAMPLE_SETS = {
 const SAMPLE_RMS = 0.12;
 
 /**
- * Klipp för varje slags vapen, i lager. Kenneys lasrar är ganska tecknade, så
- * de spelas lägre, kortare och genom ett lågpass, och kanonerna byggs av korta
- * uppväxlade bitar av explosionerna (mer smäll än "pew"). `rate` ändrar
+ * Skottljud i lager: klipp (`set`) och syntetiska lager (`synth`). De flesta av
+ * Kenneys lasrar är för tecknade, så kanonerna byggs av korta uppväxlade bitar
+ * av explosionerna (mer smäll än "pew"). Cybrans vapen använder den djupaste
+ * lasern (laserSmall_004) som den är. `rate` ändrar
  * tonhöjd, `length` kortar av klippet och `lowpass` tar bort det gälla.
- * Saknas ett slag här används syntesen.
+ * Mullerklippet är nästan bara bas under 60 Hz och hörs dåligt i vanliga
+ * högtalare, så artilleriet har en duns i mellanregistret ovanpå.
+ * Saknas klippen används syntesen.
  */
 const SHOT_SAMPLES = {
   plasma: [
@@ -49,11 +52,12 @@ const SHOT_SAMPLES = {
     { set: 'explosion', rate: 1.35, level: 0.6, length: 0.3 },
     { set: 'rumble', rate: 1.5, level: 0.45, length: 0.35 },
   ],
-  laser: [
-    { set: 'laserSmall', rate: 0.6, level: 0.3, length: 0.14, lowpass: 2600 },
-    { set: 'impact', rate: 1.7, level: 0.12, length: 0.07 },
+  laser: [{ set: 'laserSmall', rate: 1, level: 0.8 }],
+  artillery: [
+    { set: 'explosion', rate: 1.1, level: 0.9, length: 0.35 },
+    { set: 'rumble', rate: 1.3, level: 0.7, length: 0.5 },
+    { synth: 'thump', level: 1 },
   ],
-  artillery: [{ set: 'rumble', rate: 1.6, level: 0.6, length: 0.45 }],
   rifle: [{ set: 'explosion', rate: 2.4, level: 0.28, length: 0.07 }],
   flak: [
     { set: 'explosion', rate: 2.1, level: 0.3, length: 0.1 },
@@ -73,23 +77,25 @@ const rand = (min, max) => min + Math.random() * (max - min);
  * Vilket ljud varje vapen gör (efter enhetstyp):
  * - plasma: UEF:s plasmakanoner, en kort ljus smäll med en sjunkande ton
  * - heavy: ACU:ns kanon, tyngre med bas
- * - laser: Cybrans lasrar, ett surrande svep
+ * - laser: Cybrans lasrar (laserSmall_004)
  * - artillery: en djup duns (granaten låter när den slår ner)
  * - rifle: Mech Marines snabba knallar
  * - flak: luftvärnets torra smällar
  */
 export const WEAPON_SOUNDS = {
-  striker: { kind: 'plasma', pitch: 1, gain: 1 },
-  pointDefense: { kind: 'plasma', pitch: 0.75, gain: 1.3 },
-  acu: { kind: 'heavy', pitch: 1, gain: 1.4 },
-  mantis: { kind: 'laser', pitch: 1, gain: 0.9 },
-  mole: { kind: 'laser', pitch: 1.5, gain: 0.5 },
-  hunter: { kind: 'laser', pitch: 1.2, gain: 0.7 },
-  medusa: { kind: 'artillery', pitch: 1, gain: 1 },
-  lobo: { kind: 'artillery', pitch: 1.15, gain: 1 },
-  mechMarine: { kind: 'rifle', pitch: 1, gain: 0.7 },
-  snoop: { kind: 'rifle', pitch: 1.3, gain: 0.4 },
-  archer: { kind: 'flak', pitch: 1, gain: 0.8 },
+  // Nivåerna är uppmätta (se sounds.html): explosioner starkast, sedan ACU:n
+  // och artilleriet, sedan vanliga skott och träffar.
+  striker: { kind: 'plasma', pitch: 1, gain: 2.7 },
+  pointDefense: { kind: 'plasma', pitch: 0.75, gain: 3.4 },
+  acu: { kind: 'heavy', pitch: 1, gain: 1.1 },
+  mantis: { kind: 'laser', pitch: 1, gain: 2.5 },
+  mole: { kind: 'laser', pitch: 1.25, gain: 1.7 },
+  hunter: { kind: 'laser', pitch: 1.2, gain: 2 },
+  medusa: { kind: 'artillery', pitch: 1, gain: 0.6 },
+  lobo: { kind: 'artillery', pitch: 1.15, gain: 0.65 },
+  mechMarine: { kind: 'rifle', pitch: 1, gain: 4.9 },
+  snoop: { kind: 'rifle', pitch: 1.3, gain: 2.8 },
+  archer: { kind: 'flak', pitch: 1, gain: 4 },
 };
 
 export function createSound() {
@@ -106,10 +112,16 @@ export function createSound() {
   /** Grupp -> [{ buffer, norm }], när klippen har laddats. */
   const samples = new Map();
 
-  /** Måste anropas från en användarhandling (t.ex. Start-knappen) för att få spela ljud. */
-  function init() {
+  /** Löses när ljudklippen har laddats (eller misslyckats). */
+  let ready = Promise.resolve();
+
+  /**
+   * Måste anropas från en användarhandling (t.ex. Start-knappen) för att få
+   * spela ljud. `context` kan vara en OfflineAudioContext för att mäta nivåer.
+   */
+  function init(context = null) {
     if (ctx) return;
-    ctx = new AudioContext();
+    ctx = context ?? new AudioContext();
     // Limiter sist i kedjan.
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -10;
@@ -134,14 +146,16 @@ export function createSound() {
     const data = noise.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
 
+    const loading = [];
     for (const [set, names] of Object.entries(SAMPLE_SETS)) {
-      Promise.all(names.map((name) => fetch(`${import.meta.env.BASE_URL}sfx/${name}.ogg`)
+      loading.push(Promise.all(names.map((name) => fetch(`${import.meta.env.BASE_URL}sfx/${name}.ogg`)
         .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.statusText))))
         .then((buf) => ctx.decodeAudioData(buf))
         .then((buffer) => ({ buffer, norm: SAMPLE_RMS / rms(buffer) }))))
         .then((loaded) => samples.set(set, loaded))
-        .catch(() => {}); // syntesen tar över
+        .catch(() => {})); // syntesen tar över
     }
+    ready = Promise.all(loading);
 
     for (const [text, file] of Object.entries(VOICE_CLIPS)) {
       fetch(`${import.meta.env.BASE_URL}voice/${file}`)
@@ -300,9 +314,12 @@ export function createSound() {
     const layers = SHOT_SAMPLES[w.kind] ?? [];
     let played = false;
     for (const layer of layers) {
-      if (playSample(layer.set, out, t, { ...layer, rate: layer.rate * w.pitch })) played = true;
+      if (layer.set && playSample(layer.set, out, t, { ...layer, rate: layer.rate * w.pitch })) played = true;
     }
-    if (played) return;
+    if (played) {
+      for (const layer of layers) if (layer.synth) synthLayer(layer.synth, out, t, w.pitch, layer.level);
+      return;
+    }
     const p = w.pitch * rand(0.92, 1.08);
     switch (w.kind) {
       case 'plasma':
@@ -346,17 +363,31 @@ export function createSound() {
     }
   }
 
+  /**
+   * Syntetiska lager ovanpå klippen. thump: en duns i mellanregistret som hörs
+   * även i små högtalare.
+   */
+  function synthLayer(kind, out, t, pitch, level) {
+    if (kind === 'thump') {
+      tone(out, t, { type: 'sine', from: 210 * pitch, to: 70, length: 0.3, level: 0.5 * level });
+      burst(out, t, { from: 1400, to: 200, length: 0.25, level: 0.35 * level });
+    }
+  }
+
   /** Träff: ett kort metalliskt klick, eller ett artillerinedslag. */
   function impact(ev, listener) {
     if (ev.ballistic) {
-      explosion({ ...ev, size: 0.5 }, listener, 0.7);
+      explosion({ ...ev, size: 0.5 }, listener, 1.5);
       return;
     }
     if (ev.type !== 'hit') return; // direktskott som missar hörs inte
-    const out = output(ev.x, ev.z, listener, rand(0.6, 0.9), 0.6);
+    const out = output(ev.x, ev.z, listener, rand(0.85, 1), 0.6);
     if (!out) return;
     const t = ctx.currentTime;
-    if (playSample('impact', out, t, { rate: rand(1.1, 1.5), level: 0.35, length: 0.2 })) return;
+    if (playSample('impact', out, t, { rate: rand(1, 1.3), level: 1.7, length: 0.25 })) {
+      playSample('explosion', out, t, { rate: 3, level: 0.55, length: 0.05 });
+      return;
+    }
     const p = rand(0.85, 1.15);
     burst(out, t, { filter: 'bandpass', from: 3200 * p, to: 1500, q: 2, length: 0.07, level: 0.12 });
     tone(out, t, { type: 'sine', from: 1900 * p, to: 1250 * p, length: 0.09, level: 0.035 });
@@ -427,6 +458,7 @@ export function createSound() {
 
   return {
     init,
+    get ready() { return ready; },
     get muted() { return muted; },
     toggleMute() {
       muted = !muted;
