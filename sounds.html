@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sound Test</title>
+    <style>
+      html, body { margin: 0; background: #0b0f14; color: #cbd5e1; font: 14px system-ui, sans-serif; }
+      main { max-width: 900px; margin: 0 auto; padding: 20px 16px 40px; }
+      h1 { font-size: 20px; color: #e5e7eb; margin: 0 0 4px; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin: 22px 0 8px; }
+      p { margin: 0 0 12px; color: #94a3b8; }
+      .row { display: flex; flex-wrap: wrap; gap: 6px; }
+      button { background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 4px; padding: 6px 10px; cursor: pointer; font: inherit; }
+      button:hover { border-color: #93c5fd; background: #334155; }
+      button small { display: block; color: #94a3b8; font-size: 11px; }
+      label { display: inline-flex; align-items: center; gap: 8px; margin-right: 18px; }
+      #start { background: #2563eb; border-color: #3b82f6; font-weight: 600; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sound Test</h1>
+      <p>Every sound the game uses. "In game" plays it exactly as in a battle (layers, filters, reverb); the raw clips are the files in public/sfx/.</p>
+      <button id="start">Enable sound</button>
+      <div id="board" hidden>
+        <h2>Position</h2>
+        <label>Side <input id="pan" type="range" min="-40" max="40" value="0" /> <span id="panV">center</span></label>
+        <label>Distance <input id="dist" type="range" min="0" max="85" value="0" /> <span id="distV">0</span></label>
+        <div id="sections"></div>
+      </div>
+    </main>
+    <script type="module" src="/src/devtools/soundBoard.js"></script>
+  </body>
+</html>

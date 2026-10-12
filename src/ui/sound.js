@@ -22,7 +22,7 @@ const BUDGETS = { shot: 16, hit: 10, explosion: 8 };
  * Ljudklipp i public/sfx/ (Kenney Sci-fi Sounds, CC0). Varje grupp har flera
  * varianter som väljs slumpvis; nivåerna normaliseras när de laddas.
  */
-const SAMPLE_SETS = {
+export const SAMPLE_SETS = {
   laserSmall: [0, 1, 2, 3, 4].map((i) => `laserSmall_00${i}`),
   laserLarge: [0, 1, 2, 3, 4].map((i) => `laserLarge_00${i}`),
   impact: ['impactMetal_000', 'impactMetal_002', 'impactMetal_004'],
@@ -78,7 +78,7 @@ const rand = (min, max) => min + Math.random() * (max - min);
  * - rifle: Mech Marines snabba knallar
  * - flak: luftvärnets torra smällar
  */
-const WEAPON_SOUNDS = {
+export const WEAPON_SOUNDS = {
   striker: { kind: 'plasma', pitch: 1, gain: 1 },
   pointDefense: { kind: 'plasma', pitch: 0.75, gain: 1.3 },
   acu: { kind: 'heavy', pitch: 1, gain: 1.4 },
@@ -432,6 +432,28 @@ export function createSound() {
       muted = !muted;
       if (muted && 'speechSynthesis' in window) window.speechSynthesis.cancel();
       return muted;
+    },
+
+    /** Spelar ett klipp ur public/sfx/ som det är (för ljudtestsidan). */
+    playClip(name) {
+      if (!ctx) return;
+      for (const [set, names] of Object.entries(SAMPLE_SETS)) {
+        const i = names.indexOf(name);
+        const entry = samples.get(set)?.[i];
+        if (!entry) continue;
+        const src = ctx.createBufferSource();
+        src.buffer = entry.buffer;
+        const g = ctx.createGain();
+        g.gain.value = Math.min(4, entry.norm) * 0.6;
+        src.connect(g).connect(master);
+        src.start();
+        return;
+      }
+    },
+    /** Spelar en talad replik (för ljudtestsidan). */
+    say(text) {
+      lastSpoken.delete(text);
+      speak(text);
     },
 
     /** Spelar ljud för simuleringens händelser. `listener` är kamerans mittpunkt {x, z}. */

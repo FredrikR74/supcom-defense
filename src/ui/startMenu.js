@@ -21,6 +21,7 @@ export function showStartMenu(el, maps, { difficulty = 50 } = {}) {
         WASD / screen edge: pan · Wheel: zoom · Left-click: select · Right-click: move, attack, repair, reclaim<br />
         Shift: queue · P: patrol · Ctrl+1–9: set group · 1–9: select group · Delete: sell · Space: pause · +/−: game speed · M: sound
       </div>
+      ${import.meta.env.DEV ? '<div class="menu-dev">Dev: <a href="/sounds.html">Sound test</a> · <a href="/models.html">Models</a></div>' : ''}
     </div>`;
   const mapList = el.querySelector('.menu-maps');
   const slider = el.querySelector('input');

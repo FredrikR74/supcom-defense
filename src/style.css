@@ -146,6 +146,10 @@ html, body {
 }
 .resource-efficiency[hidden] { display: none; }
 
+/* Länkar till utvecklingsverktygen i startmenyn (bara på localhost). */
+.menu-dev { margin-top: 10px; font-size: 12px; color: #64748b; }
+.menu-dev a { color: #93c5fd; }
+
 /* Antal egna enheter och byggnader, längst till höger i resurspanelen. */
 .resource-units {
   display: flex;
