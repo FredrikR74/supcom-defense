@@ -220,19 +220,49 @@ function patrolScan(world, e) {
   if (best) e.orders.unshift(best);
 }
 
+/** Kan en enhet stå på (x, z): inom kartan och inte i en byggnad eller brant? */
+function standable(world, x, z) {
+  const n = world.terrain.size;
+  if (x < 0.5 || z < 0.5 || x > n - 0.5 || z > n - 0.5) return false;
+  return !isBlockedCell(world, Math.floor(z) * n + Math.floor(x));
+}
+
+/** Sidorna en fabrik kan släppa ut enheter åt, i den ordning de prövas (söder först). */
+const EXIT_SIDES = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+/**
+ * Var en ny enhet kommer ut och vilken riktning den går ut åt: söder om
+ * fabriken, eller nästa fria sida om söder är utanför kartan eller blockerad
+ * (t.ex. en fabrik längst ner på kartan eller intill en annan byggnad).
+ */
+function factoryExit(world, factory) {
+  const half = structures[factory.type].size / 2;
+  for (const [dx, dz] of EXIT_SIDES) {
+    const x = factory.x + dx * (half + 1);
+    const z = factory.z + dz * (half + 1);
+    if (standable(world, x, z)) return { x, z, dx, dz };
+  }
+  const spot = nearestFreeSpot(world, factory.x, factory.z + half + 1);
+  return spot ? { ...spot, dx: 0, dz: 1 } : { x: factory.x, z: factory.z + half + 1, dx: 0, dz: 1 };
+}
+
 function spawnProduced(world, factory, type) {
-  const def = structures[factory.type];
-  // Sprid ut nya enheter på fem platser framför fabriken.
+  // Sprid ut nya enheter på fem platser framför fabrikens utgång.
   factory.producedCount = (factory.producedCount ?? 0) + 1;
   const n = factory.producedCount % 5;
-  const exitZ = factory.z + def.size / 2 + 1;
-  const unit = addUnit(world, type, { x: factory.x, z: exitZ, owner: factory.owner });
+  const exit = factoryExit(world, factory);
+  const unit = addUnit(world, type, { x: exit.x, z: exit.z, owner: factory.owner });
   world.events.push({ type: 'unitReady', owner: factory.owner, unit: type, x: unit.x, z: unit.z });
   if (factory.rallyPoints.length > 0) {
     for (const p of factory.rallyPoints) unit.orders.push({ type: 'move', x: p.x, z: p.z });
   } else {
-    // Gå en bit ut från fabriken så att nästa enhet får plats.
-    unit.orders.push({ type: 'move', x: factory.x + (n - 2) * 1.5, z: exitZ + 3 });
+    // Gå en bit ut från fabriken så att nästa enhet får plats; tvärs över
+    // utgången sprids de ut, och en blockerad plats byts mot närmaste fria.
+    const side = (n - 2) * 1.5;
+    let x = exit.x + exit.dx * 3 + exit.dz * side;
+    let z = exit.z + exit.dz * 3 + exit.dx * side;
+    if (!standable(world, x, z)) ({ x, z } = nearestFreeSpot(world, x, z) ?? exit);
+    unit.orders.push({ type: 'move', x, z });
   }
   if (factory.repeat) factory.productionQueue.push(type);
 }

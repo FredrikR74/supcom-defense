@@ -288,3 +288,41 @@ describe('alla UEF T1-landenheter', () => {
     expect(world.entities.some((e) => e.type === type && e.owner === PLAYER_ID)).toBe(true);
   });
 });
+
+describe('fabrikens utgång', () => {
+  const produce = (world, factory) => {
+    cmd(world, { type: 'produce', id: factory.id, unit: 'engineer', count: 3 });
+    ticks(world, ENGINEER_TICKS * 3 + 60);
+  };
+  const inside = (world, e) => e.x > 0 && e.z > 0 && e.x < world.terrain.size && e.z < world.terrain.size;
+
+  it('en fabrik längst ner på kartan släpper ut enheterna inåt, inte utanför kartan', () => {
+    const world = createWorld({ map: firstDefense });
+    const n = world.terrain.size;
+    const factory = addStructure(world, 'landFactory', { x: 64, z: n - 2, owner: PLAYER_ID });
+    world.players[PLAYER_ID].economy.mass.stored = 1000;
+    world.players[PLAYER_ID].economy.energy.stored = 5000;
+    produce(world, factory);
+    const made = engineers(world);
+    expect(made.length).toBe(3);
+    for (const e of made) {
+      expect(inside(world, e)).toBe(true);
+      expect(e.z).toBeLessThan(factory.z);
+      expect(e.orders).toEqual([]); // kom fram, fastnade inte
+    }
+  });
+
+  it('går ut på en annan sida när söder är blockerad', () => {
+    const { world, factory } = setup();
+    // En annan byggnad tätt söder om fabriken.
+    addStructure(world, 'landFactory', { x: 64, z: 80, owner: PLAYER_ID });
+    produce(world, factory);
+    const made = engineers(world);
+    expect(made.length).toBe(3);
+    for (const e of made) {
+      expect(e.z).toBeLessThan(78); // inte inne i byggnaden söder om
+      expect(e.orders).toEqual([]);
+    }
+  });
+});
+

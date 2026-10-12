@@ -180,6 +180,8 @@ export function weaponsSystem(world) {
       world.projectiles.push({
         owner: e.owner,
         sourceId: e.id,
+        /** Skyttens typ, så att renderingen kan rita rätt sorts skott. */
+        source: e.type,
         x: e.x,
         z: e.z,
         prevX: e.x,
