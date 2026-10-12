@@ -8,15 +8,28 @@
  *
  * Varje ljud går genom en egen kedja: avståndsfilter (ljud långt bort blir
  * dovare, inte bara tystare) och stereo efter var det är i bild, och sedan till
- * både en torr buss och en rumsklang. En limiter på slutet hindrar stora
- * strider från att spricka. Små slumpvariationer i tonhöjd och styrka gör att
+ * både en torr buss och en rumsklang. När många ljud spelas samtidigt sänks
+ * varje nytt ljud mjukt (automatisk mixning), och en limiter på slutet tar
+ * bara de högsta topparna. Små slumpvariationer i tonhöjd och styrka gör att
  * många likadana enheter inte låter som en maskin.
  */
 const HEARING_DISTANCE = 90;
 /** Sidled (världsenheter från kamerans mitt) där ljudet ligger helt i en högtalare. */
 const PAN_DISTANCE = 40;
-/** Högst så många ljud av varje slag per sekund, så att stora strider inte blir gröt. */
-const BUDGETS = { shot: 16, hit: 10, explosion: 8 };
+/**
+ * Högst så många ljud av varje slag per sekund, så att stora strider inte blir
+ * gröt. Blir det fler väljs de som spelas slumpvis, så att inte alltid samma
+ * enheter tystnar.
+ */
+const BUDGETS = { shot: 26, hit: 14, explosion: 10 };
+/**
+ * Automatisk mixning: `load` räknar hur många ljud som startat nyligen (avklingar
+ * med tidskonstanten LOAD_SECONDS), och varje nytt ljud sänks med
+ * 1 / sqrt(1 + load / LOAD_KNEE). Då behöver limitern bara ta toppar och
+ * pumpar inte hela mixen upp och ner i stora strider.
+ */
+const LOAD_SECONDS = 0.35;
+const LOAD_KNEE = 2;
 
 /**
  * Ljudklipp i public/sfx/ (Kenney Sci-fi Sounds, CC0). Varje grupp har flera
@@ -73,6 +86,16 @@ const VOICE_CLIPS = {
 
 const rand = (min, max) => min + Math.random() * (max - min);
 
+/** En blandad kopia av `list` (Fisher–Yates). */
+function shuffled(list) {
+  const out = list.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 /**
  * Vilket ljud varje vapen gör (efter enhetstyp):
  * - plasma: UEF:s plasmakanoner, en kort ljus smäll med en sjunkande ton
@@ -106,6 +129,10 @@ export function createSound() {
   let muted = false;
   const budget = { ...BUDGETS };
   let lastRefill = 0;
+  let load = 0;
+  let loadTime = 0;
+  /** Noder som ljudtestsidan kan läsa av (t.ex. limiterns dämpning). */
+  const nodes = {};
   const lastSpoken = new Map();
   /** Replik -> avkodat klipp, när det har laddats. */
   const voiceBuffers = new Map();
@@ -124,14 +151,16 @@ export function createSound() {
     ctx = context ?? new AudioContext();
     // Limiter sist i kedjan.
     const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -10;
-    limiter.knee.value = 6;
-    limiter.ratio.value = 12;
-    limiter.attack.value = 0.003;
-    limiter.release.value = 0.25;
+    // Bara ett skydd mot toppar: hög tröskel, hårt förhållande, snabb återgång.
+    limiter.threshold.value = -3;
+    limiter.knee.value = 2;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.002;
+    limiter.release.value = 0.08;
     limiter.connect(ctx.destination);
+    nodes.limiter = limiter;
     master = ctx.createGain();
-    master.gain.value = 0.4;
+    master.gain.value = 0.5;
     master.connect(limiter);
 
     // Rumsklang: impulssvar av avklingande stereobrus.
@@ -253,8 +282,13 @@ export function createSound() {
     const d = Math.hypot(dx, z - listener.z);
     const near = 1 - d / HEARING_DISTANCE;
     if (near <= 0) return null;
+    // Automatisk mixning: ju fler ljud som startat nyss, desto lägre (se LOAD_KNEE).
+    const now = ctx.currentTime;
+    load = load * Math.exp(-(now - loadTime) / LOAD_SECONDS) + near * near;
+    loadTime = now;
+    const mix = 1 / Math.sqrt(1 + load / LOAD_KNEE);
     const gain = ctx.createGain();
-    gain.gain.value = near * near * volume;
+    gain.gain.value = near * near * volume * mix;
     const muffle = ctx.createBiquadFilter();
     muffle.type = 'lowpass';
     muffle.frequency.value = 600 + 17000 * near * near * near;
@@ -459,6 +493,7 @@ export function createSound() {
   return {
     init,
     get ready() { return ready; },
+    get nodes() { return nodes; },
     get muted() { return muted; },
     toggleMute() {
       muted = !muted;
@@ -491,11 +526,14 @@ export function createSound() {
     /** Spelar ljud för simuleringens händelser. `listener` är kamerans mittpunkt {x, z}. */
     handleEvents(events, listener) {
       if (!ctx || muted) return;
-      const now = performance.now();
-      const dt = (now - lastRefill) / 1000;
+      // Ljudklockan, inte väggklockan: stämmer även vid offline-rendering.
+      const now = ctx.currentTime;
+      const dt = Math.max(0, now - lastRefill);
       lastRefill = now;
       for (const kind of Object.keys(BUDGETS)) budget[kind] = Math.min(BUDGETS[kind], budget[kind] + dt * BUDGETS[kind]);
-      for (const ev of events) {
+      // Blanda ordningen så att budgeten inte alltid går till samma enheter.
+      const list = events.length > 1 ? shuffled(events) : events;
+      for (const ev of list) {
         if (ev.type === 'acuDeath') speak('Commander down');
         else if (ev.type === 'acuRespawn') speak('Commander online');
         if (ev.x === undefined) continue;
