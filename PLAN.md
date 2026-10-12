@@ -42,7 +42,7 @@ Ett single player-tower defense-spel i webbläsaren, med Supreme Commander: Forg
 ```
 src/
   main.js            // startmeny och spelloop
-  sim/               // ren spellogik: world, commands, director, pathing, unitPath, systems/
+  sim/               // ren spellogik: world, commands, director, squads, pathing, unitPath, systems/
   render/            // Three.js: kamera, terräng, modeller, effekter
   input/             // kamera, markering, byggläge
   ui/                // paneler, minikarta, ljud, startmeny

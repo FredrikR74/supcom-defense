@@ -1,7 +1,7 @@
 import { createWorld, tickWorld, TICK_SECONDS, PLAYER_ID } from './sim/world.js';
 import { getEntity } from './sim/entities.js';
 import { queueCommand } from './sim/commands.js';
-import { spawnEnemy } from './sim/enemies.js';
+import { spawnSquad } from './sim/squads.js';
 import { acuRespawnIn } from './sim/acu.js';
 import { createFixedStep } from './loop.js';
 import { createRenderer } from './render/renderer.js';
@@ -151,9 +151,9 @@ function startGame({ map, difficulty }) {
       e.preventDefault();
       view.toggleFlowField();
     }
-    // Bara i dev: N = en Mantis vid varje spawnpunkt.
+    // Bara i dev: N = en trupp med åtta Mantis vid en slumpad spawnpunkt.
     if (import.meta.env.DEV && e.code === 'KeyN') {
-      world.map.spawns.forEach((_, i) => spawnEnemy(world, 'mantis', i));
+      spawnSquad(world, Array(8).fill('mantis'), Math.floor(Math.random() * world.map.spawns.length));
     }
   });
 
@@ -167,10 +167,9 @@ function startGame({ map, difficulty }) {
       get profile() { return Object.fromEntries(profiler.report().map(([k, v]) => [k, +v.toFixed(2)])); },
       ui,
       time,
-      /** Skapar `n` fiender av `type`, fördelade över spawnpunkterna. */
-      spawn(n = 1, type = 'mantis') {
-        for (let i = 0; i < n; i++) spawnEnemy(world, type, i);
-        return world.entities.length;
+      /** Skapar en trupp med `n` fiender av `type` vid spawnpunkt `spawnIndex`. */
+      spawn(n = 1, type = 'mantis', spawnIndex = 0) {
+        return spawnSquad(world, Array(n).fill(type), spawnIndex).id;
       },
       tick(n = 1) {
         for (let i = 0; i < n; i++) tickWorld(world);

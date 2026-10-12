@@ -13,6 +13,7 @@ import { computeSteepCells, updatePathing } from './pathing.js';
 import { TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 import gameConfig from '../data/gameConfig.js';
 import { createDirector, directorSystem } from './director.js';
+import { squadSystem } from './squads.js';
 
 export { TICKS_PER_SECOND, TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 
@@ -42,6 +43,9 @@ export function createWorld({ seed = 1, map = null, config = {} } = {}) {
     nextEntityId: 1,
     /** Projektiler i luften. */
     projectiles: [],
+    /** Fiendens trupper (se squads.js). */
+    squads: [],
+    nextSquadId: 1,
     /** Händelser för renderingen (skott, träffar, explosioner); töms av den som läser dem. */
     events: [],
     commands: [],
@@ -116,6 +120,7 @@ export function tickWorld(world) {
     updatePathing(world);
   }
   targetingSystem(world);
+  if (world.map) squadSystem(world);
   movementSystem(world);
   separationSystem(world);
   constructionDemand(world);

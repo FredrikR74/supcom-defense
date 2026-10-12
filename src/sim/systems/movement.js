@@ -39,6 +39,16 @@ function destination(world, e, order) {
       const p = flowTarget(world, e.x, e.z);
       return p && { x: p.x, z: p.z, reach: 0 };
     }
+    case 'squad': {
+      // Målet sätts av squadSystem: en plats i formationen, flödesfältet eller stå still.
+      const g = order.goal;
+      if (!g || g.mode === 'hold') return null;
+      if (g.mode === 'flow') {
+        const p = flowTarget(world, e.x, e.z);
+        return p && { x: p.x, z: p.z, reach: 0, flow: true };
+      }
+      return { x: g.x, z: g.z, reach: g.reach };
+    }
     default: return null;
   }
 }
@@ -48,7 +58,8 @@ function destination(world, e, order) {
  * order tar vid. Bygg- och guard-order stannar inom räckhåll (`reach`) och
  * lämnas kvar åt byggsystemet. Fiender med `attackCore` följer flödesfältet
  * ruta för ruta tills de står intill kärnan, och stannar när de har ett mål att
- * skjuta på. Egna enheter går runt hinder med A* (se unitPath.js).
+ * skjuta på. Fiender i en trupp går dit squadSystem säger (se squads.js).
+ * Egna enheter går runt hinder med A* (se unitPath.js).
  */
 export function movementSystem(world) {
   world.pathBudget = PATH_BUDGET_PER_TICK;
@@ -58,7 +69,7 @@ export function movementSystem(world) {
     e.prevZ = e.z;
     // Fiender på väg mot kärnan och beväpnade patrullerare stannar och skjuter.
     const first = e.orders[0]?.type;
-    if ((first === 'attackCore' || first === 'patrol') && e.targetId) continue;
+    if ((first === 'attackCore' || first === 'squad' || first === 'patrol') && e.targetId) continue;
 
     let budget = e.speed * TICK_SECONDS;
     for (let steps = 0; budget > 0 && e.orders.length > 0 && steps < 8; steps++) {
@@ -72,7 +83,7 @@ export function movementSystem(world) {
         }
         break;
       }
-      const goal = order.type === 'attackCore' ? dest : steer(world, e, order, dest);
+      const goal = order.type === 'attackCore' || order.type === 'squad' ? dest : steer(world, e, order, dest);
       if (goal.wait) break;
       if (goal.stuck) {
         if (order.type === 'move') e.orders.shift(); // så nära som det går
@@ -92,11 +103,12 @@ export function movementSystem(world) {
       budget -= step;
 
       if (step === remaining) {
-        if (goal.waypoint || order.type === 'attackCore') {
+        if (goal.waypoint || goal.flow || order.type === 'attackCore') {
           e.x = goal.x;
           e.z = goal.z;
           continue; // nästa vägpunkt / nästa ruta i flödesfältet
         }
+        if (order.type === 'squad') break; // på sin plats i formationen
         if (order.type === 'patrol') {
           e.x = goal.x;
           e.z = goal.z;

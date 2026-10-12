@@ -270,7 +270,7 @@ export function retaliationSystem(world) {
     if (!canTarget(weapon, attacker, weapon.range)) continue; // t.ex. luftvärn mot markenheter
     const order = { type: 'attack', targetId: attacker.id };
     if (e.orders.length === 0) e.orders.push(order);
-    else if (e.orders[0].type === 'attackCore') e.orders.unshift(order);
+    else if (e.orders[0].type === 'attackCore' || e.orders[0].type === 'squad') e.orders.unshift(order);
   }
 }
 

@@ -1,4 +1,4 @@
-import { spawnEnemy } from './enemies.js';
+import { spawnSquad } from './squads.js';
 import { TICK_SECONDS, ENEMY_ID } from './constants.js';
 import { getEntity } from './entities.js';
 import units from '../data/units.js';
@@ -6,9 +6,10 @@ import units from '../data/units.js';
 /**
  * Fiendens strömmande "ekonomi": precis som spelarens ekonomi flyter fiendens
  * resurser in hela tiden. En budget i mass per sekund växer med speltiden och
- * multipliceras med svårighetsgraden. När budgeten räcker för nästa enhet skapas
- * den. Fienderna kommer en spawnpunkt i taget, som byts med jämna mellanrum.
- * Spelet tar aldrig slut: trycket växer tills kärnan faller.
+ * multipliceras med svårighetsgraden. Budgeten sparas ihop till vågor: efter en
+ * slumpad paus (utan förvarning) köps så många enheter budgeten räcker till, och
+ * de kommer som en eller flera trupper i formation från en slumpad gateway
+ * (se squads.js). Spelet tar aldrig slut: trycket växer tills kärnan faller.
  *
  * `world.director.state`: 'grace' (lugn början), 'active', 'defeat' (kärnan förstörd).
  */
@@ -33,8 +34,9 @@ export function createDirector(config, difficulty = 50) {
     difficulty,
     elapsed: 0,
     budget: 0,
-    spawnIndex: 0,
-    spawnTimer: 0,
+    /** Sekunder kvar tills nästa våg får gå. */
+    waveTimer: 0,
+    waves: 0,
     nextType: null,
     spentMass: 0,
     /** Antal skapade fiender per typ. */
@@ -78,27 +80,34 @@ export function directorSystem(world) {
   }
   d.elapsed += TICK_SECONDS;
   if (d.elapsed < d.config.graceSeconds) return;
-  if (d.state === 'grace') d.state = 'active';
-
-  // Byt spawnpunkt med jämna mellanrum, så att fienden anfaller från olika håll.
-  d.spawnTimer -= TICK_SECONDS;
-  if (d.spawnTimer <= 0) {
-    d.spawnIndex = Math.floor(world.rng.next() * world.map.spawns.length);
-    d.spawnTimer = d.config.spawnSwitchSeconds;
+  if (d.state === 'grace') {
+    // Första vågen får också samlas ihop en stund.
+    d.state = 'active';
+    d.waveTimer = world.rng.range(d.config.waveSeconds.min, d.config.waveSeconds.max);
   }
 
   d.budget += threatRate(d) * TICK_SECONDS;
   d.nextType ??= chooseType(world, d);
-  // Flera kan komma samma tick om budgeten räcker (höga svårighetsgrader).
-  for (let i = 0; i < 20; i++) {
-    const cost = units[d.nextType].cost.mass;
-    if (d.budget < cost) break;
-    d.budget -= cost;
-    d.spentMass += cost;
-    spawnEnemy(world, d.nextType, d.spawnIndex);
-    d.spawned[d.nextType] = (d.spawned[d.nextType] ?? 0) + 1;
-    d.nextType = chooseType(world, d);
+  d.waveTimer -= TICK_SECONDS;
+  if (d.waveTimer > 0 || d.budget < units[d.nextType].cost.mass) return;
+
+  // En våg: hela budgeten, uppdelad i trupper om högst maxSquadSize, var och en
+  // från en slumpad gateway (höga svårighetsgrader ger flera trupper samtidigt).
+  const { maxSquadSize, maxSquadsPerWave, waveSeconds } = d.config;
+  for (let s = 0; s < maxSquadsPerWave && d.budget >= units[d.nextType].cost.mass; s++) {
+    const types = [];
+    while (types.length < maxSquadSize && d.budget >= units[d.nextType].cost.mass) {
+      const cost = units[d.nextType].cost.mass;
+      d.budget -= cost;
+      d.spentMass += cost;
+      types.push(d.nextType);
+      d.spawned[d.nextType] = (d.spawned[d.nextType] ?? 0) + 1;
+      d.nextType = chooseType(world, d);
+    }
+    spawnSquad(world, types, Math.floor(world.rng.next() * world.map.spawns.length));
   }
+  d.waves++;
+  d.waveTimer = world.rng.range(waveSeconds.min, waveSeconds.max);
 }
 
 /** Sammanfattning för UI:t. */

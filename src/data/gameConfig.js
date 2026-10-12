@@ -31,8 +31,16 @@ export default {
     /** Tillväxt per minut. Med exponenten 1,5 blir det ~15 mass/s efter 10 min. */
     growthPerMinute: 0.5,
     growthExponent: 1.5,
-    /** Hur ofta fienden byter spawnpunkt. */
-    spawnSwitchSeconds: 30,
+    /**
+     * Budgeten sparas ihop till vågor. Pausen mellan vågorna slumpas i det här
+     * intervallet och visas inte för spelaren (organiska vågor).
+     */
+    waveSeconds: { min: 20, max: 45 },
+    /** Största truppen; en större våg delas upp i flera trupper. */
+    maxSquadSize: 24,
+    maxSquadsPerWave: 6,
+    /** Truppen samlas så här länge framför gatewayen innan den marscherar. */
+    musterSeconds: 3,
     /** Fiendetyper (Cybran T1), vikt och från vilken minut de kan komma. */
     unitPool: [
       { type: 'mole', weight: 2 },

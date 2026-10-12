@@ -65,12 +65,26 @@ describe('fiendens strömmande tryck', () => {
     expect(directorInfo(w).state).toBe('active');
   });
 
-  it('spenderad mass följer budgeten (inom en enhets kostnad)', () => {
+  it('spenderad mass plus sparad budget följer inkomsten', () => {
     const w = setup();
     seconds(w, 70);
-    // Inkomst base × (1 + growth × min) i 60 s efter lugnet: 2 × (60 + 60/2) = 180.
-    expect(w.director.spentMass).toBeGreaterThan(180 - units.mantis.cost.mass);
-    expect(w.director.spentMass).toBeLessThanOrEqual(180 + 1e-6);
+    // Inkomst base × (1 + growth × min)^1,5 (exponenten från standardkonfigurationen)
+    // i 60 s efter lugnet: 2 × 60 × (2^2,5 − 1) / 2,5 ≈ 223,5.
+    expect(w.director.spentMass + w.director.budget).toBeCloseTo(2 * 60 * (2 ** 2.5 - 1) / 2.5, 0);
+    expect(w.director.spentMass).toBeGreaterThan(0);
+  });
+
+  it('fienderna kommer i vågor: budgeten sparas ihop mellan vågorna', () => {
+    const w = setup(50, { ...TEST_DIRECTOR, waveSeconds: { min: 30, max: 30 } });
+    // Lugnet slutar efter 10 s, första vågen 30 s senare.
+    seconds(w, 39);
+    expect(w.director.spentMass).toBe(0);
+    expect(w.director.budget).toBeGreaterThan(units.mantis.cost.mass);
+    seconds(w, 1.5);
+    expect(w.director.waves).toBe(1);
+    expect(w.director.budget).toBeLessThan(units.mantis.cost.mass);
+    expect(w.squads).toHaveLength(1);
+    expect(w.squads[0].members.length).toBe(enemies(w).length);
   });
 
   it('trycket växer med tiden', () => {
@@ -85,7 +99,7 @@ describe('fiendens strömmande tryck', () => {
   it('högre svårighetsgrad ger fler fiender', () => {
     const count = (difficulty) => {
       const w = setup(difficulty);
-      seconds(w, 90);
+      seconds(w, 180);
       return w.director.spentMass;
     };
     expect(count(0)).toBeLessThan(count(50));
