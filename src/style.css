@@ -217,6 +217,21 @@ html, body {
 
 #selection-box[hidden] { display: none; }
 
+/* Varför en byggplats nekas, vid muspekaren medan man placerar en byggnad. */
+.place-reason {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  padding: 3px 8px;
+  font: 600 12px system-ui, sans-serif;
+  color: #fecaca;
+  background: #450a0aee;
+  border: 1px solid #ef4444;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.place-reason[hidden] { display: none; }
+
 /* Kommandopanel */
 #commands {
   position: fixed;

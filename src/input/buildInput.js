@@ -19,9 +19,25 @@ export function buildersFor(world, selection, type) {
  * - Högerklick/Esc avbryter, och släppt Shift avslutar efter köade byggen.
  * Måste skapas före markeringsinmatningen så att den hinner fånga klicken.
  */
+/** Varför en plats nekas (canPlace:s `reason`), som text för spelaren. */
+const REASON_TEXT = {
+  occupied: 'Something is already here',
+  'too steep': 'Ground is too steep',
+  'requires mass deposit': 'Must be built on a mass deposit',
+  'covers mass deposit': 'Would cover a mass deposit',
+  'too close to enemy gateway': 'Too close to an enemy gateway',
+  'blocks enemy path': "Would block the enemy's only path",
+  'outside map': 'Outside the map',
+};
+
 export function createBuildInput(canvas, view, world, selection, ui) {
   /** Startpunkt (fäst mittpunkt) för en pågående Shift+dra-rad. */
   let lineStart = null;
+  /** Text vid muspekaren som säger varför spöket är rött. */
+  const reasonTip = document.createElement('div');
+  reasonTip.className = 'place-reason';
+  reasonTip.hidden = true;
+  document.body.appendChild(reasonTip);
 
   const toNdc = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -43,7 +59,10 @@ export function createBuildInput(canvas, view, world, selection, ui) {
     if (!pos) return [];
     const { type } = ui.placing;
     const positions = lineStart ? lineOfPlacements(lineStart, pos, structures[type].size) : [pos];
-    return positions.map((p) => ({ pos: p, ok: canPlace(world, type, p.x, p.z).ok }));
+    return positions.map((p) => {
+      const { ok, reason } = canPlace(world, type, p.x, p.z);
+      return { pos: p, ok, reason };
+    });
   }
 
   function queueBuilds(placements, queue) {
@@ -100,6 +119,20 @@ export function createBuildInput(canvas, view, world, selection, ui) {
     if (e.key === 'Shift' && ui.placing?.queued && !lineStart) ui.placing = null;
   });
 
+  /** Visar varför platsen under pekaren (eller en plats i raden) nekas. */
+  function showReason(placements, ndc) {
+    const bad = placements[placements.length - 1]?.ok === false
+      ? placements[placements.length - 1]
+      : placements.find((p) => !p.ok);
+    const text = bad ? REASON_TEXT[bad.reason] : null;
+    reasonTip.hidden = !text;
+    if (!text) return;
+    if (reasonTip.textContent !== text) reasonTip.textContent = text;
+    const r = canvas.getBoundingClientRect();
+    reasonTip.style.left = `${r.left + ((ndc.x + 1) / 2) * r.width + 18}px`;
+    reasonTip.style.top = `${r.top + ((1 - ndc.y) / 2) * r.height + 14}px`;
+  }
+
   return {
     /** Uppdaterar förhandsvisningen. Anropas varje frame. */
     update(mouseNdc) {
@@ -109,9 +142,12 @@ export function createBuildInput(canvas, view, world, selection, ui) {
       if (!ui.placing) lineStart = null;
       if (!ui.placing || !mouseNdc) {
         view.setPlacementGhosts(null);
+        reasonTip.hidden = true;
         return;
       }
-      view.setPlacementGhosts(ui.placing.type, placementsAt(mouseNdc));
+      const placements = placementsAt(mouseNdc);
+      view.setPlacementGhosts(ui.placing.type, placements);
+      showReason(placements, mouseNdc);
     },
   };
 }
