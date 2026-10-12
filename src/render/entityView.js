@@ -23,6 +23,23 @@ const ringMaterial = new THREE.MeshBasicMaterial({
 /** Ringens lyft över marken. */
 const RING_LIFT = 0.06;
 
+/**
+ * Spawnsköld runt nya fiender: en röd bubbla med additiv blandning, så att
+ * instansens färg styr hur stark den är (svart = osynlig) och den kan tona bort.
+ */
+const SHIELD_CAPACITY = 512;
+const SHIELD_COLOR = new THREE.Color(0xff3b4e);
+const shieldGeometry = new THREE.SphereGeometry(1, 20, 12);
+const shieldMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.4,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+/** Sekunder som skölden tonar bort på innan den tar slut. */
+const SHIELD_FADE_SECONDS = 1;
+
 const flagPole = new THREE.CylinderGeometry(0.05, 0.05, 2, 6).translate(0, 1, 0);
 const flagCloth = new THREE.BufferGeometry().setFromPoints([
   new THREE.Vector3(0, 2, 0), new THREE.Vector3(0, 1.4, 0), new THREE.Vector3(0.8, 1.7, 0),
@@ -110,6 +127,15 @@ export function createEntityView(terrain) {
   const icons = new THREE.Group();
   icons.visible = false;
   const overlay = new THREE.Group();
+  const shields = new THREE.InstancedMesh(shieldGeometry, shieldMaterial, SHIELD_CAPACITY);
+  shields.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  shields.frustumCulled = false;
+  shields.count = 0;
+  shields.renderOrder = 5;
+  meshes.add(shields);
+  const shieldMatrix = new THREE.Matrix4();
+  const shieldColor = new THREE.Color();
+  let shieldTime = 0;
   /** id -> { mesh, icon, ring, top } där `top` är meshens höjd över marken. */
   const views = new Map();
   /** Byggorder-objekt -> spökmodell för köade byggen som inte påbörjats. */
@@ -415,6 +441,8 @@ export function createEntityView(terrain) {
       for (const b of ownBatches.values()) b.begin();
       for (const b of wreckBatches.values()) b.begin();
       instancedPos.clear();
+      shieldTime += frameSeconds;
+      let shieldCount = 0;
       for (const e of world.entities) {
         if (e.kind === 'wreck') {
           const b = wreckBatchFor(e.type);
@@ -429,6 +457,16 @@ export function createEntityView(terrain) {
           const y = groundY(x, z);
           b.add(e.id, x, y, z, e.heading, enemyWalk(e.id, x, z, frameSeconds));
           instancedPos.set(e.id, { x, y, z, top: b.top });
+          if (e.shieldUntil > world.tick && shieldCount < SHIELD_CAPACITY) {
+            const left = (e.shieldUntil - world.tick) / 10;
+            const pulse = 0.85 + 0.15 * Math.sin(shieldTime * 6 + e.id);
+            const r = e.radius * 1.9;
+            shieldMatrix.makeScale(r, r * 0.8, r).setPosition(x, y + b.top * 0.4, z);
+            shields.setMatrixAt(shieldCount, shieldMatrix);
+            shields.setColorAt(shieldCount, shieldColor.copy(SHIELD_COLOR)
+              .multiplyScalar(Math.min(1, left / SHIELD_FADE_SECONDS) * pulse));
+            shieldCount++;
+          }
           continue;
         }
         alive.add(e.id);
@@ -469,6 +507,9 @@ export function createEntityView(terrain) {
       }
       for (const b of batches.values()) b.end();
       for (const b of ownBatches.values()) b.end();
+      shields.count = shieldCount;
+      shields.instanceMatrix.needsUpdate = true;
+      if (shields.instanceColor) shields.instanceColor.needsUpdate = true;
       // Glöm gångfasen för fiender som inte finns längre.
       for (const [id, w] of enemyWalks) if (w.frame !== walkFrame) enemyWalks.delete(id);
       walkFrame++;

@@ -41,6 +41,11 @@ export default {
     maxSquadsPerWave: 6,
     /** Truppen samlas så här länge framför gatewayen innan den marscherar. */
     musterSeconds: 3,
+    /**
+     * Nya fiender är osårbara så här länge (samlingen plus en sekund), så att
+     * spelaren inte kan campa vid gatewayen (tower defense-avsteg från FA).
+     */
+    spawnShieldSeconds: 4,
     /** Fiendetyper (Cybran T1), vikt och från vilken minut de kan komma. */
     unitPool: [
       { type: 'mole', weight: 2 },
@@ -48,6 +53,11 @@ export default {
       { type: 'medusa', weight: 2, fromMinute: 4 },
     ],
   },
+  /**
+   * Spelaren får inte bygga närmare en fiendes gateway än så här (mitt till
+   * byggnadens kant), så att man inte kan bygga en bas vid fiendens spawnpunkt.
+   */
+  gatewayNoBuildRadius: 20,
   /** ACU:n återuppstår vid kärnan efter så här många sekunder (tower defense-avsteg från FA). */
   acuRespawnSeconds: 30,
   /** Svårighetsgrad 0–100 vid start (kan ändras under spelet). */

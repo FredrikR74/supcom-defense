@@ -59,6 +59,13 @@ export function lineOfPlacements(start, end, size) {
 
 const fail = (reason) => ({ ok: false, reason });
 
+/** Avstånd från (x, z) till närmaste punkt i rutan [cx, cx + size) × [cz, cz + size). */
+function nearRect(x, z, cx, cz, size) {
+  const dx = Math.max(cx - x, 0, x - (cx + size));
+  const dz = Math.max(cz - z, 0, z - (cz + size));
+  return Math.hypot(dx, dz);
+}
+
 /** Kan `type` byggas med mittpunkt (x, z)? Returnerar { ok, reason }. */
 export function canPlace(world, type, x, z) {
   const def = structures[type];
@@ -96,6 +103,10 @@ export function canPlace(world, type, x, z) {
       cx < d.x + 1 && cx + size > d.x - 1 && cz < d.z + 1 && cz + size > d.z - 1);
     if (covers) return fail('covers mass deposit');
   }
+
+  // Ingen bas vid fiendens gateways.
+  const noBuild = world.config?.gatewayNoBuildRadius ?? 0;
+  if (map.spawns?.some((s) => nearRect(s.x, s.z, cx, cz, size) < noBuild)) return fail('too close to enemy gateway');
 
   // Fienderna måste alltid kunna nå kärnan från varje spawnpunkt.
   if (map.spawns?.length) {

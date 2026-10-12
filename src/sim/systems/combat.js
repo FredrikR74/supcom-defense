@@ -240,6 +240,8 @@ export function projectileSystem(world) {
     }
     const hit = victims[0] ?? null;
     for (const t of victims) {
+      // Spawnskölden tar all skada (se squads.js).
+      if (t.shieldUntil > world.tick) continue;
       const wasAlive = t.hp > 0;
       t.hp -= p.damage;
       recordDamage(t, p.sourceId, p.damage);

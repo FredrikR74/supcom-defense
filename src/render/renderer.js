@@ -9,6 +9,7 @@ import { createCombatView } from './combatView.js';
 import { createHealthBars } from './healthBars.js';
 import { createGhost, setGhostState, applySurfaceDetail } from './models.js';
 import { PLAYER_ID } from '../sim/constants.js';
+import { createNoBuildZones } from './noBuildZones.js';
 import { raycastTerrain, isInsideMap, getHeight } from '../sim/terrain.js';
 
 /** Över detta kameraavstånd visas strategiska ikoner i stället för meshes. */
@@ -51,6 +52,10 @@ export function createRenderer(canvas, world) {
   scene.add(combat.group);
   const healthBars = createHealthBars();
   scene.add(healthBars.group);
+
+  // Byggförbudszonerna runt fiendens gateways visas medan man placerar en byggnad.
+  const noBuildZones = createNoBuildZones(map, terrain, world.config.gatewayNoBuildRadius);
+  scene.add(noBuildZones);
 
   // Förhandsvisningar av byggnader man håller på att placera: en pool per typ.
   const placementGhosts = {};
@@ -129,6 +134,7 @@ export function createRenderer(canvas, world) {
      * gröna om ok, annars röda. Tom lista döljer alla.
      */
     setPlacementGhosts(type, placements = []) {
+      noBuildZones.visible = Boolean(type);
       for (const [t, pool] of Object.entries(placementGhosts)) {
         pool.forEach((g, i) => { g.visible = t === type && i < placements.length; });
       }

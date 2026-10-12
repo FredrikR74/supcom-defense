@@ -125,3 +125,25 @@ describe('lineOfPlacements', () => {
     expect(line.every(({ x, z }) => canPlace(w, 'wall', x, z).ok)).toBe(true);
   });
 });
+
+describe('byggförbud vid fiendens gateways', () => {
+  it('nekar byggen inom radien från en spawnpunkt, men inte utanför', () => {
+    const w = world();
+    const s = firstDefense.spawns[0];
+    const r = w.config.gatewayNoBuildRadius;
+    expect(r).toBeGreaterThan(0);
+    expect(canPlace(w, 'wall', s.x + 5.5, s.z + 0.5).reason).toBe('too close to enemy gateway');
+    expect(canPlace(w, 'wall', s.x + r - 0.5, s.z + 0.5).reason).toBe('too close to enemy gateway');
+    expect(canPlace(w, 'wall', s.x + r + 1.5, s.z + 0.5)).toEqual({ ok: true });
+  });
+
+  it('räknar från byggnadens kant, så stora byggnader hålls också utanför', () => {
+    const w = world();
+    const s = firstDefense.spawns[0];
+    const r = w.config.gatewayNoBuildRadius;
+    // En 2×2-byggnad med mitten på radien når in i zonen med sin kant.
+    expect(canPlace(w, 'powerGenerator', s.x + r, s.z).reason).toBe('too close to enemy gateway');
+    expect(canPlace(w, 'powerGenerator', s.x + r + 2, s.z)).toEqual({ ok: true });
+  });
+});
+

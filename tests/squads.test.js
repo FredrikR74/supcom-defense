@@ -3,6 +3,7 @@ import { createWorld, tickWorld, PLAYER_ID, ENEMY_ID } from '../src/sim/world.js
 import { addUnit, getEntity } from '../src/sim/entities.js';
 import { cellIndex, isBlockedCell } from '../src/sim/pathing.js';
 import { spawnSquad, formationSlots } from '../src/sim/squads.js';
+import { projectileSystem } from '../src/sim/systems/combat.js';
 import firstDefense from '../src/data/maps/firstDefense.js';
 import maps from '../src/data/maps/index.js';
 
@@ -138,5 +139,23 @@ describe('trupper', () => {
       return w.entities.filter((e) => e.owner === ENEMY_ID).map((e) => [e.x, e.z]);
     };
     expect(run()).toEqual(run());
+  });
+});
+
+describe('spawnsköld', () => {
+  it('nya fiender tar ingen skada medan skölden är uppe, men väl efteråt', () => {
+    const w = world();
+    const squad = spawnSquad(w, ['mantis'], 0);
+    const m = members(w, squad)[0];
+    expect(m.shieldUntil).toBe(w.tick + 40); // 4 s
+    const shoot = () => {
+      w.projectiles.push({ x: m.x, z: m.z, tx: m.x, tz: m.z, owner: PLAYER_ID, sourceId: null, speed: 10, damage: 50, damageRadius: 0, y: 1 });
+      projectileSystem(w);
+    };
+    shoot();
+    expect(m.hp).toBe(m.maxHp);
+    w.tick = m.shieldUntil;
+    shoot();
+    expect(m.hp).toBe(m.maxHp - 50);
   });
 });

@@ -1,6 +1,6 @@
 import { addUnit, getEntity, getDef } from './entities.js';
 import { cellIndex, isBlockedCell, flowTarget } from './pathing.js';
-import { TICK_SECONDS, ENEMY_ID } from './constants.js';
+import { TICK_SECONDS, TICKS_PER_SECOND, ENEMY_ID } from './constants.js';
 
 /**
  * Fiendens trupper (squads). En våg spawnar samlad i formation framför en
@@ -12,6 +12,9 @@ import { TICK_SECONDS, ENEMY_ID } from './constants.js';
  * I trånga passager trycks formationen ihop mot mitten till en kolonn och breddas
  * igen efteråt. När någon i truppen strider stannar ankaret och de andra går mot
  * fienden; när striden är över formerar truppen sig på nytt och fortsätter.
+ *
+ * Nya medlemmar har en spawnsköld (`shieldUntil`, ett tick) och tar ingen skada
+ * förrän den har tagit slut, se combat.js.
  *
  * Medlemmar har ordern { type: 'squad', squadId }; squadSystem lägger målpunkten
  * för detta tick i ordern (`goal`), och rörelsesystemet går dit.
@@ -162,6 +165,7 @@ export function spawnSquad(world, types, spawnIndex) {
   const sorted = types.map((type, k) => ({ type, k }))
     .sort((a, b) => weaponRange(a.type) - weaponRange(b.type) || a.k - b.k);
   const slots = formationSlots(sorted.length);
+  const shieldUntil = world.tick + Math.round((world.director.config.spawnShieldSeconds ?? 0) * TICKS_PER_SECOND);
   sorted.forEach(({ type }, k) => {
     let pos = slotPosition(squad, slots[k]);
     if (!standable(world, pos.x, pos.z)) {
@@ -171,6 +175,7 @@ export function spawnSquad(world, types, spawnIndex) {
     }
     const unit = addUnit(world, type, { x: pos.x, z: pos.z, owner: ENEMY_ID, heading: squad.heading });
     unit.orders.push({ type: 'squad', squadId: squad.id, goal: null });
+    unit.shieldUntil = shieldUntil;
     squad.members.push({ id: unit.id, slot: slots[k] });
   });
   world.squads.push(squad);
