@@ -34,16 +34,31 @@ const SAMPLE_SETS = {
 const SAMPLE_RMS = 0.12;
 
 /**
- * Vilket klipp varje slags vapen använder, med tonhöjd (uppspelningshastighet)
- * och nivå. Saknas ett slag här används syntesen.
+ * Klipp för varje slags vapen, i lager. Kenneys lasrar är ganska tecknade, så
+ * de spelas lägre, kortare och genom ett lågpass, och kanonerna byggs av korta
+ * uppväxlade bitar av explosionerna (mer smäll än "pew"). `rate` ändrar
+ * tonhöjd, `length` kortar av klippet och `lowpass` tar bort det gälla.
+ * Saknas ett slag här används syntesen.
  */
 const SHOT_SAMPLES = {
-  plasma: { set: 'laserLarge', rate: 1.25, level: 0.45, length: 0.35 },
-  heavy: { set: 'laserLarge', rate: 0.7, level: 0.8 },
-  laser: { set: 'laserSmall', rate: 1, level: 0.5 },
-  artillery: { set: 'rumble', rate: 1.6, level: 0.6, length: 0.45 },
-  rifle: { set: 'laserSmall', rate: 1.6, level: 0.35, length: 0.12 },
-  flak: { set: 'impact', rate: 0.8, level: 0.4, length: 0.15 },
+  plasma: [
+    { set: 'explosion', rate: 1.9, level: 0.4, length: 0.16 },
+    { set: 'laserLarge', rate: 0.55, level: 0.12, length: 0.12, lowpass: 1800 },
+  ],
+  heavy: [
+    { set: 'explosion', rate: 1.35, level: 0.6, length: 0.3 },
+    { set: 'rumble', rate: 1.5, level: 0.45, length: 0.35 },
+  ],
+  laser: [
+    { set: 'laserSmall', rate: 0.6, level: 0.3, length: 0.14, lowpass: 2600 },
+    { set: 'impact', rate: 1.7, level: 0.12, length: 0.07 },
+  ],
+  artillery: [{ set: 'rumble', rate: 1.6, level: 0.6, length: 0.45 }],
+  rifle: [{ set: 'explosion', rate: 2.4, level: 0.28, length: 0.07 }],
+  flak: [
+    { set: 'explosion', rate: 2.1, level: 0.3, length: 0.1 },
+    { set: 'impact', rate: 0.8, level: 0.15, length: 0.1 },
+  ],
 };
 
 /** Repliker -> inspelade klipp i public/voice/. */
@@ -153,9 +168,10 @@ export function createSound() {
   /**
    * Spelar ett slumpvalt klipp ur gruppen `set` till `out`. `rate` ändrar
    * tonhöjd och längd, `length` (sekunder) kortar av klippet med en snabb
-   * uttoning. Returnerar false om klippen inte har laddats.
+   * uttoning och `lowpass` (Hz) dämpar diskanten. Returnerar false om klippen
+   * inte har laddats.
    */
-  function playSample(set, out, t, { rate = 1, level = 1, length = null }) {
+  function playSample(set, out, t, { rate = 1, level = 1, length = null, lowpass = null }) {
     const list = samples.get(set);
     if (!list?.length) return false;
     const { buffer, norm } = list[Math.floor(Math.random() * list.length)];
@@ -170,7 +186,15 @@ export function createSound() {
       g.gain.setValueAtTime(peak, t + end * 0.6);
       g.gain.exponentialRampToValueAtTime(0.0001, t + end);
     }
-    src.connect(g).connect(out);
+    if (lowpass) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = lowpass;
+      src.connect(f).connect(g);
+    } else {
+      src.connect(g);
+    }
+    g.connect(out);
     src.start(t);
     src.stop(t + end + 0.02);
     return true;
@@ -273,8 +297,12 @@ export function createSound() {
     const out = output(ev.x, ev.z, listener, w.gain * rand(0.85, 1.1), 0.8);
     if (!out) return;
     const t = ctx.currentTime;
-    const sample = SHOT_SAMPLES[w.kind];
-    if (sample && playSample(sample.set, out, t, { ...sample, rate: sample.rate * w.pitch })) return;
+    const layers = SHOT_SAMPLES[w.kind] ?? [];
+    let played = false;
+    for (const layer of layers) {
+      if (playSample(layer.set, out, t, { ...layer, rate: layer.rate * w.pitch })) played = true;
+    }
+    if (played) return;
     const p = w.pitch * rand(0.92, 1.08);
     switch (w.kind) {
       case 'plasma':
