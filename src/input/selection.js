@@ -115,14 +115,20 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
         queueCommand(world, { type: 'attack', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
         return;
       }
-      // Högerklick på ett vrak: återvinn. På något eget skadat: reparera.
+      // Byggare = enheter med byggkraft (ACU, ingenjörer); fabriker räknas inte.
+      const isBuilder = (id) => {
+        const ent = world.entities.find((x) => x.id === id);
+        return ent?.kind === 'unit' && (getDef(ent.type)?.buildPower ?? 0) > 0;
+      };
+      // Högerklick på ett vrak: byggare återvinner det, övriga går dit (som i FA).
+      let moveIds = ids;
       if (target?.kind === 'wreck') {
-        queueCommand(world, { type: 'reclaim', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });
-        return;
-      }
-      if (target?.owner === PLAYER_ID && needsRepair(target) && ids.some((id) => id !== targetId)) {
+        const builders = ids.filter(isBuilder);
+        if (builders.length > 0) queueCommand(world, { type: 'reclaim', owner: PLAYER_ID, ids: builders, targetId, queue: e.shiftKey });
+        moveIds = ids.filter((id) => !isBuilder(id));
+        if (moveIds.length === 0) return;
+      } else if (target?.owner === PLAYER_ID && needsRepair(target) && ids.some((id) => id !== targetId)) {
         // Byggare reparerar; övriga assisterar (följer och skyddar) en skadad enhet.
-        const isBuilder = (id) => (getDef(world.entities.find((ent) => ent.id === id)?.type)?.buildPower ?? 0) > 0;
         queueCommand(world, { type: 'repair', owner: PLAYER_ID, ids: ids.filter(isBuilder), targetId, queue: e.shiftKey });
         if (target.kind === 'unit') {
           const others = ids.filter((id) => id !== targetId && !isBuilder(id));
@@ -138,7 +144,7 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
       const ground = view.pickAtNdc(ndc.x, ndc.y);
       if (!ground) return;
       // Enheter går dit, fabriker får en waypoint dit.
-      const order = { owner: PLAYER_ID, ids, x: ground.x, z: ground.z, queue: e.shiftKey };
+      const order = { owner: PLAYER_ID, ids: moveIds, x: ground.x, z: ground.z, queue: e.shiftKey };
       queueCommand(world, { type: 'move', ...order });
       queueCommand(world, { type: 'setRally', ...order });
     }
