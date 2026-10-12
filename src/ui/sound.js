@@ -8,9 +8,10 @@
  *
  * Varje ljud går genom en egen kedja: avståndsfilter (ljud långt bort blir
  * dovare, inte bara tystare) och stereo efter var det är i bild, och sedan till
- * både en torr buss och en rumsklang. När många ljud spelas samtidigt sänks
- * varje nytt ljud mjukt (automatisk mixning), och en limiter på slutet tar
- * bara de högsta topparna. Små slumpvariationer i tonhöjd och styrka gör att
+ * en kanal med egen EQ (skott, träffar, explosioner) och en rumsklang. Varje
+ * vapentyp har ett tak för samtidiga ljud, skott av samma typ nära varandra
+ * slås ihop till salvor, och när många ljud spelas samtidigt sänks varje nytt
+ * ljud mjukt (automatisk mixning). En limiter på slutet tar bara topparna. Små slumpvariationer i tonhöjd och styrka gör att
  * många likadana enheter inte låter som en maskin.
  */
 const HEARING_DISTANCE = 90;
@@ -30,6 +31,27 @@ const BUDGETS = { shot: 26, hit: 14, explosion: 10 };
  */
 const LOAD_SECONDS = 0.35;
 const LOAD_KNEE = 2;
+
+/**
+ * Tak per ljudtyp, som FA:s ljudmotor: högst så många samtidiga ljud av varje
+ * vapentyp (och av träffar och explosioner). Kommer ett till tonas det äldsta
+ * snabbt ut. `seconds` är hur länge ett ljud räknas som pågående.
+ */
+const VOICE_LIMITS = {
+  mantis: 4, hunter: 4, mole: 3, striker: 4, pointDefense: 3, acu: 2,
+  medusa: 3, lobo: 3, mechMarine: 3, snoop: 2, archer: 3,
+  hit: 4, explosion: 5,
+};
+const DEFAULT_VOICE_LIMIT = 2;
+const VOICE_SECONDS = { shot: 0.35, hit: 0.25, explosion: 1.2 };
+/**
+ * Salvor: skjuter flera av samma typ inom VOLLEY_SECONDS och VOLLEY_DISTANCE
+ * från varandra spelas ett enda ljud, som blir fylligare (upp till VOLLEY_MAX
+ * gånger starkare) för varje skott som slås ihop med det.
+ */
+const VOLLEY_SECONDS = 0.06;
+const VOLLEY_DISTANCE = 12;
+const VOLLEY_MAX = 2;
 
 /**
  * Ljudklipp i public/sfx/ (Kenney Sci-fi Sounds, CC0). Varje grupp har flera
@@ -111,12 +133,12 @@ function shuffled(list) {
 export const WEAPON_SOUNDS = {
   // Nivåerna är uppmätta (se sounds.html): explosioner starkast, sedan ACU:n
   // och artilleriet, sedan vanliga skott och träffar.
-  striker: { kind: 'plasma', pitch: 1, gain: 2.7 },
+  striker: { kind: 'plasma', pitch: 1, gain: 3.2 },
   pointDefense: { kind: 'plasma', pitch: 0.75, gain: 3.4 },
   acu: { kind: 'heavy', pitch: 1, gain: 1.3 },
-  mantis: { kind: 'laser', pitch: 1, gain: 2.5 },
-  mole: { kind: 'laser', pitch: 1.25, gain: 1.7 },
-  hunter: { kind: 'laser', pitch: 1.2, gain: 2 },
+  mantis: { kind: 'laser', pitch: 1, gain: 4.3 },
+  mole: { kind: 'laser', pitch: 1.25, gain: 2.9 },
+  hunter: { kind: 'laser', pitch: 1.2, gain: 3.4 },
   medusa: { kind: 'artillery', pitch: 1, gain: 0.6 },
   lobo: { kind: 'artillery', pitch: 1.15, gain: 0.65 },
   mechMarine: { kind: 'rifle', pitch: 1, gain: 4.9 },
@@ -134,6 +156,10 @@ export function createSound() {
   let lastRefill = 0;
   let load = 0;
   let loadTime = 0;
+  /** Ljudtyp -> pågående ljud [{ start, end, gain, base, count, x, z }], äldst först. */
+  const voices = new Map();
+  /** Kanaler med egen EQ: skott, träffar och explosioner (se init). */
+  const buses = {};
   /** Noder som ljudtestsidan kan läsa av (t.ex. limiterns dämpning). */
   const nodes = {};
   const lastSpoken = new Map();
@@ -165,6 +191,31 @@ export function createSound() {
     master = ctx.createGain();
     master.gain.value = 0.5;
     master.connect(limiter);
+
+    // Kanaler med egen EQ, så att skott, träffar och explosioner får varsin
+    // plats i frekvensbilden i stället för att slåss om samma register:
+    // - skott: utan djupbas, dämpad gäll diskant, lite lägre
+    // - träffar: mellanregistret
+    // - explosioner: basen och lite mindre diskant
+    const chain = (level, filters) => {
+      const input = ctx.createGain();
+      input.gain.value = level;
+      let node = input;
+      for (const [type, frequency, gain = 0, q = 0.7] of filters) {
+        const f = ctx.createBiquadFilter();
+        f.type = type;
+        f.frequency.value = frequency;
+        f.gain.value = gain;
+        f.Q.value = q;
+        node.connect(f);
+        node = f;
+      }
+      node.connect(master);
+      return input;
+    };
+    buses.shot = chain(1, [['highpass', 110], ['peaking', 3500, -4, 1], ['lowpass', 9000]]);
+    buses.hit = chain(1, [['highpass', 250], ['peaking', 3000, -2, 1], ['lowpass', 7000]]);
+    buses.explosion = chain(1, [['lowshelf', 120, 3], ['highshelf', 4500, -3]]);
 
     // Rumsklang: impulssvar av avklingande stereobrus.
     const convolver = ctx.createConvolver();
@@ -280,25 +331,50 @@ export function createSound() {
    * Utgång för ett ljud vid (x, z): styrka, avståndsfilter och stereo efter
    * kamerans mittpunkt, eller null om det är för långt bort för att höras.
    */
-  function output(x, z, listener, volume = 1, wet = 1) {
+  function output(x, z, listener, volume = 1, wet = 1, { bus = 'shot', key = null, volley = false } = {}) {
     const dx = x - listener.x;
     const d = Math.hypot(dx, z - listener.z);
     const near = 1 - d / HEARING_DISTANCE;
     if (near <= 0) return null;
-    // Automatisk mixning: ju fler ljud som startat nyss, desto lägre (se LOAD_KNEE).
     const now = ctx.currentTime;
+
+    // Tak per ljudtyp och salvor.
+    let list = null;
+    if (key) {
+      list = (voices.get(key) ?? []).filter((v) => v.end > now);
+      voices.set(key, list);
+      const last = list[list.length - 1];
+      if (volley && last && now - last.start <= VOLLEY_SECONDS && Math.hypot(last.x - x, last.z - z) <= VOLLEY_DISTANCE) {
+        last.count++;
+        last.gain.gain.setTargetAtTime(last.base * Math.min(VOLLEY_MAX, Math.sqrt(last.count)), now, 0.01);
+        return null; // slogs ihop med salvan
+      }
+      const limit = VOICE_LIMITS[key] ?? DEFAULT_VOICE_LIMIT;
+      while (list.length >= limit) {
+        const oldest = list.shift();
+        oldest.gain.gain.cancelScheduledValues(now);
+        oldest.gain.gain.setTargetAtTime(0, now, 0.012);
+      }
+    }
+
+    // Automatisk mixning: ju fler ljud som startat nyss, desto lägre (se LOAD_KNEE).
     load = load * Math.exp(-(now - loadTime) / LOAD_SECONDS) + near * near;
     loadTime = now;
     const mix = 1 / Math.sqrt(1 + load / LOAD_KNEE);
     const gain = ctx.createGain();
-    gain.gain.value = near * near * volume * mix;
+    const base = near * near * volume * mix;
+    gain.gain.value = base;
+    if (list) {
+      const seconds = VOICE_SECONDS[bus] ?? 0.4;
+      list.push({ start: now, end: now + seconds, gain, base, count: 1, x, z });
+    }
     const muffle = ctx.createBiquadFilter();
     muffle.type = 'lowpass';
     muffle.frequency.value = 600 + 17000 * near * near * near;
     const pan = ctx.createStereoPanner();
     pan.pan.value = Math.max(-1, Math.min(1, dx / PAN_DISTANCE)) * 0.85;
     gain.connect(muffle).connect(pan);
-    pan.connect(master);
+    pan.connect(buses[bus] ?? master);
     // Avlägsna ljud har mer klang i förhållande till direktljudet.
     const send = ctx.createGain();
     send.gain.value = wet * (0.5 + (1 - near));
@@ -345,7 +421,8 @@ export function createSound() {
   /** Skott: ett ljud per vapentyp, med lite slumpvariation. */
   function shot(ev, listener) {
     const w = WEAPON_SOUNDS[ev.source] ?? { kind: ev.owner === 1 ? 'plasma' : 'laser', pitch: 1, gain: 0.8 };
-    const out = output(ev.x, ev.z, listener, w.gain * rand(0.85, 1.1), 0.8);
+    const out = output(ev.x, ev.z, listener, w.gain * rand(0.85, 1.1), 0.8,
+      { bus: 'shot', key: ev.source ?? w.kind, volley: true });
     if (!out) return;
     const t = ctx.currentTime;
     const layers = SHOT_SAMPLES[w.kind] ?? [];
@@ -418,7 +495,7 @@ export function createSound() {
       return;
     }
     if (ev.type !== 'hit') return; // direktskott som missar hörs inte
-    const out = output(ev.x, ev.z, listener, rand(0.85, 1), 0.6);
+    const out = output(ev.x, ev.z, listener, rand(0.85, 1), 0.6, { bus: 'hit', key: 'hit' });
     if (!out) return;
     const t = ctx.currentTime;
     if (playSample('impact', out, t, { rate: rand(1, 1.3), level: 1.7, length: 0.25 })) {
@@ -436,7 +513,8 @@ export function createSound() {
    */
   function explosion(ev, listener, volume = 1) {
     const size = Math.max(0.3, ev.size ?? 1) * (ev.kind === 'structure' ? 1.8 : 1);
-    const out = output(ev.x, ev.z, listener, volume * rand(0.85, 1.1) * Math.min(1.6, 0.7 + size * 0.4), 1.4);
+    const out = output(ev.x, ev.z, listener, volume * rand(0.85, 1.1) * Math.min(1.6, 0.7 + size * 0.4), 1.4,
+      { bus: 'explosion', key: 'explosion' });
     if (!out) return;
     const t = ctx.currentTime;
     const big = size >= 1.5;
