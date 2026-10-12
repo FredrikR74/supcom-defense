@@ -52,7 +52,10 @@ export function createWorld({ seed = 1, map = null, config = {} } = {}) {
     events: [],
     commands: [],
     /** Fiendens strömmande tryck och svårighetsgrad. */
-    director: createDirector({ ...gameConfig.director, ...config.director }, config.difficulty ?? gameConfig.difficulty),
+    director: createDirector(
+      { ...gameConfig.director, ...map?.scenario?.director, ...config.director },
+      config.difficulty ?? gameConfig.difficulty,
+    ),
     players: {
       [PLAYER_ID]: {
         id: PLAYER_ID,
@@ -66,9 +69,28 @@ export function createWorld({ seed = 1, map = null, config = {} } = {}) {
     world.coreId = addStructure(world, 'core', { ...map.core, owner: PLAYER_ID }).id;
     // ACU:n startar strax söder om kärnan, vänd mot söder (mot kameran).
     spawnAcu(world);
+    if (map.scenario) applyScenario(world, map.scenario);
     updatePathing(world);
   }
   return world;
+}
+
+/**
+ * En förberedd situation (t.ex. för testning): färdiga byggnader och enheter
+ * för spelaren, och fulla lager (efter att storage-byggnaderna räknats in).
+ */
+function applyScenario(world, scenario) {
+  for (const s of scenario.structures ?? []) addStructure(world, s.type, { x: s.x, z: s.z, owner: PLAYER_ID });
+  for (const u of scenario.units ?? []) {
+    for (let i = 0; i < (u.count ?? 1); i++) {
+      addUnit(world, u.type, { x: u.x + (i % 4) * 1.5, z: u.z + Math.floor(i / 4) * 1.5, owner: PLAYER_ID });
+    }
+  }
+  if (scenario.fullStorage) {
+    const player = world.players[PLAYER_ID];
+    updateStorage(world, player);
+    for (const r of ['mass', 'energy']) player.economy[r].stored = player.economy[r].max;
+  }
 }
 
 export function createTerrainForMap(map) {

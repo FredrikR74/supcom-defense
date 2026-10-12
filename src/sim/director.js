@@ -33,7 +33,8 @@ export function createDirector(config, difficulty = 50) {
     state: 'grace',
     difficulty,
     elapsed: 0,
-    budget: 0,
+    /** Mass som fienden har från start (t.ex. för en testkarta där de kommer direkt). */
+    budget: config.startBudget ?? 0,
     /** Sekunder kvar tills nästa våg får gå. */
     waveTimer: 0,
     waves: 0,
@@ -83,7 +84,7 @@ export function directorSystem(world) {
   if (d.state === 'grace') {
     // Första vågen får också samlas ihop en stund.
     d.state = 'active';
-    d.waveTimer = world.rng.range(d.config.waveSeconds.min, d.config.waveSeconds.max);
+    d.waveTimer = d.config.firstWaveSeconds ?? world.rng.range(d.config.waveSeconds.min, d.config.waveSeconds.max);
   }
 
   d.budget += threatRate(d) * TICK_SECONDS;
