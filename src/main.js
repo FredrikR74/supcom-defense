@@ -87,6 +87,8 @@ function startGame({ map, difficulty }) {
     onPause: (value) => queueCommand(world, { type: 'setPaused', owner: PLAYER_ID, ids: selectedIds(), value }),
     onEnhance: (enhancement, queue = false) =>
       queueCommand(world, { type: 'enhance', owner: PLAYER_ID, ids: selectedIds(), enhancement, queue }),
+    onCancelEnhance: (enhancement) =>
+      queueCommand(world, { type: 'cancelEnhance', owner: PLAYER_ID, ids: selectedIds(), enhancement }),
     onPatrol: startPatrol,
     onSell: sellSelected,
   });

@@ -80,13 +80,13 @@ Enheter: UEF ACU, Engineer och MA12 Striker. Fiender: Cybran Mantis, Mole och Me
   *Test (Vitest):* efter uppgraderingen ger utvinnaren T2:s mass och drar T2:s energi.
 - [ ] **7. Fler kartor med mer variation.** Fler och större kartor med olika terräng (raviner, höjder och flera vägar) och olika antal spawnpunkter. **Räckvidd och projektilfart** är i dag hårdkodat halverade för första kartans storlek, så lagra FA:s ohalverade värden i data och låt en skalfaktor per karta räkna fram dem.
   *Test (Vitest):* alla kartor klarar karttesterna (spawnpunkter når kärnan); samma enhet får rätt räckvidd på kartor med olika skala.
-- [x] **8. ACU-uppgraderingar.** UEF ACU:ns enhancements med värden från FAF:s blueprint (`UEL0001_unit.bp`) och effekter från `UEL0001_script.lua`. Uppgraderingarna ligger i `src/data/enhancements.js`. ACU:n bygger dem på sig själv med sin byggkraft och står still under tiden. Kostnaden dras löpande, och ingenjörer kan assistera. En ny order avbryter uppgraderingen, och det som lagts ner är förlorat. Varje plats (höger arm, vänster arm, rygg) rymmer en uppgradering, och en ny ersätter den gamla. Uppgraderingarna försvinner när ACU:n dör, precis som veterancy.
+- [x] **8. ACU-uppgraderingar.** UEF ACU:ns enhancements med värden från FAF:s blueprint (`UEL0001_unit.bp`) och effekter från `UEL0001_script.lua`. Uppgraderingarna ligger i `src/data/enhancements.js`. ACU:n bygger dem på sig själv med sin byggkraft och står still under tiden. Kostnaden dras löpande, och ingenjörer kan assistera. En flyttorder eller annan order avbryter inte uppgraderingen, utan läggs efter den. Bara Cancel upgrade (eller högerklick på knappen) avbryter, och då får man tillbaka det som lagts ner. Varje plats (höger arm, vänster arm, rygg) rymmer en uppgradering, och en ny ersätter den gamla. Uppgraderingarna försvinner när ACU:n dör, precis som veterancy.
   - **Zephyr Amplifier** (höger arm): 800 mass, 24 000 energi, byggtid 800. +100 skada och räckvidd 22→30 (i spelet 11→15).
   - **Nano-Repair System** (vänster arm): 800 mass, 24 000 energi, byggtid 800. +1 500 max-HP och +40 regen.
   - **Resource Allocation System** (höger arm): 5 000 mass, 175 000 energi, byggtid 2 800. +14 mass/s och +2 500 energi/s.
 
   Senare: T2/T3 Engineering Suite (med steg 5), sköldarna (med T2 Shield Generator i steg 5), C-D1 Shoulder Drone (med steg 2), Tactical Missile Launcher och "Billy" (kräver missilvapen). Personal Teleporter tas inte med.
-  *Test (Vitest):* `tests/enhancements.test.js`. Uppgraderingen tar `buildTime / byggkraft`, kostar rätt och ger rätt effekt. En ny uppgradering på samma plats ersätter den gamla. En assisterande ingenjör gör den snabbare, och den försvinner när ACU:n återuppstår.
+  *Test (Vitest):* `tests/enhancements.test.js`. Uppgraderingen tar `buildTime / byggkraft`, kostar rätt och ger rätt effekt. En ny uppgradering på samma plats ersätter den gamla. En flyttorder avbryter inte, men cancelEnhance gör det och ger tillbaka kostnaden. En assisterande ingenjör gör den snabbare, och den försvinner när ACU:n återuppstår.
 
 ## Arbetsflöde per steg
 

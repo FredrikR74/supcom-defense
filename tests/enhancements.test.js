@@ -96,15 +96,34 @@ describe('ACU-uppgraderingar', () => {
     expect(hasEnhancement(acu, 'zephyrAmplifier')).toBe(true);
   });
 
-  it('en ny order avbryter uppgraderingen och framsteget går förlorat', () => {
+  it('en flyttorder avbryter inte uppgraderingen utan väntar tills den är klar', () => {
     const { world, acu } = setup();
+    const start = { x: acu.x, z: acu.z };
     enhance(world, [acu.id], 'nanoRepair');
     ticks(world, 100);
     queueCommand(world, { type: 'move', owner: PLAYER_ID, ids: [acu.id], x: acu.x + 2, z: acu.z });
-    ticks(world, 1);
+    ticks(world, 10);
+    expect(acu.orders.map((o) => o.type)).toEqual(['enhance', 'move']);
+    expect(acu.orders[0].progress).toBeGreaterThan(0.1);
+    expect({ x: acu.x, z: acu.z }).toEqual(start);
+    ticks(world, enhanceTicks('nanoRepair', units.acu.buildPower));
+    expect(hasEnhancement(acu, 'nanoRepair')).toBe(true);
+    expect(acu.x).toBeCloseTo(start.x + 2);
+  });
+
+  it('cancelEnhance avbryter och ger tillbaka det som lagts ner', () => {
+    const { world, acu, economy } = setup();
+    economy.mass.stored = 5000;
     enhance(world, [acu.id], 'nanoRepair');
-    ticks(world, 2);
-    expect(acu.orders[0].progress).toBeLessThan(0.01);
+    ticks(world, 200);
+    const progress = acu.orders[0].progress;
+    const before = economy.mass.stored;
+    queueCommand(world, { type: 'cancelEnhance', owner: PLAYER_ID, ids: [acu.id], enhancement: 'nanoRepair' });
+    ticks(world, 1);
+    expect(acu.orders).toHaveLength(0);
+    expect(hasEnhancement(acu, 'nanoRepair')).toBe(false);
+    // Tillbaka: kostnaden × framsteget (plus ett ticks inkomst).
+    expect(economy.mass.stored - before).toBeCloseTo(enhancements.nanoRepair.cost.mass * progress + units.acu.production.mass / 10, 0);
   });
 
   it('kan inte beställas av enheter utan uppgraderingen eller om den redan finns', () => {

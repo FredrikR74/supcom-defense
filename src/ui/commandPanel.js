@@ -13,7 +13,7 @@ const costText = (cost) => `${cost.mass} M · ${cost.energy} E`;
  * och repetering för markerade fabriker, och Sell för markerade byggnader.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
-export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol, onEnhance }) {
+export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol, onEnhance, onCancelEnhance }) {
   let signature = '';
   /** Enhetstyp -> framstegsstapel i dess produktionsknapp; uppdateras varje frame. */
   let progressBars = new Map();
@@ -167,12 +167,20 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
         }, { active: installed, badge: queuedAt > 0 ? `${queuedAt + 1}` : '' });
         b.title = `${SLOT_NAMES[enh.slot]} upgrade: ${enh.description}` +
           (!installed && replaces ? ` · replaces ${enhancements[replaces].name}` : '') +
-          (installed ? '' : ' · Shift+click: queue');
+          (installed ? '' : queuedAt >= 0 ? ' · Right-click: cancel' : ' · Shift+click: queue');
+        b.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          if (queuedAt >= 0) onCancelEnhance(key);
+        });
         const bar = document.createElement('span');
         bar.className = 'cmd-progress';
         b.appendChild(bar);
         enhanceBars.set(key, bar);
         buttons.appendChild(b);
+      }
+      if (enhanceOrders.length) {
+        buttons.appendChild(button('Cancel upgrade', enhancements[enhanceOrders[0].enhancement].name,
+          () => onCancelEnhance(enhanceOrders[0].enhancement)));
       }
       for (const type of producible) {
         const def = units[type];

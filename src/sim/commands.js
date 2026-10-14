@@ -1,6 +1,7 @@
 import { getEntity, removeEntity, getDef, weaponOf } from './entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
+import enhancements from '../data/enhancements.js';
 import { setDifficulty } from './director.js';
 import { enhancementsFor, hasEnhancement } from './enhancements.js';
 
@@ -28,6 +29,7 @@ const HANDLERS = {
   reclaim: (world, cmd) => applyWork(world, cmd, 'reclaim'),
   patrol: applyPatrol,
   enhance: applyEnhance,
+  cancelEnhance: applyCancelEnhance,
 };
 
 export function applyCommands(world) {
@@ -42,8 +44,12 @@ function ownUnits(world, ids, owner, filter = () => true) {
     .filter((e) => e && e.kind === 'unit' && e.owner === owner && filter(e));
 }
 
+/**
+ * Utan `queue` ersätts tidigare order, utom en uppgradering som pågår: den
+ * avbryts bara med cancelEnhance, och den nya ordern tar vid när den är klar.
+ */
 function giveOrder(unit, order, queue) {
-  if (!queue) unit.orders.length = 0;
+  if (!queue) unit.orders.length = unit.orders[0]?.type === 'enhance' ? 1 : 0;
   unit.orders.push(order);
 }
 
@@ -108,13 +114,33 @@ function applyPatrol(world, { owner, ids, x, z, queue }) {
 /**
  * `{ type: 'enhance', owner, ids, enhancement, queue }`: ACU:n bygger en
  * uppgradering på sig själv (se enhancements.js). Den står still under tiden,
- * och en ny order utan `queue` avbryter den (det som lagts ner är förlorat).
+ * och andra order väntar tills den är klar (se giveOrder).
  */
 function applyEnhance(world, { owner, ids, enhancement, queue }) {
   const can = (e) => enhancementsFor(e.type).includes(enhancement) && !hasEnhancement(e, enhancement) &&
     !e.orders.some((o) => o.type === 'enhance' && o.enhancement === enhancement);
   for (const e of ownUnits(world, ids, owner, can)) {
     giveOrder(e, { type: 'enhance', enhancement, progress: 0 }, queue);
+  }
+}
+
+/**
+ * `{ type: 'cancelEnhance', owner, ids, enhancement }`: avbryt uppgraderingen
+ * `enhancement` (alla om den saknas), pågående eller köad. För den som pågår
+ * får man tillbaka det den kostat hittills, som när en fabrik avbryter.
+ */
+function applyCancelEnhance(world, { owner, ids, enhancement }) {
+  const economy = world.players[owner]?.economy;
+  const match = (o) => o.type === 'enhance' && (enhancement == null || o.enhancement === enhancement);
+  for (const e of ownUnits(world, ids, owner, (u) => u.orders.some(match))) {
+    const current = e.orders[0];
+    if (match(current) && economy) {
+      const { cost } = enhancements[current.enhancement];
+      for (const r of ['mass', 'energy']) {
+        economy[r].stored = Math.min(economy[r].max, economy[r].stored + cost[r] * current.progress);
+      }
+    }
+    e.orders = e.orders.filter((o) => !match(o));
   }
 }
 
