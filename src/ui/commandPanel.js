@@ -3,13 +3,14 @@ import { getDef } from '../sim/entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
 import enhancements from '../data/enhancements.js';
-import { enhancementsFor, hasEnhancement, SLOT_NAMES } from '../sim/enhancements.js';
+import { enhancementsFor } from '../sim/enhancements.js';
+import { renderBuildMenu, menuTabs } from './buildMenu.js';
 
 const costText = (cost) => `${cost.mass} M · ${cost.energy} E`;
 
 /**
- * Kommandopanel längst ner: byggknappar för markerade byggare, uppgraderingar
- * för en markerad ACU, produktionsknappar
+ * Kommandopanel längst ner: byggmenyn för markerade byggare och en markerad
+ * ACU:s uppgraderingar (se buildMenu.js), produktionsknappar
  * och repetering för markerade fabriker, och Sell för markerade byggnader.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
@@ -19,8 +20,14 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
   let progressBars = new Map();
   /** Framstegsstapel i köns första ruta. */
   let queueBar = null;
-  /** Uppgradering -> framstegsstapel i dess knapp; uppdateras varje frame. */
+  /** Uppgradering -> framstegsstapel i dess ruta; uppdateras varje frame. */
   let enhanceBars = new Map();
+  /** Byggmenyns flik ('build' eller en uppgraderingsplats), tech-nivå och ruta under musen. */
+  let tab = 'build';
+  let tech = 'TECH1';
+  let hovered = null;
+  /** Ritar om byggmenyns informationsruta; sätts när menyn byggs. */
+  let refreshMenu = null;
 
   /** Som i FA: Ctrl eller Shift gör att ett klick gäller 5 i stället för 1. */
   const batch = (e) => (e.ctrlKey || e.shiftKey ? 5 : 1);
@@ -128,16 +135,18 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
           const order = enhanceOrders.find((o) => o.enhancement === key);
           bar.style.width = `${(order?.progress ?? 0) * 100}%`;
         }
+        refreshMenu?.();
       };
 
       const hasUnits = selected.some((e) => e.kind === 'unit');
+      if (!menuTabs(enhanceable).some((t) => t.key === tab)) tab = 'build';
       // Kön visas för en markerad fabrik (den första om flera är markerade).
       const queueFactory = factories[0] ?? null;
       const sig = JSON.stringify([
         hasUnits, ui.mode, queueFactory?.id, queueFactory?.productionQueue,
         [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat, paused,
         sellable.length, ui.placing?.type, enhanceable?.id, enhanceable?.enhancements,
-        enhanceOrders.map((o) => o.enhancement),
+        enhanceOrders.map((o) => o.enhancement), tab, tech,
       ]);
       if (sig === signature) {
         updateProgress();
@@ -148,35 +157,34 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       el.replaceChildren();
       progressBars = new Map();
       enhanceBars = new Map();
+      refreshMenu = null;
       queueBar = null;
       const buttons = document.createElement('div');
       buttons.className = 'cmd-row';
-      for (const type of buildable) {
-        const def = structures[type];
-        buttons.appendChild(button(def.name, costText(def.cost), () => onBuild(type), {
-          active: ui.placing?.type === type,
-        }));
-      }
-      for (const key of enhanceable ? enhancementsFor(enhanceable.type) : []) {
-        const enh = enhancements[key];
-        const installed = hasEnhancement(enhanceable, key);
-        const queuedAt = enhanceOrders.findIndex((o) => o.enhancement === key);
-        const replaces = enhanceable.enhancements?.[enh.slot];
-        const b = button(enh.name, installed ? 'Installed' : costText(enh.cost), (e) => {
-          if (!installed) onEnhance(key, e.shiftKey);
-        }, { active: installed, badge: queuedAt > 0 ? `${queuedAt + 1}` : '' });
-        b.title = `${SLOT_NAMES[enh.slot]} upgrade: ${enh.description}` +
-          (!installed && replaces ? ` · replaces ${enhancements[replaces].name}` : '') +
-          (installed ? '' : queuedAt >= 0 ? ' · Right-click: cancel' : ' · Shift+click: queue');
-        b.addEventListener('contextmenu', (e) => {
-          e.preventDefault();
-          if (queuedAt >= 0) onCancelEnhance(key);
+      const builders = selected.filter((e) => e.kind === 'unit' && units[e.type].builds?.length);
+      if (builders.length) {
+        const menu = renderBuildMenu({
+          buildable: [...buildable],
+          powerFor: (type) => builders.filter((e) => units[e.type].builds.includes(type))
+            .reduce((sum, e) => sum + units[e.type].buildPower, 0),
+          enhanceable,
+          enhanceOrders,
+          enhancePower: enhanceable ? units[enhanceable.type].buildPower : 0,
+          tab,
+          tech,
+          placing: ui.placing?.type,
+          hovered,
+        }, {
+          onTab: (key) => { tab = key; signature = ''; },
+          onTech: (key) => { tech = key; signature = ''; },
+          onHover: (key) => { hovered = key; },
+          onBuild,
+          onEnhance,
+          onCancelEnhance,
         });
-        const bar = document.createElement('span');
-        bar.className = 'cmd-progress';
-        b.appendChild(bar);
-        enhanceBars.set(key, bar);
-        buttons.appendChild(b);
+        el.appendChild(menu.root);
+        enhanceBars = menu.bars;
+        refreshMenu = menu.refresh;
       }
       if (enhanceOrders.length) {
         buttons.appendChild(button('Cancel upgrade', enhancements[enhanceOrders[0].enhancement].name,
