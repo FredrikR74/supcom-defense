@@ -1,5 +1,6 @@
 import { TICK_SECONDS } from './constants.js';
 import { getDef, getEntity } from './entities.js';
+import { baseMaxHp } from './enhancements.js';
 
 /**
  * HP-regenerering och veterancy enligt FAF (lua/defaultcomponents.lua,
@@ -13,6 +14,7 @@ import { getDef, getEntity } from './entities.js';
  * - Varje nivå: max-HP × (1 + 0,1 × nivå) utan att fylla på, en engångsläkning
  *   på VeteranHealingMult × bas-max-HP (standard 0,1) och extra regen per tech-nivå.
  * - Bara enheter och byggnader med vapen får veterancy.
+ * - Max-HP räknas på blueprintens plus ACU-uppgraderingarnas (se enhancements.js).
  */
 
 export const MAX_VET_LEVEL = 5;
@@ -82,15 +84,16 @@ export function addVetLevel(e) {
   const def = getDef(e.type);
   const level = e.vetLevel + 1;
   e.vetLevel = level;
-  e.maxHp = def.maxHp * (1 + 0.1 * level);
+  const base = baseMaxHp(e);
+  e.maxHp = base * (1 + 0.1 * level);
   const healMult = def.veteranHealingMult?.[level - 1] ?? 0.1;
-  e.hp = Math.min(e.maxHp, e.hp + def.maxHp * healMult);
+  e.hp = Math.min(e.maxHp, e.hp + base * healMult);
   e.vetRegen = VET_REGEN[TECH_TO_REGEN_ROW[def.techCategory ?? 'TECH1'] ?? 0][level - 1];
 }
 
-/** HP per sekund för en entitet: blueprintens regen plus veterancy-regen. */
+/** HP per sekund för en entitet: blueprintens regen plus veterancy- och uppgraderingsregen. */
 export function regenRate(e) {
-  return (getDef(e.type)?.regenRate ?? 0) + (e.vetRegen ?? 0);
+  return (getDef(e.type)?.regenRate ?? 0) + (e.vetRegen ?? 0) + (e.enhancementRegen ?? 0);
 }
 
 /** Levande enheter och färdiga byggnader regenererar HP. */

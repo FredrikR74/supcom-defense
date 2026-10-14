@@ -35,6 +35,8 @@ export default {
     buildRange: 5,
     builds: BASIC_STRUCTURES,
     production: { mass: 1, energy: 20 },
+    /** Uppgraderingar (nycklar i data/enhancements.js). */
+    enhancements: ['zephyrAmplifier', 'nanoRepair', 'resourceAllocation'],
     /** Veterancy i FA: egna trösklar (massa dödad per nivå) och läkning per nivå. */
     veteranMass: [1000, 1250, 1750, 2500, 3500],
     veteranHealingMult: [0.1, 0.2, 0.3, 0.4, 0.5],

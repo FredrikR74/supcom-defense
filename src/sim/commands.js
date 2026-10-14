@@ -1,7 +1,8 @@
-import { getEntity, removeEntity, getDef } from './entities.js';
+import { getEntity, removeEntity, getDef, weaponOf } from './entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
 import { setDifficulty } from './director.js';
+import { enhancementsFor, hasEnhancement } from './enhancements.js';
 
 /**
  * Spelarens kommandon läggs i en kö och verkställs i början av nästa tick.
@@ -26,6 +27,7 @@ const HANDLERS = {
   repair: (world, cmd) => applyWork(world, cmd, 'repair'),
   reclaim: (world, cmd) => applyWork(world, cmd, 'reclaim'),
   patrol: applyPatrol,
+  enhance: applyEnhance,
 };
 
 export function applyCommands(world) {
@@ -62,7 +64,7 @@ function applyAttack(world, { owner, ids, targetId, queue }) {
   const target = getEntity(world, targetId);
   if (!target || target.owner === owner || target.owner === 0) return;
   // Luftvärn anfaller bara flyg.
-  const canAttack = (u) => Boolean(units[u.type].weapon) && Boolean(units[u.type].weapon.antiAir) === Boolean(getDef(target.type)?.air);
+  const canAttack = (u) => Boolean(weaponOf(u)) && Boolean(weaponOf(u).antiAir) === Boolean(getDef(target.type)?.air);
   for (const e of ownUnits(world, ids, owner, canAttack)) {
     giveOrder(e, { type: 'attack', targetId }, queue);
   }
@@ -100,6 +102,19 @@ function applyPatrol(world, { owner, ids, x, z, queue }) {
     }
     const start = last ? orderEnd(world, e, last) : { x: e.x, z: e.z };
     giveOrder(e, { type: 'patrol', points: [start, { x, z }], index: 1 }, queue);
+  }
+}
+
+/**
+ * `{ type: 'enhance', owner, ids, enhancement, queue }`: ACU:n bygger en
+ * uppgradering på sig själv (se enhancements.js). Den står still under tiden,
+ * och en ny order utan `queue` avbryter den (det som lagts ner är förlorat).
+ */
+function applyEnhance(world, { owner, ids, enhancement, queue }) {
+  const can = (e) => enhancementsFor(e.type).includes(enhancement) && !hasEnhancement(e, enhancement) &&
+    !e.orders.some((o) => o.type === 'enhance' && o.enhancement === enhancement);
+  for (const e of ownUnits(world, ids, owner, can)) {
+    giveOrder(e, { type: 'enhance', enhancement, progress: 0 }, queue);
   }
 }
 

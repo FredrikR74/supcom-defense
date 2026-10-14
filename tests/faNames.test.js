@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import faNames from '../src/data/faNames.js';
 import structures from '../src/data/structures.js';
 import units from '../src/data/units.js';
+import enhancements from '../src/data/enhancements.js';
 
 const approved = (name, unitName) =>
   faNames.some((n) => n.name === name && (unitName === undefined || n.unitName === unitName));
@@ -10,6 +11,7 @@ describe('bara riktiga FA-namn', () => {
   const all = [
     ...Object.entries(structures).map(([key, def]) => ['structures', key, def]),
     ...Object.entries(units).map(([key, def]) => ['units', key, def]),
+    ...Object.entries(enhancements).map(([key, def]) => ['enhancements', key, def]),
   ];
 
   it.each(all)('%s.%s har ett godkänt FA-namn', (_file, _key, def) => {

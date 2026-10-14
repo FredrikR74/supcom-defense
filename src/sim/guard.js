@@ -1,4 +1,4 @@
-import { getEntity, getDef, needsRepair } from './entities.js';
+import { getEntity, needsRepair, weaponOf } from './entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
 
@@ -17,12 +17,12 @@ const areEnemies = (a, b) => a.owner !== b.owner && a.owner !== 0 && b.owner !==
 /**
  * Assist (guard) som i FA: en enhet som assisterar en annan egen enhet eller
  * fabrik följer den och
- * - byggare hjälper till med det den bygger eller producerar, och reparerar
+ * - byggare hjälper till med det den bygger, producerar eller uppgraderar, och reparerar
  *   den när den är skadad
  * - beväpnade anfaller fiender som kommer nära den (se updateGuardEngagement)
  *
  * Returnerar vart enheten ska gå och vad den ska göra där:
- * { x, z, reach, target, mode, site } där mode är 'build', 'factory', 'repair',
+ * { x, z, reach, target, mode, site } där mode är 'build', 'factory', 'enhance', 'repair',
  * 'engage' eller 'follow', eller null om den assisterade försvunnit.
  */
 export function guardDestination(world, unit, order) {
@@ -41,12 +41,16 @@ export function guardDestination(world, unit, order) {
   if (builder && target.buildJob?.kind === 'unit') {
     return { x: target.x, z: target.z, reach: range + target.radius, target, site: null, mode: 'factory' };
   }
+  if (builder && target.buildJob?.kind === 'enhance' && target.buildJob.targetId === target.id) {
+    return { x: target.x, z: target.z, reach: range + target.radius, target, site: null, mode: 'enhance' };
+  }
   if (builder && needsRepair(target)) {
     return { x: target.x, z: target.z, reach: range + target.radius, target, site: null, mode: 'repair' };
   }
   const enemy = order.engageId != null ? getEntity(world, order.engageId) : null;
-  if (enemy && def.weapon) {
-    return { x: enemy.x, z: enemy.z, reach: def.weapon.range * 0.9 + enemy.radius, target, site: null, mode: 'engage' };
+  const weapon = weaponOf(unit);
+  if (enemy && weapon) {
+    return { x: enemy.x, z: enemy.z, reach: weapon.range * 0.9 + enemy.radius, target, site: null, mode: 'engage' };
   }
   return { x: target.x, z: target.z, reach: range + target.radius + FOLLOW_SLACK, target, site: null, mode: 'follow' };
 }
@@ -60,7 +64,7 @@ export function updateGuardEngagement(world) {
   for (const e of world.entities) {
     const order = e.kind === 'unit' ? e.orders[0] : null;
     if (order?.type !== 'guard') continue;
-    const weapon = getDef(e.type)?.weapon;
+    const weapon = weaponOf(e);
     const target = getEntity(world, order.targetId);
     if (!weapon || weapon.antiAir || !target) {
       order.engageId = null;

@@ -2,20 +2,25 @@ import { PLAYER_ID } from '../sim/constants.js';
 import { getDef } from '../sim/entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
+import enhancements from '../data/enhancements.js';
+import { enhancementsFor, hasEnhancement, SLOT_NAMES } from '../sim/enhancements.js';
 
 const costText = (cost) => `${cost.mass} M · ${cost.energy} E`;
 
 /**
- * Kommandopanel längst ner: byggknappar för markerade byggare, produktionsknappar
+ * Kommandopanel längst ner: byggknappar för markerade byggare, uppgraderingar
+ * för en markerad ACU, produktionsknappar
  * och repetering för markerade fabriker, och Sell för markerade byggnader.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
-export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol }) {
+export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol, onEnhance }) {
   let signature = '';
   /** Enhetstyp -> framstegsstapel i dess produktionsknapp; uppdateras varje frame. */
   let progressBars = new Map();
   /** Framstegsstapel i köns första ruta. */
   let queueBar = null;
+  /** Uppgradering -> framstegsstapel i dess knapp; uppdateras varje frame. */
+  let enhanceBars = new Map();
 
   /** Som i FA: Ctrl eller Shift gör att ett klick gäller 5 i stället för 1. */
   const batch = (e) => (e.ctrlKey || e.shiftKey ? 5 : 1);
@@ -104,6 +109,9 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
         (n, e) => n + e.productionQueue.filter((t) => t === type).length, 0);
       const repeat = factories.length > 0 && factories.every((f) => f.repeat);
       const paused = factories.length > 0 && factories.every((f) => f.paused);
+      // Uppgraderingar visas för den första markerade enheten som kan få några (ACU:n).
+      const enhanceable = selected.find((e) => e.kind === 'unit' && enhancementsFor(e.type).length) ?? null;
+      const enhanceOrders = enhanceable?.orders.filter((o) => o.type === 'enhance') ?? [];
       const sellable = selected.filter((e) => e.kind === 'structure' && getDef(e.type).cost && !getDef(e.type).unsellable);
 
       // Framsteget ändras varje frame, så det uppdateras utan att panelen byggs om.
@@ -116,6 +124,10 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
           const pct = busy.length ? Math.max(...busy.map((f) => f.productionProgress)) * 100 : 0;
           bar.style.width = `${pct}%`;
         }
+        for (const [key, bar] of enhanceBars) {
+          const order = enhanceOrders.find((o) => o.enhancement === key);
+          bar.style.width = `${(order?.progress ?? 0) * 100}%`;
+        }
       };
 
       const hasUnits = selected.some((e) => e.kind === 'unit');
@@ -124,7 +136,8 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       const sig = JSON.stringify([
         hasUnits, ui.mode, queueFactory?.id, queueFactory?.productionQueue,
         [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat, paused,
-        sellable.length, ui.placing?.type,
+        sellable.length, ui.placing?.type, enhanceable?.id, enhanceable?.enhancements,
+        enhanceOrders.map((o) => o.enhancement),
       ]);
       if (sig === signature) {
         updateProgress();
@@ -134,6 +147,7 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
 
       el.replaceChildren();
       progressBars = new Map();
+      enhanceBars = new Map();
       queueBar = null;
       const buttons = document.createElement('div');
       buttons.className = 'cmd-row';
@@ -142,6 +156,23 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
         buttons.appendChild(button(def.name, costText(def.cost), () => onBuild(type), {
           active: ui.placing?.type === type,
         }));
+      }
+      for (const key of enhanceable ? enhancementsFor(enhanceable.type) : []) {
+        const enh = enhancements[key];
+        const installed = hasEnhancement(enhanceable, key);
+        const queuedAt = enhanceOrders.findIndex((o) => o.enhancement === key);
+        const replaces = enhanceable.enhancements?.[enh.slot];
+        const b = button(enh.name, installed ? 'Installed' : costText(enh.cost), (e) => {
+          if (!installed) onEnhance(key, e.shiftKey);
+        }, { active: installed, badge: queuedAt > 0 ? `${queuedAt + 1}` : '' });
+        b.title = `${SLOT_NAMES[enh.slot]} upgrade: ${enh.description}` +
+          (!installed && replaces ? ` · replaces ${enhancements[replaces].name}` : '') +
+          (installed ? '' : ' · Shift+click: queue');
+        const bar = document.createElement('span');
+        bar.className = 'cmd-progress';
+        b.appendChild(bar);
+        enhanceBars.set(key, bar);
+        buttons.appendChild(b);
       }
       for (const type of producible) {
         const def = units[type];

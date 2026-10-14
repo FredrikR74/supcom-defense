@@ -23,6 +23,10 @@ export default [
   { name: 'Wall Section', faction: 'UEF', tech: 1, verified: true },
   { name: 'Point Defense', unitName: 'DM1 Plasma Cannon', faction: 'UEF', tech: 1, verified: true },
   { name: 'Quantum Gateway', faction: 'UEF', tech: 3, verified: true },
+  // UEF ACU:ns uppgraderingar (Enhancements i UEL0001_unit.bp)
+  { name: 'Zephyr Amplifier', faction: 'UEF', verified: true },
+  { name: 'Nano-Repair System', faction: 'UEF', verified: true },
+  { name: 'Resource Allocation System', faction: 'UEF', verified: true },
 
   // Cybran (fienderna)
   { name: 'Assault Bot', unitName: 'Mantis', faction: 'Cybran', tech: 1, verified: true },

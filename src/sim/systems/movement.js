@@ -2,7 +2,7 @@ import { TICK_SECONDS } from '../constants.js';
 import { guardDestination } from '../guard.js';
 import { flowTarget } from '../pathing.js';
 import { steer, PATH_BUDGET_PER_TICK } from '../unitPath.js';
-import { getEntity, getDef, needsRepair } from '../entities.js';
+import { getEntity, needsRepair, weaponOf } from '../entities.js';
 import units from '../../data/units.js';
 
 /** Gå till inom byggräckvidd för att reparera/återvinna; null när det inte behövs längre. */
@@ -17,7 +17,7 @@ function workDestination(world, e, order) {
 /** Gå mot målet tills det är inom vapnets räckvidd; null om målet är borta. */
 function attackDestination(world, e, order) {
   const target = getEntity(world, order.targetId);
-  const range = getDef(e.type)?.weapon?.range;
+  const range = weaponOf(e)?.range;
   if (!target || target.hp <= 0 || !range) return null;
   return { x: target.x, z: target.z, reach: Math.max(0.5, range + target.radius - 0.5) };
 }

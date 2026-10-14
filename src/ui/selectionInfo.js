@@ -1,5 +1,7 @@
 import { PLAYER_ID } from '../sim/constants.js';
-import { getDef, getEntity } from '../sim/entities.js';
+import { getDef, getEntity, weaponOf } from '../sim/entities.js';
+import { installedEnhancements } from '../sim/enhancements.js';
+import enhancements from '../data/enhancements.js';
 import { regenRate } from '../sim/veterancy.js';
 
 const fmt = (v) => v.toFixed(1);
@@ -53,7 +55,7 @@ function describe(e, { enemy, world }) {
   let html = `<div class="info-name ${enemy ? 'info-enemy' : ''}">${name} <span class="info-vet">${stars(e.vetLevel)}</span></div>`;
   if (enemy) html += `<div class="info-row info-sub">${def.faction ?? 'Enemy'} · enemy</div>`;
   html += row('HP', `${Math.ceil(e.hp)} / ${Math.round(e.maxHp)}${regen ? ` <span class="info-sub">(+${regen}/s)</span>` : ''}`);
-  const w = def.weapon;
+  const w = weaponOf(e);
   if (w) {
     const dps = w.damage * w.rateOfFire;
     html += row('Weapon', `${w.damage} × ${fmt(w.rateOfFire)}/s <span class="info-sub">(${fmt(dps)} DPS)</span>`);
@@ -70,6 +72,10 @@ function describe(e, { enemy, world }) {
       : 0;
     html += row('Build rate', assist ? `${def.buildPower} <span class="info-gives">+${assist} assist</span>` : def.buildPower);
   }
+  const installed = installedEnhancements(e);
+  if (installed.length) html += row('Upgrades', installed.map((k) => enhancements[k].name).join(', '));
+  const enhancing = e.kind === 'unit' && e.orders[0]?.type === 'enhance' ? e.orders[0] : null;
+  if (enhancing) html += row('Upgrading', `${enhancements[enhancing.enhancement].name} ${Math.floor(enhancing.progress * 100)}%`);
   if (enemy && def.cost) html += row('Mass value', def.cost.mass);
   if (e.kind === 'structure' && !e.built) html += row('Building', `${Math.floor(e.progress * 100)}%`);
   return html;

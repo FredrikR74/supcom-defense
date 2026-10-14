@@ -1,6 +1,6 @@
 import { TICK_SECONDS } from '../constants.js';
 import { createSpatialHash } from '../spatialHash.js';
-import { getDef, getEntity, removeEntity, addWreck } from '../entities.js';
+import { getDef, getEntity, removeEntity, addWreck, weaponOf } from '../entities.js';
 import { recordDamage, disperseVeterancy } from '../veterancy.js';
 import { updateGuardEngagement } from '../guard.js';
 
@@ -17,7 +17,7 @@ const areEnemies = (a, b) => a.owner !== b.owner && a.owner !== 0 && b.owner !==
 /** Vapnet för en entitet som kan skjuta just nu (byggnader måste vara klara), annars null. */
 export function activeWeapon(e) {
   if (!isTargetable(e) || (e.kind === 'structure' && !e.built)) return null;
-  return getDef(e.type)?.weapon ?? null;
+  return weaponOf(e);
 }
 
 /**

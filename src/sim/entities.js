@@ -8,6 +8,14 @@ export function getDef(type) {
 }
 
 /**
+ * Entitetens vapen: en egen kopia om en uppgradering ändrat det (se
+ * enhancements.js), annars definitionens. null om den saknar vapen.
+ */
+export function weaponOf(e) {
+  return e.weapon ?? getDef(e.type)?.weapon ?? null;
+}
+
+/**
  * Skapar en byggnad från dess definition i data/structures.js.
  * (x, z) är mittpunkten. `built: false` ger en ofärdig byggnad som byggs upp.
  */

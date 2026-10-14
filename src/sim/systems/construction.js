@@ -5,6 +5,8 @@ import { isBlockedCell } from '../pathing.js';
 import { guardDestination } from '../guard.js';
 import structures from '../../data/structures.js';
 import units from '../../data/units.js';
+import enhancements from '../../data/enhancements.js';
+import { applyEnhancement, hasEnhancement } from '../enhancements.js';
 
 /** Byggnaden räknas som klar när progress når hit (tål flyttalsavrundning). */
 const DONE = 1 - 1e-9;
@@ -19,6 +21,8 @@ export function buildRate(buildPower, buildTime) {
  * - 'structure': bygger byggnaden `job.targetId`
  * - 'unit': fabriken bygger själv enheten `job.type`
  * - 'factoryAssist': hjälper fabriken `job.targetId` med dess enhet
+ * - 'enhance': bygger uppgraderingen `job.enhancement` på enheten `job.targetId`
+ *   (sig själv, eller den den assisterar)
  */
 function setJob(e, job, def, power) {
   const rate = buildRate(power, def.buildTime);
@@ -117,6 +121,9 @@ function startGuardOrder(world, e, order) {
   } else if (dest.mode === 'factory') {
     const type = dest.target.buildJob.type;
     setJob(e, { kind: 'factoryAssist', targetId: dest.target.id }, units[type], power);
+  } else if (dest.mode === 'enhance') {
+    const key = dest.target.buildJob.enhancement;
+    setJob(e, { kind: 'enhance', targetId: dest.target.id, enhancement: key }, enhancements[key], power);
   } else if (dest.mode === 'repair') {
     setRepairJob(world, e, dest.target);
   }
@@ -127,6 +134,16 @@ function setRepairJob(world, e, target) {
   setJob(e, { kind: 'repair', targetId: target.id }, getDef(target.type), units[e.type].buildPower);
   const mult = world.config.repairCostMult;
   e.demand = { mass: e.demand.mass * mult, energy: e.demand.energy * mult };
+}
+
+/** ACU:n bygger en uppgradering på sig själv; en redan installerad hoppas över. */
+function startEnhanceOrder(e, order) {
+  if (hasEnhancement(e, order.enhancement)) {
+    e.orders.shift();
+    return;
+  }
+  setJob(e, { kind: 'enhance', targetId: e.id, enhancement: order.enhancement },
+    enhancements[order.enhancement], units[e.type].buildPower);
 }
 
 function startProductionJob(e) {
@@ -156,6 +173,7 @@ export function constructionDemand(world) {
     else if (order?.type === 'guard') guards.push(e);
     else if (order?.type === 'repair') startRepairOrder(world, e, order);
     else if (order?.type === 'reclaim') startReclaimOrder(world, e, order);
+    else if (order?.type === 'enhance') startEnhanceOrder(e, order);
   }
   for (const e of guards) startGuardOrder(world, e, e.orders[0]);
 }
@@ -300,9 +318,21 @@ export function constructionProgress(world) {
         target.built = true;
         world.events.push({ type: 'built', owner: target.owner, structure: target.type, x: target.x, z: target.z });
       }
+    } else if (e.buildJob.kind === 'enhance') {
+      const order = target.orders[0];
+      if (order?.type === 'enhance' && order.enhancement === e.buildJob.enhancement) order.progress += delta;
     } else {
       target.productionProgress += delta;
     }
+  }
+
+  // Enheter vars uppgradering blivit klar.
+  for (const e of world.entities) {
+    const order = e.kind === 'unit' ? e.orders[0] : null;
+    if (order?.type !== 'enhance' || order.progress < DONE) continue;
+    e.orders.shift();
+    applyEnhancement(e, order.enhancement);
+    world.events.push({ type: 'enhanced', owner: e.owner, enhancement: order.enhancement, x: e.x, z: e.z });
   }
 
   // Fabriker vars enhet blivit klar (av egen kraft och/eller med assist).

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { createIcon } from './icons.js';
-import { isIdleBuilder, isIdleFactory, getDef } from '../sim/entities.js';
+import { isIdleBuilder, isIdleFactory, getDef, weaponOf } from '../sim/entities.js';
 import { createModel, createGhost, WRECK_MATERIAL, BUILD_WIRE_MATERIAL } from './models.js';
 import { createInstancedBatch } from './instancedUnits.js';
 
@@ -250,9 +250,10 @@ export function createEntityView(terrain) {
       const def = getDef(e.type);
       if (!def || (e.kind === 'structure' && !e.built)) continue;
       const { x, z } = e.kind === 'unit' ? lerpPos(e, alpha) : e;
-      if (def.weapon) {
-        addRangeRing(weaponRings, x, z, def.weapon.range);
-        if (def.weapon.minRange) addRangeRing(weaponRings, x, z, def.weapon.minRange);
+      const weapon = weaponOf(e);
+      if (weapon) {
+        addRangeRing(weaponRings, x, z, weapon.range);
+        if (weapon.minRange) addRangeRing(weaponRings, x, z, weapon.minRange);
       }
       if (e.kind === 'unit' && def.buildPower > 0 && def.buildRange) addRangeRing(buildRings, x, z, def.buildRange);
     }

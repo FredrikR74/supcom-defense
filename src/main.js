@@ -22,6 +22,7 @@ import { createSound } from './ui/sound.js';
 import { showStartMenu } from './ui/startMenu.js';
 import maps from './data/maps/index.js';
 import gameConfig from './data/gameConfig.js';
+import enhancements from './data/enhancements.js';
 
 /** Spelhastigheter man stegar mellan med +/− (1× är normal). */
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
@@ -84,6 +85,8 @@ function startGame({ map, difficulty }) {
       queueCommand(world, { type: 'cancelProduce', owner: PLAYER_ID, id, index, count }),
     onRepeat: (value) => queueCommand(world, { type: 'setRepeat', owner: PLAYER_ID, ids: selectedIds(), value }),
     onPause: (value) => queueCommand(world, { type: 'setPaused', owner: PLAYER_ID, ids: selectedIds(), value }),
+    onEnhance: (enhancement, queue = false) =>
+      queueCommand(world, { type: 'enhance', owner: PLAYER_ID, ids: selectedIds(), enhancement, queue }),
     onPatrol: startPatrol,
     onSell: sellSelected,
   });
@@ -211,6 +214,7 @@ function startGame({ map, difficulty }) {
       if (ev.type === 'defeat') showGameOver(ev.elapsed);
       if (ev.type === 'acuDeath') threatPanel.toast(`ACU destroyed! Respawning in ${ev.seconds} s`);
       if (ev.type === 'acuRespawn') threatPanel.toast('ACU respawned at the Quantum Gateway');
+      if (ev.type === 'enhanced' && ev.owner === PLAYER_ID) threatPanel.toast(`Upgrade complete: ${enhancements[ev.enhancement].name}`);
     }
     measure('sound', () => sound.handleEvents(world.events, view.rig.target));
     view.render(world, alpha, selection, time.paused ? 0 : frameSeconds, measure);
