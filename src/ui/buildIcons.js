@@ -54,6 +54,15 @@ const ICONS = {
     <path d="M24 17l12-6v4l-11 6z" fill="${TEAM}" ${LINE}/>
     <circle cx="20" cy="20" r="2.5" fill="${RED}"/>`),
 
+  // ACU:n: bred robot med kanonarm och byggarm.
+  acu: svg(`
+    <rect x="12" y="8" width="16" height="15" rx="3" fill="${TEAM}" ${LINE}/>
+    <rect x="16" y="11" width="8" height="4" fill="#67e8f9"/>
+    <path d="M12 12H6v10h6M28 12h6v10h-6" fill="${DARK}" ${LINE}/>
+    <path d="M6 22v6M34 22v7" stroke="${DARK}" stroke-width="3"/>
+    <circle cx="34" cy="31" r="2" fill="${ENERGY}"/>
+    <path d="M15 23l-3 12M25 23l3 12" stroke="${DARK}" stroke-width="4" stroke-linecap="round"/>`),
+
   // Enheter från fabriken
   // Ingenjörsfordon med byggarm.
   engineer: svg(`

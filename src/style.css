@@ -376,7 +376,7 @@ html, body {
 #idle {
   position: fixed;
   left: 8px;
-  top: 8px;
+  top: 70px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -386,7 +386,8 @@ html, body {
 
 /* Resurspanelen är fönsterbred i smala fönster: idle-knapparna flyttas under den */
 @media (max-width: 760px) {
-  #idle { top: 52px; }
+  #acu { top: 52px; }
+  #idle { top: 114px; }
 }
 
 .idle-button {
@@ -750,3 +751,78 @@ html, body {
 .ro-facts { color: #94a3b8; font-size: 11px; }
 .ro-gives { color: #86efac; }
 .ro-takes { color: #fca5a5; }
+
+/* ACU-knappen uppe till vänster (acuButton.js), alltid synlig som i FA */
+#acu {
+  position: fixed;
+  left: 8px;
+  top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 200px;
+  padding: 4px 8px 4px 4px;
+  font: 12px/1.2 system-ui, sans-serif;
+  color: #e5e7eb;
+  text-align: left;
+  background: linear-gradient(#1f2937ee, #111827ee);
+  border: 1px solid #3b4b63;
+  border-radius: 5px;
+  cursor: pointer;
+}
+#acu:hover { border-color: #93c5fd; }
+#acu.acu-selected { border-color: #4ade80; box-shadow: 0 0 0 1px #4ade80 inset; }
+#acu.acu-hit { animation: acu-hit 0.5s ease-in-out infinite alternate; }
+#acu.acu-dead { opacity: 0.7; cursor: default; }
+#acu.acu-dead .acu-icon { filter: grayscale(1) brightness(0.6); }
+@keyframes acu-hit {
+  from { border-color: #ef4444; box-shadow: 0 0 0 0 #ef444400; }
+  to { border-color: #ef4444; box-shadow: 0 0 10px 2px #ef4444cc; }
+}
+.acu-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 3px;
+  background: radial-gradient(circle at 50% 35%, #2b3f5c, #121b2a 75%);
+  border: 1px solid #3b4b63;
+  border-radius: 3px;
+}
+.acu-icon svg { display: block; width: 100%; height: 100%; }
+.acu-body { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+.acu-name { font-weight: 700; letter-spacing: 0.04em; }
+.acu-vet { color: #facc15; font-weight: 600; letter-spacing: 0; }
+.acu-bar { height: 6px; background: #0b1220; border: 1px solid #334155; border-radius: 2px; overflow: hidden; }
+.acu-fill { display: block; height: 100%; width: 100%; background: #4ade80; }
+.acu-hp { font-size: 11px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+/* Flera markerade: en ruta per typ med antal och samlad hälsa (selectionInfo.js) */
+#info:has(.sel-grid) { max-width: 340px; }
+.sel-grid { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0 6px; }
+.sel-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 52px;
+  padding: 3px 2px 2px;
+  background: radial-gradient(circle at 50% 35%, #2b3f5c, #121b2a 75%);
+  border: 1px solid #3b4b63;
+  border-radius: 3px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.sel-tile:hover { border-color: #93c5fd; }
+.sel-icon { display: block; width: 32px; height: 32px; }
+.sel-icon svg { display: block; width: 100%; height: 100%; }
+.sel-label { font: 600 9px/1.1 system-ui, sans-serif; color: #cbd5e1; text-align: center; }
+.sel-count {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font: 700 11px/1 system-ui, sans-serif;
+  color: #f8fafc;
+  text-shadow: 0 1px 2px #000, 0 0 2px #000;
+}
+.sel-bar { width: 100%; height: 3px; margin-top: 2px; background: #0b1220; }
+.sel-bar span { display: block; height: 100%; }

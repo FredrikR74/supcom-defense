@@ -17,6 +17,7 @@ import { createCommandPanel } from './ui/commandPanel.js';
 import { createThreatPanel } from './ui/threatPanel.js';
 import { createSelectionInfo } from './ui/selectionInfo.js';
 import { createIdlePanel } from './ui/idlePanel.js';
+import { createAcuButton } from './ui/acuButton.js';
 import { createMinimap } from './ui/minimap.js';
 import { createSound } from './ui/sound.js';
 import { showStartMenu } from './ui/startMenu.js';
@@ -109,7 +110,24 @@ function startGame({ map, difficulty }) {
 
   const modeHint = $('mode-hint');
   const speedHint = $('speed');
-  const selectionInfo = createSelectionInfo($('info'));
+  /** Behåll bara markerade av `type` (eller ta bort dem, med `keep = false`). */
+  const filterSelection = (type, keep) => {
+    for (const id of [...selection]) {
+      const e = getEntity(world, id);
+      if (!e || (e.type === type) !== keep) selection.delete(id);
+    }
+  };
+  const selectionInfo = createSelectionInfo($('info'), {
+    onSelectOnly: (type) => filterSelection(type, true),
+    onDeselect: (type) => filterSelection(type, false),
+  });
+  const acuButton = createAcuButton($('acu'), {
+    onSelect: (acu) => {
+      selection.clear();
+      selection.add(acu.id);
+    },
+    onCenter: (acu) => view.centerOn(acu.x, acu.z),
+  });
   const minimap = createMinimap($('minimap'), world, view);
   const idlePanel = createIdlePanel($('idle'), {
     // Markerar utan att flytta kameran.
@@ -229,6 +247,7 @@ function startGame({ map, difficulty }) {
     measure('threat panel', () => threatPanel.update(world, { respawnIn: acuRespawnIn(world) }));
     measure('selection info', () => selectionInfo.update(world, selection, ui));
     measure('idle panel', () => idlePanel.update(world));
+    measure('acu button', () => acuButton.update(world, selection));
     measure('minimap', () => minimap.update());
 
     const speed = SPEEDS[time.speed];

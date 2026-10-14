@@ -31,6 +31,8 @@ const DESCRIPTIONS = {
 
 /** Namn under ikonen, så att man ser vad rutan är utan att hålla musen över den. */
 const LABELS = {
+  acu: 'ACU',
+  core: 'Quantum Gateway',
   landFactory: 'Land Factory',
   massExtractor: 'Mass Extractor',
   powerGenerator: 'Power Gen.',
@@ -48,6 +50,9 @@ const LABELS = {
   nanoRepair: 'Nano-Repair',
   resourceAllocation: 'Resource Alloc.',
 };
+
+/** Kortnamnet för en typ (byggnad, enhet eller uppgradering). */
+export const shortName = (key) => LABELS[key] ?? key;
 
 /** Grupper i rutnätet, i FA:s ordning: fabriker, ekonomi, försvar; enheter: ingenjör, strid, stöd. */
 const GROUPS = [

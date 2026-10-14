@@ -2,6 +2,8 @@ import { PLAYER_ID } from '../sim/constants.js';
 import { getDef, getEntity, weaponOf } from '../sim/entities.js';
 import { installedEnhancements } from '../sim/enhancements.js';
 import enhancements from '../data/enhancements.js';
+import { buildIcon } from './buildIcons.js';
+import { shortName } from './buildMenu.js';
 import { regenRate } from '../sim/veterancy.js';
 
 const fmt = (v) => v.toFixed(1);
@@ -82,11 +84,63 @@ function describe(e, { enemy, world }) {
 }
 
 /**
+ * Flera markerade: en ruta per typ med ikon, antal och samlad hälsa, som FA:s
+ * markeringspanel. Enheter före byggnader, flest först.
+ */
+function selectionGrid(selected) {
+  const groups = new Map();
+  for (const e of selected) {
+    const g = groups.get(e.type) ?? { type: e.type, unit: e.kind === 'unit', n: 0, hp: 0, maxHp: 0 };
+    g.n++;
+    g.hp += Math.max(0, e.hp);
+    g.maxHp += e.maxHp;
+    groups.set(e.type, g);
+  }
+  const sorted = [...groups.values()].sort((a, b) =>
+    (b.unit - a.unit) || (b.type === 'acu') - (a.type === 'acu') || b.n - a.n);
+  const tiles = sorted.map((g) => {
+    const frac = g.maxHp > 0 ? g.hp / g.maxHp : 0;
+    const color = frac > 0.6 ? '#4ade80' : frac > 0.3 ? '#facc15' : '#ef4444';
+    const def = getDef(g.type);
+    const name = def.unitName ?? def.name;
+    return `<span class="sel-tile" data-type="${g.type}" title="${name}: ${g.n} · ${Math.round(frac * 100)}% health · ` +
+      `Click: select only these · Shift/right-click: deselect">` +
+      `<span class="sel-icon">${buildIcon(g.type)}</span>` +
+      (g.n > 1 ? `<span class="sel-count">${g.n}</span>` : '') +
+      `<span class="sel-label">${shortName(g.type)}</span>` +
+      `<span class="sel-bar"><span style="width:${Math.round(frac * 100)}%;background:${color}"></span></span></span>`;
+  });
+  return `<div class="info-name">${selected.length} selected</div><div class="sel-grid">${tiles.join('')}</div>`;
+}
+
+/**
  * Info nere till vänster om det som är markerat (eller en fiende man klickat på):
  * namn, HP, veterancy, kills, vapen och fart, och för egna saker vad de ger
- * och drar i mass och energi per sekund. Flera markerade: antal och summan.
+ * och drar i mass och energi per sekund. Flera markerade: en ruta per typ
+ * (se selectionGrid) och summan. Klick på en ruta markerar bara den typen,
+ * Shift-klick eller högerklick tar bort typen ur markeringen.
  */
-export function createSelectionInfo(el) {
+export function createSelectionInfo(el, { onSelectOnly, onDeselect } = {}) {
+  // Panelen ritas om varje frame, så klicken fångas på panelen (mousedown).
+  el.addEventListener('mousedown', (e) => {
+    const tile = e.target.closest?.('.sel-tile');
+    if (!tile) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const type = tile.dataset.type;
+    if (e.button === 2 || e.shiftKey) onDeselect?.(type);
+    else if (e.button === 0) onSelectOnly?.(type);
+  });
+  el.addEventListener('contextmenu', (e) => {
+    if (e.target.closest?.('.sel-tile')) e.preventDefault();
+  });
+  // Skriv bara om panelen när innehållet ändrats, så att hover och verktygstips håller.
+  let shown = '';
+  const render = (html) => {
+    if (html === shown) return;
+    shown = html;
+    el.innerHTML = html;
+  };
   return {
     update(world, selection, ui = {}) {
       const selected = world.entities.filter((e) => selection.has(e.id) && e.owner === PLAYER_ID);
@@ -97,7 +151,7 @@ export function createSelectionInfo(el) {
       if (el.hidden) return;
 
       if (inspected) {
-        el.innerHTML = describe(inspected, { enemy: inspected.owner !== PLAYER_ID && inspected.owner !== 0, world });
+        render(describe(inspected, { enemy: inspected.owner !== PLAYER_ID && inspected.owner !== 0, world }));
         return;
       }
 
@@ -121,12 +175,12 @@ export function createSelectionInfo(el) {
 
       const head = selected.length === 1
         ? describe(selected[0], { enemy: false, world })
-        : `<div class="info-name">${selected.length} selected</div>`;
+        : selectionGrid(selected);
       const economy = economyLine('Produces', gives, '+', 'info-gives') + economyLine('Consumes', takes, '−', 'info-takes');
       const stallNote = stalled
         ? `<div class="info-row info-takes">Resource shortage: running at ${Math.round(economy0.efficiency * 100)}% speed</div>`
         : '';
-      el.innerHTML = head + (economy || '<div class="info-row info-sub">No resource use</div>') + stallNote;
+      render(head + (economy || '<div class="info-row info-sub">No resource use</div>') + stallNote);
     },
   };
 }

@@ -59,6 +59,7 @@ Spelet är spelbart från start till förlust. Det har:
 - **Strid:** FA-värden, veterancy och regen.
 - **Fiender och vägar:** fiender som hittar vägen runt murar, och A* för egna enheter.
 - **Spelet:** startmeny med två kartor, paus och spelhastighet, minikarta och ljud.
+- **ACU-knapp och markeringspanel:** ACU-knappen uppe till vänster syns alltid, med hälsa, blinkar vid skada och visar nedräkningen när ACU:n är död. Vid flera markerade visar infopanelen en ruta per typ med antal och hälsa, och klick väljer bara den typen.
 - **Bygg- och fabriksmeny i FA-stil:** flikar (Build och ACU:ns uppgraderingsplatser), tech-nivåer T1–EXP, ikonrutnät med namn under varje ikon och en informationsruta med kostnad, byggtid och effekt.
 
 - **ACU-uppgraderingar:** Zephyr Amplifier, Nano-Repair System och Resource Allocation System.
