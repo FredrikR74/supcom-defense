@@ -4,9 +4,7 @@ import structures from '../data/structures.js';
 import units from '../data/units.js';
 import enhancements from '../data/enhancements.js';
 import { enhancementsFor } from '../sim/enhancements.js';
-import { renderBuildMenu, menuTabs } from './buildMenu.js';
-
-const costText = (cost) => `${cost.mass} M · ${cost.energy} E`;
+import { renderBuildMenu, renderFactoryMenu, menuTabs } from './buildMenu.js';
 
 /**
  * Kommandopanel längst ner: byggmenyn för markerade byggare och en markerad
@@ -88,6 +86,20 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       strip.appendChild(loop);
     }
     return strip;
+  }
+
+  /**
+   * Högerklick i fabriksmenyn: ta bort de `n` sista av `type` ur varje fabriks
+   * kö (den sista gruppen av typen, så att den som byggs tas sist).
+   */
+  function removeQueued(factories, type, n) {
+    for (const f of factories) {
+      const end = f.productionQueue.lastIndexOf(type);
+      if (end < 0) continue;
+      let start = end;
+      while (start > 0 && end - start + 1 < n && f.productionQueue[start - 1] === type) start--;
+      onCancelProduce(f.id, start, end - start + 1);
+    }
   }
 
   function button(label, sub, onClick, { active = false, badge = '' } = {}) {
@@ -190,19 +202,24 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
         buttons.appendChild(button('Cancel upgrade', enhancements[enhanceOrders[0].enhancement].name,
           () => onCancelEnhance(enhanceOrders[0].enhancement)));
       }
-      for (const type of producible) {
-        const def = units[type];
-        const n = queued(type);
-        // Som i FA: Ctrl- eller Shift-klick köar 5 åt gången.
-        const b = button(def.name, costText(def.cost), (e) => onProduce(type, batch(e)), {
-          badge: n ? `${n}` : '',
+      let factoryMenu = null;
+      if (factories.length) {
+        factoryMenu = renderFactoryMenu({
+          producible: [...producible],
+          queued,
+          power: structures[factories[0].type].buildPower,
+          tech,
+          hovered,
+        }, {
+          // Som i FA: Ctrl- eller Shift-klick köar 5 åt gången, högerklick tar bort.
+          onProduce: (type, e) => onProduce(type, batch(e)),
+          onRemove: (type, e) => removeQueued(factories, type, batch(e)),
+          onTab: () => {},
+          onTech: (key) => { tech = key; signature = ''; },
+          onHover: (key) => { hovered = key; },
         });
-        b.title = 'Click: queue 1 · Shift/Ctrl+click: queue 5';
-        const bar = document.createElement('span');
-        bar.className = 'cmd-progress';
-        b.appendChild(bar);
-        progressBars.set(type, bar);
-        buttons.appendChild(b);
+        progressBars = factoryMenu.bars;
+        refreshMenu = factoryMenu.refresh;
       }
       if (factories.length) {
         buttons.appendChild(button('Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
@@ -217,6 +234,7 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       // Kön ligger ovanför knapparna: panelen sitter i skärmens nederkant, så när
       // kön växer flyttar sig inte knapparna under muspekaren.
       if (queueFactory?.productionQueue.length) el.appendChild(queueStrip(queueFactory));
+      if (factoryMenu) el.appendChild(factoryMenu.root);
       if (buttons.childElementCount) el.appendChild(buttons);
       el.hidden = el.childElementCount === 0;
       updateProgress();

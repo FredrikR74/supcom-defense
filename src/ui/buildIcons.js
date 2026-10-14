@@ -1,7 +1,7 @@
 /**
- * Ikoner för byggmenyn (SVG, 40×40). Egen design i FA:s anda: en enkel bild
- * av byggnaden eller uppgraderingen i lagfärg, med massgrönt och energigult
- * där det hör till. FA:s egna ikoner används inte.
+ * Ikoner för bygg- och fabriksmenyn (SVG, 40×40). Egen design i FA:s anda: en
+ * enkel bild av byggnaden, enheten eller uppgraderingen i lagfärg, med
+ * massgrönt och energigult där det hör till. FA:s egna ikoner används inte.
  */
 
 const TEAM = '#60a5fa';
@@ -54,6 +54,44 @@ const ICONS = {
     <path d="M24 17l12-6v4l-11 6z" fill="${TEAM}" ${LINE}/>
     <circle cx="20" cy="20" r="2.5" fill="${RED}"/>`),
 
+  // Enheter från fabriken
+  // Ingenjörsfordon med byggarm.
+  engineer: svg(`
+    <rect x="7" y="20" width="22" height="10" rx="2" fill="${TEAM}" ${LINE}/>
+    <path d="M18 20l6-9 9 3" fill="none" stroke="${ENERGY}" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="33" cy="14" r="2.5" fill="${ENERGY}"/>
+    <circle cx="11" cy="32" r="3" fill="${DARK}" ${LINE}/><circle cx="25" cy="32" r="3" fill="${DARK}" ${LINE}/>`),
+  // Lätt spaningsfordon med radarskål.
+  snoop: svg(`
+    <path d="M6 28l4-7h18l6 7z" fill="${TEAM}" ${LINE}/>
+    <path d="M18 21v-7" stroke="${DARK}" stroke-width="2"/>
+    <path d="M11 10a8 6 0 0 0 14 0" fill="none" stroke="#67e8f9" stroke-width="2.5"/>
+    <circle cx="11" cy="31" r="3" fill="${DARK}" ${LINE}/><circle cx="28" cy="31" r="3" fill="${DARK}" ${LINE}/>`),
+  // Tvåbent robot med gevär.
+  mechMarine: svg(`
+    <rect x="13" y="9" width="12" height="12" rx="2" fill="${TEAM}" ${LINE}/>
+    <rect x="16" y="12" width="6" height="3" fill="#67e8f9"/>
+    <path d="M15 21l-4 13M23 21l4 13" stroke="${DARK}" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M25 15h11" stroke="${DARK}" stroke-width="3"/>`),
+  // Stridsvagn med torn och kanon.
+  striker: svg(`
+    <rect x="4" y="24" width="30" height="9" rx="3" fill="${DARK}" ${LINE}/>
+    <path d="M7 24l3-6h18l3 6z" fill="${TEAM}" ${LINE}/>
+    <rect x="13" y="13" width="11" height="6" rx="1" fill="${TEAM}" ${LINE}/>
+    <path d="M24 15h13" stroke="${DARK}" stroke-width="3"/>`),
+  // Artilleri med högt riktat eldrör.
+  lobo: svg(`
+    <rect x="5" y="25" width="28" height="8" rx="3" fill="${DARK}" ${LINE}/>
+    <path d="M8 25l2-6h18l2 6z" fill="${TEAM}" ${LINE}/>
+    <path d="M18 20l12-14" stroke="${DARK}" stroke-width="3.5"/>
+    <path d="M30 6l3-3" stroke="${RED}" stroke-width="3" stroke-linecap="round"/>`),
+  // Luftvärn med dubbla eldrör uppåt.
+  archer: svg(`
+    <rect x="5" y="25" width="28" height="8" rx="3" fill="${DARK}" ${LINE}/>
+    <path d="M9 25l2-6h16l2 6z" fill="${TEAM}" ${LINE}/>
+    <path d="M15 19l4-14M22 19l4-14" stroke="${DARK}" stroke-width="2.5"/>
+    <path d="M12 7l4 2M26 4l2 4" stroke="#67e8f9" stroke-width="1.5"/>`),
+
   // Uppgraderingar
   // Kraftigare eldrör med laddningsringar.
   zephyrAmplifier: svg(`
@@ -74,7 +112,7 @@ const ICONS = {
     <circle cx="20" cy="20" r="3" fill="${ENERGY}"/>`),
 };
 
-/** SVG för `key` (byggnad eller uppgradering), eller en tom ram. */
+/** SVG för `key` (byggnad, enhet eller uppgradering), eller en tom ram. */
 export function buildIcon(key) {
   return ICONS[key] ?? svg(`<rect x="8" y="8" width="24" height="24" fill="${TEAM}" ${LINE}/>`);
 }
