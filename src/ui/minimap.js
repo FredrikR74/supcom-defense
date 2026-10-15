@@ -1,9 +1,11 @@
 import { PLAYER_ID, ENEMY_ID } from '../sim/constants.js';
+import { INTEL } from '../sim/intel.js';
 
 /**
  * Minikarta nere till höger: terrängen, kärnan, spawnpunkter, fyndigheter,
- * enheter och byggnader som prickar, och kamerans synfält. Klick eller drag
- * flyttar kameran dit.
+ * enheter och byggnader som prickar, och kamerans synfält. Det som ligger
+ * utanför egen sikt är mörkare, och fiender syns bara inom sikt eller radar.
+ * Klick eller drag flyttar kameran dit.
  */
 export function createMinimap(el, world, view) {
   const SIZE = 180;
@@ -41,6 +43,19 @@ export function createMinimap(el, world, view) {
 
   const toMap = (x, z) => [x * scale, z * scale];
 
+  // Krigsdimman: mörkt där spelaren inte ser (se sim/intel.js).
+  const fogCanvas = document.createElement('canvas');
+  fogCanvas.width = fogCanvas.height = n;
+  const fogCtx = fogCanvas.getContext('2d');
+  const fogImage = fogCtx.createImageData(n, n);
+  function drawFog() {
+    if (!world.intel) return;
+    const { vision } = world.intel;
+    for (let i = 0; i < vision.length; i++) fogImage.data[i * 4 + 3] = vision[i] ? 0 : 130;
+    fogCtx.putImageData(fogImage, 0, 0);
+    ctx.drawImage(fogCanvas, 0, 0, SIZE, SIZE);
+  }
+
   let dragging = false;
   const moveCamera = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -64,6 +79,7 @@ export function createMinimap(el, world, view) {
 
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(background, 0, 0, SIZE, SIZE);
+      drawFog();
 
       // Spawnpunkter och fyndigheter.
       ctx.fillStyle = '#ef4444';
@@ -88,6 +104,8 @@ export function createMinimap(el, world, view) {
           ctx.fillRect(x - 1, y - 1, 2, 2);
           continue;
         }
+        // Fiender i dimman syns inte, de på radar som en prick.
+        if (e.owner === ENEMY_ID && (e.intel ?? INTEL.VISIBLE) === INTEL.HIDDEN) continue;
         ctx.fillStyle = e.owner === PLAYER_ID ? '#3b82f6' : e.owner === ENEMY_ID ? '#ef4444' : '#9ca3af';
         if (e.kind === 'structure') {
           const s = Math.max(3, e.radius * 2 * scale);

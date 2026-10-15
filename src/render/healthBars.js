@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isRevealed } from '../sim/intel.js';
 
 /**
  * HP-staplar ovanför skadade enheter och byggnader, som i FA. Ritas
@@ -36,7 +37,7 @@ export function createHealthBars(capacity = 2048) {
       let n = 0;
       for (const e of world.entities) {
         if (n >= capacity) break;
-        if ((e.kind !== 'unit' && e.kind !== 'structure') || e.hp >= e.maxHp) continue;
+        if ((e.kind !== 'unit' && e.kind !== 'structure') || e.hp >= e.maxHp || !isRevealed(e)) continue;
         if (e.kind === 'structure' && !e.built) continue;
         const frac = Math.max(0, e.hp / e.maxHp);
         const width = Math.max(0.8, e.radius * 1.6);

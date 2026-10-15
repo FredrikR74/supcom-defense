@@ -55,6 +55,8 @@ describe('ACU:n på patrull', () => {
 
   it('går och anfaller fiender inom sin GuardScanRadius i stället för att återvinna', () => {
     const { world, acu } = setup();
+    // Dimman (intel.js) testas för sig; här ska enheten se fienden.
+    world.intel = null;
     cmd(world, { type: 'patrol', ids: [acu.id], x: acu.x + 10, z: acu.z });
     tickWorld(world);
     addWreck(world, { type: 'mantis', x: acu.x - 2, z: acu.z, radius: 0.6, mass: 500 });

@@ -6,6 +6,7 @@ import { buildIcon } from './buildIcons.js';
 import { shortName } from './buildMenu.js';
 import { regenRate } from '../sim/veterancy.js';
 import { techName, techRoman } from './tech.js';
+import { isRevealed } from '../sim/intel.js';
 
 const fmt = (v) => v.toFixed(1);
 const stars = (level) => '★'.repeat(level ?? 0);
@@ -152,7 +153,9 @@ export function createSelectionInfo(el, { onSelectOnly, onDeselect } = {}) {
   return {
     update(world, selection, ui = {}) {
       const selected = world.entities.filter((e) => selection.has(e.id) && e.owner === PLAYER_ID);
-      const inspected = selected.length === 0 && ui.inspectId != null ? getEntity(world, ui.inspectId) : null;
+      let inspected = selected.length === 0 && ui.inspectId != null ? getEntity(world, ui.inspectId) : null;
+      // En fiende som försvunnit i dimman kan inte inspekteras längre.
+      if (inspected && !isRevealed(inspected)) inspected = null;
       if (ui.inspectId != null && !inspected) ui.inspectId = null;
 
       el.hidden = selected.length === 0 && !inspected;

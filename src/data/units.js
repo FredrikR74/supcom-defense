@@ -1,5 +1,5 @@
 const BASIC_STRUCTURES = [
-  'landFactory', 'massExtractor', 'powerGenerator', 'massStorage', 'energyStorage', 'wall', 'pointDefense',
+  'landFactory', 'massExtractor', 'powerGenerator', 'massStorage', 'energyStorage', 'wall', 'pointDefense', 'radar',
 ];
 
 /**
@@ -7,7 +7,7 @@ const BASIC_STRUCTURES = [
  * Extractor fås bara genom uppgradering (se `upgradesTo` i structures.js).
  */
 const T2_STRUCTURES = [
-  'massExtractorT2', 'powerGeneratorT2', 'massFabricator', 'pointDefenseT2', 'artilleryT2', 'shieldGenerator',
+  'massExtractorT2', 'powerGeneratorT2', 'massFabricator', 'pointDefenseT2', 'artilleryT2', 'shieldGenerator', 'radarT2',
 ];
 
 /**
@@ -32,6 +32,8 @@ const T2_STRUCTURES = [
  * - `shield`: sköld som i FA (se sim/shields.js): `maxHp` (ShieldMaxHealth),
  *   `regenRate`, `regenStartTime`, `rechargeTime` och `radius` (ShieldSize / 2, halverad).
  * - `upkeep`: förbrukning per sekund (MaintenanceConsumptionPerSecond*).
+ * - `visionRadius`, `radarRadius`: FA:s Intel.VisionRadius och RadarRadius (eller
+ *   OmniRadius), halverade som räckvidderna. Se sim/intel.js.
  */
 export default {
   /** UEF ACU (UEL0001). */
@@ -41,6 +43,8 @@ export default {
     /** FA: General.SelectionPriority = 3 (som ingenjörer, under stridsenheter). */
     selectionPriority: 3,
     maxHp: 12000,
+    visionRadius: 12,
+    radarRadius: 12,
     regenRate: 10,
     speed: 3,
     radius: 1,
@@ -66,6 +70,7 @@ export default {
     faction: 'Cybran',
     techCategory: 'TECH1',
     maxHp: 270,
+    visionRadius: 10,
     speed: 3.6,
     radius: 0.6,
     cost: { mass: 56, energy: 273 },
@@ -83,6 +88,8 @@ export default {
     faction: 'Cybran',
     techCategory: 'TECH1',
     maxHp: 15,
+    visionRadius: 12,
+    radarRadius: 22,
     speed: 4.8,
     radius: 0.45,
     cost: { mass: 8, energy: 60 },
@@ -98,6 +105,7 @@ export default {
     faction: 'Cybran',
     techCategory: 'TECH1',
     maxHp: 140,
+    visionRadius: 9,
     speed: 2.8,
     radius: 0.6,
     cost: { mass: 36, energy: 180 },
@@ -110,6 +118,7 @@ export default {
     unitName: 'MA12 Striker',
     techCategory: 'TECH1',
     maxHp: 300,
+    visionRadius: 10,
     speed: 3.4,
     radius: 0.7,
     cost: { mass: 56, energy: 266 },
@@ -126,6 +135,8 @@ export default {
     unitName: 'Snoop',
     techCategory: 'TECH1',
     maxHp: 29,
+    visionRadius: 12,
+    radarRadius: 22,
     speed: 4.5,
     radius: 0.45,
     cost: { mass: 12, energy: 80 },
@@ -142,6 +153,7 @@ export default {
     unitName: 'Mech Marine',
     techCategory: 'TECH1',
     maxHp: 60,
+    visionRadius: 9,
     speed: 4.2,
     radius: 0.45,
     cost: { mass: 30, energy: 120 },
@@ -159,6 +171,7 @@ export default {
     unitName: 'Lobo',
     techCategory: 'TECH1',
     maxHp: 205,
+    visionRadius: 9,
     speed: 2.8,
     radius: 0.55,
     cost: { mass: 36, energy: 180 },
@@ -179,6 +192,7 @@ export default {
     unitName: 'Archer',
     techCategory: 'TECH1',
     maxHp: 310,
+    visionRadius: 10,
     speed: 3.3,
     radius: 0.5,
     cost: { mass: 55, energy: 275 },
@@ -196,6 +210,7 @@ export default {
     /** FA: General.SelectionPriority = 3. */
     selectionPriority: 3,
     maxHp: 150,
+    visionRadius: 9,
     speed: 3.5,
     radius: 0.6,
     buildPower: 5,
@@ -213,6 +228,7 @@ export default {
     techCategory: 'TECH2',
     selectionPriority: 3,
     maxHp: 400,
+    visionRadius: 10,
     speed: 3.5,
     radius: 0.65,
     buildPower: 13,
@@ -231,6 +247,7 @@ export default {
     unitName: 'Pillar',
     techCategory: 'TECH2',
     maxHp: 1500,
+    visionRadius: 10,
     speed: 3.1,
     radius: 0.85,
     cost: { mass: 198, energy: 990 },
@@ -248,6 +265,7 @@ export default {
     unitName: 'Mongoose',
     techCategory: 'TECH2',
     maxHp: 650,
+    visionRadius: 13,
     speed: 2.9,
     radius: 0.6,
     cost: { mass: 200, energy: 1000 },
@@ -264,6 +282,7 @@ export default {
     unitName: 'Riptide',
     techCategory: 'TECH2',
     maxHp: 1800,
+    visionRadius: 9,
     speed: 3.7,
     radius: 0.8,
     cost: { mass: 320, energy: 1650 },
@@ -281,6 +300,7 @@ export default {
     unitName: 'Flapjack',
     techCategory: 'TECH2',
     maxHp: 825,
+    visionRadius: 9,
     speed: 2.9,
     radius: 0.7,
     cost: { mass: 180, energy: 1350 },
@@ -300,6 +320,7 @@ export default {
     unitName: 'Sky Boxer',
     techCategory: 'TECH2',
     maxHp: 1000,
+    visionRadius: 10,
     speed: 3.1,
     radius: 0.7,
     cost: { mass: 160, energy: 800 },
@@ -319,6 +340,7 @@ export default {
     unitName: 'Parashield',
     techCategory: 'TECH2',
     maxHp: 150,
+    visionRadius: 10,
     speed: 3.5,
     radius: 0.55,
     cost: { mass: 220, energy: 900 },
@@ -336,6 +358,7 @@ export default {
     faction: 'Cybran',
     techCategory: 'TECH2',
     maxHp: 1900,
+    visionRadius: 11,
     speed: 2.9,
     radius: 0.85,
     cost: { mass: 290, energy: 1500 },
@@ -352,6 +375,7 @@ export default {
     faction: 'Cybran',
     techCategory: 'TECH2',
     maxHp: 550,
+    visionRadius: 13,
     speed: 3.4,
     radius: 0.6,
     cost: { mass: 200, energy: 1000 },
@@ -369,6 +393,7 @@ export default {
     faction: 'Cybran',
     techCategory: 'TECH2',
     maxHp: 1200,
+    visionRadius: 10,
     speed: 3.7,
     radius: 0.8,
     cost: { mass: 297, energy: 1980 },
@@ -385,6 +410,7 @@ export default {
     faction: 'Cybran',
     techCategory: 'TECH2',
     maxHp: 700,
+    visionRadius: 9,
     speed: 3,
     radius: 0.75,
     cost: { mass: 180, energy: 1350 },

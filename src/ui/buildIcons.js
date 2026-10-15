@@ -204,6 +204,19 @@ const ICONS = {
     <circle cx="20" cy="14" r="3" fill="#67e8f9"/>
     <path d="M9 34h6M25 34h6" stroke="#67e8f9" stroke-width="2"/>`),
 
+  // Radarmast med skärm och radarvågor.
+  radar: svg(`
+    <rect x="10" y="30" width="20" height="5" rx="1" fill="${DARK}" ${LINE}/>
+    <path d="M17 30l2-14h2l2 14z" fill="${TEAM}" ${LINE}/>
+    <path d="M10 14a10 7 0 0 0 20 0z" fill="${TEAM}" ${LINE} transform="rotate(-15 20 12)"/>
+    <path d="M30 6a8 8 0 0 1 4 6M32 2a12 12 0 0 1 6 9" fill="none" stroke="#4ade80" stroke-width="1.8"/>`),
+  radarT2: svg(`
+    <rect x="9" y="32" width="22" height="4" rx="1" fill="${DARK}" ${LINE}/>
+    <path d="M18 32l1-20h2l1 20z" fill="${TEAM}" ${LINE}/>
+    <path d="M7 11a13 8 0 0 0 26 0z" fill="${TEAM}" ${LINE} transform="rotate(-15 20 9)"/>
+    <path d="M12 22a7 4 0 0 0 14 0z" fill="${TEAM}" ${LINE}/>
+    <path d="M31 4a8 8 0 0 1 4 6M33 0a12 12 0 0 1 6 9" fill="none" stroke="#4ade80" stroke-width="1.8"/>`),
+
   // Uppgraderingar
   // Kraftigare eldrör med laddningsringar.
   zephyrAmplifier: svg(`

@@ -3,6 +3,7 @@ import { getEntity } from './sim/entities.js';
 import { queueCommand } from './sim/commands.js';
 import { spawnSquad } from './sim/squads.js';
 import { acuRespawnIn } from './sim/acu.js';
+import { isVisibleAt } from './sim/intel.js';
 import { createFixedStep } from './loop.js';
 import { createRenderer } from './render/renderer.js';
 import { createCameraInput } from './input/cameraInput.js';
@@ -244,7 +245,9 @@ function startGame({ map, difficulty }) {
       }
       if (ev.type === 'shieldDown' && ev.owner === PLAYER_ID) threatPanel.toast('Shield down!');
     }
-    measure('sound', () => sound.handleEvents(world.events, view.rig.target));
+    // Det som händer i dimman hörs inte heller.
+    measure('sound', () => sound.handleEvents(
+      world.events.filter((ev) => ev.x === undefined || isVisibleAt(world, ev.x, ev.z)), view.rig.target));
     view.render(world, alpha, selection, time.paused ? 0 : frameSeconds, measure);
 
     const hovered = measure('hover pick', () => ndc && !ui.placing && getEntity(world, view.pickEntityAtNdc(ndc.x, ndc.y)));

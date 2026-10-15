@@ -63,6 +63,7 @@ Spelet är spelbart från start till förlust. Det har:
 - **Bygg- och fabriksmeny i FA-stil:** flikar (Build och ACU:ns uppgraderingsplatser), tech-nivåer T1–EXP, ikonrutnät med namn under varje ikon och en informationsruta med kostnad, byggtid och effekt.
 
 - **ACU-uppgraderingar:** Zephyr Amplifier, Nano-Repair System och Resource Allocation System.
+- **Radar och krigsdimma** som i FA: sikt per enhet, radarblippar och Radar System T1/T2.
 - **T2:** fabriker och Mass Extractors uppgraderas som i FA, T2-ingenjören bygger T2-byggnaderna, Land Factory HQ bygger T2-enheter, sköldar (Shield Generator och Parashield), och Cybran T2 i fiendens pool.
 
 Enheter: UEF ACU, Engineer, Snoop, Mech Marine, MA12 Striker, Lobo och Archer (T1), och T2 Engineer, Pillar, Mongoose, Riptide, Flapjack, Sky Boxer och Parashield (T2). Fiender: Cybran Mantis, Mole och Medusa (T1), och Rhino, Hoplite, Wagner och Viper (T2).
@@ -75,8 +76,13 @@ Enheter: UEF ACU, Engineer, Snoop, Mech Marine, MA12 Striker, Lobo och Archer (T
   *Test (Vitest):* flyg flyger rakt över murar; markvapen skjuter inte på flyg; luftvärn gör det.
 - [ ] **3. UEF T1-enheter för fienden.** Spelaren kan redan bygga alla UEF T1-landenheter (Snoop, Mech Marine, MA12 Striker, Lobo, Archer och Engineer) med värden från FAF:s blueprints. Kvar: fiendens pool ska kunna innehålla UEF-enheter. Archer skjuter bara på flyg och har inga mål förrän punkt 2 (flyg) är klar.
   *Test (Vitest):* fiendens pool kan skapa UEF-enheter.
-- [ ] **4. Radar och fog of war.** Krigsdimma: man ser bara det som är inom egna enheters och byggnaders siktradie. UEF Radar System visar fiender inom sin radie som radarblippar. Värden från blueprints.
-  *Test (Vitest):* en fiende utanför sikt och radar är dold; inom radar syns den som blipp; inom sikt syns den helt.
+- [x] **4. Radar och fog of war.** Som i FA, i `sim/intel.js`. Varje egen enhet och färdig byggnad ser runt sig (Intel.VisionRadius, halverad), och radar (RadarRadius, ACU:ns OmniRadius och Snoopens radar) visar fiender längre bort. Värden från FAF:s blueprints; byggnader vars blueprint saknar Intel (T1 Mass Extractor, T1 Power Generator, Mass Fabricator, lagren och muren) ser ingenting.
+  - **Inom sikt** syns fienden helt. **Bara på radar** syns den som FA:s generiska blipp (en tom röd romb, icon_land_generic) utan modell, hälsa, typ eller tech-nivå, på alla zoomnivåer. **Annars** är den dold, även på minikartan.
+  - Dimman ritas som i FA:s "Explored": terrängen syns, men det som ligger utanför egen sikt är mörkare, även på minikartan. Skott, träffar och explosioner i dimman syns och hörs inte.
+  - Egna vapen väljer bara fiender som syns eller finns på radar, och släpper ett mål som försvinner i dimman. Lobo och Point Defense skjuter alltså längre än de ser, som i FA, och behöver radar eller andra enheter som ser målet. Fienden (datorn) ser allt.
+  - **Radar System:** SA1-1000 (UEB3101, T1: radar 58, 20 energi/s) byggs av ACU:n och ingenjörer och uppgraderas till SA2-2000 (UEB3201, T2: radar 100, 150 energi/s), som T2-ingenjören också kan bygga. Radarn fungerar bara när dess energi räcker. Markerad radar visar sin räckvidd som en grön ring.
+  - Inte med än: Omni Sensor Array (T3), stealth och jamming, och minnet av fiendebyggnader man sett (fienden har inga byggnader).
+  *Test (Vitest):* `tests/intel.test.js`. En fiende utanför sikt och radar är dold, inom radar en blipp, inom sikt syns den helt. Radar utan energi och ofärdig radar ger inget, egna vapen skjuter inte på dolda fiender men på dem på radar, och T1-radarn uppgraderas till T2.
 - [x] **5. T2.** Värden från FAF:s blueprints. Uppgradering ligger i `sim/upgrades.js` och sköldar i `sim/shields.js`.
   - **Uppgradering som i FA:** en färdig byggnad med `upgradesTo` bygger uppgraderingen med sin egen byggkraft (FA:s BuildRate) och kostnaden (den nya typens hela pris) dras löpande. Ingenjörer kan assistera, och Cancel upgrade ger tillbaka det som lagts ner. En fabrik bygger inga enheter under tiden men behåller kön. Land Factory (BuildRate 20) blir **Land Factory HQ** (UEB0201: 1410 mass, 11 200 energi, byggtid 2300, BuildRate 40).
   - **T2 Engineer** (UEL0208, BuildRate 13) byggs i HQ:n och bygger T1- och T2-byggnader: T2 Mass Extractor, EG-200 Fusion Reactor (500 energi/s), Mass Fabricator, Triad (T2 Point Defense), Klink Hammer (Artillery Installation) och SD-Pulse (Shield Generator).

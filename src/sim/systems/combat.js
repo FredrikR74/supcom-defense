@@ -4,6 +4,7 @@ import { getDef, getEntity, removeEntity, addWreck, weaponOf } from '../entities
 import { recordDamage, disperseVeterancy } from '../veterancy.js';
 import { updateGuardEngagement } from '../guard.js';
 import { enemyShields, absorbProjectile } from '../shields.js';
+import { isDetected } from '../intel.js';
 
 /** Hur nära nedslagspunkten en entitets kant måste vara för att träffas. */
 const HIT_TOLERANCE = 0.3;
@@ -70,6 +71,7 @@ export function targetPriority(t) {
 /**
  * Varje entitet med vapen behåller sitt mål så länge det lever och är inom
  * räckvidd, annars väljs det viktigaste målet inom räckvidd (närmast vid lika).
+ * Spelarens vapen väljer bara fiender som syns eller finns på radar (intel.js).
  */
 export function targetingSystem(world) {
   updateGuardEngagement(world);
@@ -82,20 +84,21 @@ export function targetingSystem(world) {
     const order = e.orders?.[0];
     if (order?.type === 'attack') {
       const t = getEntity(world, order.targetId);
-      if (t && t.hp > 0 && canTarget(weapon, t, edgeDistance(e, t))) {
+      if (t && t.hp > 0 && isDetected(e.owner, t) && canTarget(weapon, t, edgeDistance(e, t))) {
         e.targetId = t.id;
         continue;
       }
     }
 
     const current = e.targetId ? getEntity(world, e.targetId) : null;
-    if (current && current.hp > 0 && canTarget(weapon, current, edgeDistance(e, current))) continue;
+    // Ett mål som försvunnit i dimman släpps, som i FA.
+    if (current && current.hp > 0 && isDetected(e.owner, current) && canTarget(weapon, current, edgeDistance(e, current))) continue;
 
     let best = null;
     let bestPrio = Infinity;
     let bestDist = Infinity;
     for (const t of hash.queryRadius(e.x, e.z, weapon.range + maxRadius)) {
-      if (!areEnemies(e, t) || t.hp <= 0) continue;
+      if (!areEnemies(e, t) || t.hp <= 0 || !isDetected(e.owner, t)) continue;
       const prio = targetPriority(t);
       if (prio === null) continue;
       const d = edgeDistance(e, t);
@@ -340,7 +343,7 @@ export function patrolEngageSystem(world) {
     let bestPrio = Infinity;
     let bestDist = Infinity;
     for (const t of hash.queryRadius(e.x, e.z, scan + maxRadius)) {
-      if (!areEnemies(e, t) || t.hp <= 0) continue;
+      if (!areEnemies(e, t) || t.hp <= 0 || !isDetected(e.owner, t)) continue;
       const prio = targetPriority(t);
       if (prio === null) continue;
       const d = edgeDistance(e, t);

@@ -1,6 +1,7 @@
 import { getEntity, needsRepair, weaponOf } from './entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
+import { isDetected } from './intel.js';
 
 /** Hur nära en assisterande enhet håller sig till den den följer, utöver räckvidden. */
 const FOLLOW_SLACK = 1;
@@ -78,7 +79,7 @@ export function updateGuardEngagement(world) {
     const tooFar = (t) => Math.hypot(t.x - target.x, t.z - target.z) - t.radius > scan * GUARD_RETURN_MULT;
 
     const current = order.engageId != null ? getEntity(world, order.engageId) : null;
-    if (current && current.hp > 0 && !tooFar(current)) continue;
+    if (current && current.hp > 0 && isDetected(e.owner, current) && !tooFar(current)) continue;
     order.engageId = null;
 
     const theirs = target.targetId != null ? getEntity(world, target.targetId) : null;
@@ -89,7 +90,7 @@ export function updateGuardEngagement(world) {
     let best = null;
     let bestDist = scan;
     for (const t of world.entities) {
-      if ((t.kind !== 'unit' && t.kind !== 'structure') || !areEnemies(e, t) || t.hp <= 0) continue;
+      if ((t.kind !== 'unit' && t.kind !== 'structure') || !areEnemies(e, t) || t.hp <= 0 || !isDetected(e.owner, t)) continue;
       const d = Math.hypot(t.x - target.x, t.z - target.z) - t.radius;
       if (d < bestDist) {
         best = t;

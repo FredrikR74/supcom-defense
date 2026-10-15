@@ -39,6 +39,8 @@ export default [
   { name: 'Point Defense', unitName: 'Triad', faction: 'UEF', tech: 2, verified: true },
   { name: 'Artillery Installation', unitName: 'Klink Hammer', faction: 'UEF', tech: 2, verified: true },
   { name: 'Shield Generator', unitName: 'SD - Pulse', faction: 'UEF', tech: 2, verified: true },
+  { name: 'Radar System', unitName: 'SA1 - 1000', faction: 'UEF', tech: 1, verified: true },
+  { name: 'Radar System', unitName: 'SA2 - 2000', faction: 'UEF', tech: 2, verified: true },
   // UEF ACU:ns uppgraderingar (Enhancements i UEL0001_unit.bp)
   { name: 'Zephyr Amplifier', faction: 'UEF', verified: true },
   { name: 'Nano-Repair System', faction: 'UEF', verified: true },

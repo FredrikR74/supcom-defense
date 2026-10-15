@@ -43,6 +43,8 @@ const DESCRIPTIONS = {
   flapjack: 'Long-range mobile missile launcher. Cannot fire at close targets.',
   skyBoxer: 'Mobile flak artillery. Fires only at air units.',
   parashield: 'Mobile shield generator that protects nearby units.',
+  radar: 'Reveals enemy units within its radius as radar contacts. Upgradeable.',
+  radarT2: 'Reveals enemy units within a large radius as radar contacts.',
 };
 
 /** Namn under ikonen, så att man ser vad rutan är utan att hålla musen över den. */
@@ -81,6 +83,8 @@ const LABELS = {
   hoplite: 'Hoplite',
   wagner: 'Wagner',
   viper: 'Viper',
+  radar: 'Radar',
+  radarT2: 'T2 Radar',
   mantis: 'Mantis',
   mole: 'Mole',
   medusa: 'Medusa',
@@ -98,6 +102,7 @@ const GROUPS = [
   ['massExtractor', 'massExtractorT2', 'massExtractorT3', 'powerGenerator', 'powerGeneratorT2', 'massFabricator',
     'massStorage', 'energyStorage'],
   ['pointDefense', 'pointDefenseT2', 'artilleryT2', 'shieldGenerator', 'wall'],
+  ['radar', 'radarT2'],
   ['engineer', 'engineerT2'],
   ['snoop', 'mechMarine', 'striker', 'pillar', 'mongoose', 'riptide'],
   ['lobo', 'archer', 'flapjack', 'skyBoxer', 'parashield'],
@@ -152,6 +157,8 @@ function defRollover(type, def, power) {
   if (def.storage?.energy) facts.push(`Stores ${def.storage.energy} energy`);
   if (def.weapon) facts.push(weaponFact(def.weapon));
   if (def.shield) facts.push(`shield ${def.shield.maxHp} HP · radius ${def.shield.radius}`);
+  if (def.radarRadius) facts.push(`radar ${def.radarRadius}`);
+  if (def.visionRadius) facts.push(`vision ${def.visionRadius}`);
   if (def.speed) facts.push(`speed ${def.speed}`);
   if (def.buildPower && def.speed) facts.push(`build rate ${def.buildPower}`);
   return nameLine(def) +

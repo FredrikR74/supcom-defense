@@ -10,6 +10,8 @@ import { createHealthBars } from './healthBars.js';
 import { createGhost, setGhostState, applySurfaceDetail } from './models.js';
 import { PLAYER_ID } from '../sim/constants.js';
 import { createNoBuildZones } from './noBuildZones.js';
+import { createFogOfWar } from './fogOfWar.js';
+import { isVisibleAt } from '../sim/intel.js';
 import { raycastTerrain, isInsideMap, getHeight } from '../sim/terrain.js';
 
 /** Över detta kameraavstånd visas strategiska ikoner i stället för meshes. */
@@ -45,7 +47,10 @@ export function createRenderer(canvas, world) {
   sun.position.set(-100, 60, -40);
   scene.add(sun);
 
-  scene.add(createTerrainMesh(terrain, renderer, { seed: map.seed }));
+  const terrainMesh = createTerrainMesh(terrain, renderer, { seed: map.seed });
+  scene.add(terrainMesh);
+  const fog = createFogOfWar(terrainMesh, terrain.size);
+  scene.add(fog.mesh);
   scene.add(createTerrainProps(map, terrain));
   const markers = createMapMarkers(map, terrain);
   scene.add(markers.meshes, markers.icons);
@@ -182,13 +187,15 @@ export function createRenderer(canvas, world) {
     render(world, alpha, selection, frameSeconds = 0, measure = (_name, fn) => fn()) {
       const strategic = rig.distance > STRATEGIC_DISTANCE;
       measure('render: entities', () => entities.sync(world, alpha, selection, PLAYER_ID, frameSeconds));
+      fog.update(world);
       pathDebug.update(world);
       markers.setStrategic(strategic);
       const fade = THREE.MathUtils.clamp((rig.distance - ICON_FADE_DISTANCE) / (STRATEGIC_DISTANCE - ICON_FADE_DISTANCE), 0, 1);
       entities.setStrategic(strategic, fade);
       // Händelser (skott, träffar, explosioner) blir effekter och töms sedan.
       measure('render: effects', () => {
-        combat.handleEvents(world.events);
+        // Skott, träffar och explosioner i dimman syns inte (som i FA).
+        combat.handleEvents(world.events.filter((ev) => ev.x === undefined || isVisibleAt(world, ev.x, ev.z)));
         world.events.length = 0;
         combat.update(world, alpha, frameSeconds);
       });

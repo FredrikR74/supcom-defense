@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
+import { isVisibleAt } from '../sim/intel.js';
 
 const OWNER_COLORS = {
   1: new THREE.Color(0x7dd3fc), // UEF: blå plasma
@@ -426,6 +427,7 @@ export function createCombatView(terrain, capacity = 2048) {
       for (const p of world.projectiles) {
         const x = p.prevX + (p.x - p.prevX) * alpha;
         const z = p.prevZ + (p.z - p.prevZ) * alpha;
+        if (!isVisibleAt(world, x, z)) continue; // i dimman
         q.setFromAxisAngle(up, Math.atan2(p.tx - p.prevX, p.tz - p.prevZ));
         let y = ground(x, z) + p.y;
         const color = OWNER_COLORS[p.owner] ?? DEFAULT_COLOR;

@@ -1,7 +1,8 @@
 import { spawnSquad } from './squads.js';
-import { TICK_SECONDS, ENEMY_ID } from './constants.js';
+import { TICK_SECONDS, ENEMY_ID, PLAYER_ID } from './constants.js';
 import { getEntity } from './entities.js';
 import units from '../data/units.js';
+import { isDetected } from './intel.js';
 
 /**
  * Fiendens strömmande "ekonomi": precis som spelarens ekonomi flyter fiendens
@@ -121,6 +122,7 @@ export function directorInfo(world) {
     rate: threatRate(d),
     difficulty: d.difficulty,
     label: difficultyLabel(d.difficulty),
-    enemies: world.entities.filter((e) => e.owner === ENEMY_ID && e.kind === 'unit').length,
+    /** Fiender som spelaren känner till (syns eller på radar), som i FA. */
+    enemies: world.entities.filter((e) => e.owner === ENEMY_ID && e.kind === 'unit' && isDetected(PLAYER_ID, e)).length,
   };
 }

@@ -11,7 +11,7 @@ const TYPES = ['acu', 'engineer', 'snoop', 'mechMarine', 'striker', 'lobo', 'arc
   'mantis', 'mole', 'medusa', 'rhino', 'hoplite', 'wagner', 'viper',
   'landFactory', 'landFactoryT2', 'massExtractor', 'massExtractorT2', 'massExtractorT3', 'powerGenerator',
   'powerGeneratorT2', 'massFabricator', 'massStorage', 'energyStorage', 'pointDefense', 'pointDefenseT2',
-  'artilleryT2', 'shieldGenerator', 'wall', 'core', 'cybranGateway'];
+  'artilleryT2', 'shieldGenerator', 'radar', 'radarT2', 'wall', 'core', 'cybranGateway'];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));

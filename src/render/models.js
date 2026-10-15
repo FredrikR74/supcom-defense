@@ -1122,6 +1122,53 @@ const MODELS = {
     return mergeByMaterial(parts);
   },
 
+  /**
+   * UEF SA1-1000 (T1 Radar System): liten fot med en fackverksmast och en
+   * radarskärm överst, och en glödande sensor.
+   */
+  radar() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const dish = rotated(taper(0.55, 0.12, 0.12, armor, 0, 1.75, 0.05, 16), -0.35);
+    const parts = [
+      chamferBox(1.6, 0.2, 1.6, armorDark, 0, 0.1, 0, 0.05),
+      chamferBox(0.9, 0.35, 0.9, armor, 0, 0.37, 0, 0.04),
+      chamferBox(0.94, 0.06, 0.94, teamPanel, 0, 0.5, 0, 0.01),
+      dish,
+      strut([0, 1.75, 0.05], [0, 1.9, 0.5], 0.04, armorDark, true),
+      chamferBox(0.08, 0.08, 0.08, glow, 0, 1.92, 0.52, 0.01),
+      cylinder(0.08, 0.1, armorDark, 0, 1.62, 0, 10),
+    ];
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      parts.push(strut([sx * 0.35, 0.55, sz * 0.35], [sx * 0.06, 1.6, sz * 0.06], 0.05, armorDark));
+    }
+    for (const y of [0.9, 1.25]) parts.push(chamferBox(0.5 - (y - 0.9) * 0.6, 0.03, 0.5 - (y - 0.9) * 0.6, armorDark, 0, y, 0, 0.005));
+    return mergeByMaterial(parts);
+  },
+
+  /**
+   * UEF SA2-2000 (T2 Radar System): högre mast på en kraftigare fot, en stor
+   * radarskärm och en mindre under den, och lampor i toppen.
+   */
+  radarT2() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const parts = [
+      chamferBox(1.8, 0.22, 1.8, armorDark, 0, 0.11, 0, 0.05),
+      rotated(taper(0.55, 0.7, 0.45, armor, 0, 0.45, 0, 8), 0, Math.PI / 8),
+      rotated(taper(0.58, 0.58, 0.07, teamPanel, 0, 0.6, 0, 8), 0, Math.PI / 8),
+      taper(0.1, 0.18, 2.0, armorDark, 0, 1.65, 0, 8), // mast
+      rotated(taper(0.8, 0.16, 0.14, armor, 0, 2.6, 0.08, 18), -0.3),
+      rotated(taper(0.45, 0.1, 0.1, armor, 0, 1.75, -0.05, 14), 0.4),
+      strut([0, 2.6, 0.08], [0, 2.8, 0.7], 0.05, armorDark, true),
+      chamferBox(0.1, 0.1, 0.1, glow, 0, 2.82, 0.72, 0.01),
+      chamferBox(0.08, 0.08, 0.08, glow, 0, 2.75, 0, 0.01),
+    ];
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + i * Math.PI / 2;
+      parts.push(strut([Math.sin(a) * 0.6, 0.62, Math.cos(a) * 0.6], [Math.sin(a) * 0.12, 2.0, Math.cos(a) * 0.12], 0.05, armorDark));
+    }
+    return mergeByMaterial(parts);
+  },
+
   // ---- UEF T2: enheter ----
 
   /** UEF T2 Engineer: T1-ingenjören i större skala med en andra kranarm och tjockare pansar. */

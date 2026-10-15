@@ -64,6 +64,8 @@ const ICON_SPECS = {
   pointDefenseT2: ['structure', 'directfire'],
   artilleryT2: ['structure', 'artillery'],
   shieldGenerator: ['structure', 'shield'],
+  radar: ['structure', 'intel'],
+  radarT2: ['structure', 'intel'],
   wall: ['wall', null],
 };
 
@@ -255,6 +257,23 @@ const DRAW = {
 };
 
 for (const type of Object.keys(ICON_SPECS)) DRAW[type] = unitIcon(type);
+
+/**
+ * Radarblipp som FA:s icon_land_generic: en fiende som bara syns på radar
+ * visas som en tom romb, utan roll och tech-nivå.
+ */
+DRAW.radarBlip = (ctx) => {
+  shapePath(ctx, 'land');
+  ctx.fillStyle = ENEMY_FILL;
+  ctx.fill();
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+  shapePath(ctx, 'land');
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.stroke();
+};
 
 const textures = {};
 

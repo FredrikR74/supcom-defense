@@ -15,6 +15,9 @@
  *   sim/upgrades.js. Uppgraderingen kostar den nya typens `cost` och `buildTime`
  *   och byggs med byggnadens egen `buildPower` (FA:s BuildRate); ingenjörer kan assistera.
  * - `shield`: sköld, se units.js och sim/shields.js.
+ * - `visionRadius`, `radarRadius`: sikt och radar, se units.js och sim/intel.js.
+ *   Byggnader vars blueprint saknar Intel (t.ex. T1 Mass Extractor) ser inget (0).
+ *   Radar kräver att upkeep-energin räcker.
  */
 
 const T1_LAND_UNITS = ['engineer', 'snoop', 'mechMarine', 'striker', 'lobo', 'archer'];
@@ -30,6 +33,7 @@ export default {
     techCategory: 'TECH3',
     size: 4,
     maxHp: 10000,
+    visionRadius: 10,
     cost: { mass: 3000, energy: 30000 },
     buildTime: 4097,
     /** Går inte att sälja (tower defense: den ska försvaras). */
@@ -41,6 +45,7 @@ export default {
     techCategory: 'TECH1',
     size: 4,
     maxHp: 4000,
+    visionRadius: 10,
     cost: { mass: 240, energy: 2100 },
     buildTime: 300,
     buildPower: 20,
@@ -56,6 +61,7 @@ export default {
     techCategory: 'TECH2',
     size: 4,
     maxHp: 8000,
+    visionRadius: 10,
     cost: { mass: 1410, energy: 11200 },
     buildTime: 2300,
     buildPower: 40,
@@ -67,6 +73,7 @@ export default {
     techCategory: 'TECH1',
     size: 2,
     maxHp: 400,
+    visionRadius: 0,
     cost: { mass: 36, energy: 360 },
     buildTime: 60,
     buildPower: 10,
@@ -81,6 +88,7 @@ export default {
     techCategory: 'TECH2',
     size: 2,
     maxHp: 2000,
+    visionRadius: 10,
     cost: { mass: 900, energy: 5400 },
     buildTime: 900,
     buildPower: 15,
@@ -95,6 +103,7 @@ export default {
     techCategory: 'TECH3',
     size: 2,
     maxHp: 7000,
+    visionRadius: 10,
     cost: { mass: 4600, energy: 31625 },
     buildTime: 2875,
     production: { mass: 18, energy: 0 },
@@ -107,6 +116,7 @@ export default {
     techCategory: 'TECH1',
     size: 2,
     maxHp: 600,
+    visionRadius: 0,
     cost: { mass: 75, energy: 750 },
     buildTime: 125,
     production: { mass: 0, energy: 20 },
@@ -118,6 +128,7 @@ export default {
     techCategory: 'TECH2',
     size: 3,
     maxHp: 2500,
+    visionRadius: 10,
     cost: { mass: 1200, energy: 12000 },
     buildTime: 2198,
     production: { mass: 0, energy: 500 },
@@ -128,6 +139,7 @@ export default {
     techCategory: 'TECH2',
     size: 2,
     maxHp: 360,
+    visionRadius: 0,
     cost: { mass: 200, energy: 4000 },
     buildTime: 500,
     production: { mass: 1, energy: 0 },
@@ -139,6 +151,7 @@ export default {
     techCategory: 'TECH1',
     size: 2,
     maxHp: 800,
+    visionRadius: 0,
     cost: { mass: 200, energy: 1500 },
     buildTime: 250,
     storage: { mass: 500, energy: 0 },
@@ -149,6 +162,7 @@ export default {
     techCategory: 'TECH1',
     size: 2,
     maxHp: 500,
+    visionRadius: 0,
     cost: { mass: 250, energy: 1200 },
     buildTime: 200,
     storage: { mass: 0, energy: 10000 },
@@ -159,6 +173,7 @@ export default {
     techCategory: 'TECH1',
     size: 1,
     maxHp: 500,
+    visionRadius: 0,
     cost: { mass: 3, energy: 20 },
     buildTime: 15,
     benign: true,
@@ -170,6 +185,7 @@ export default {
     techCategory: 'TECH1',
     size: 1,
     maxHp: 1300,
+    visionRadius: 12,
     cost: { mass: 250, energy: 2000 },
     buildTime: 250,
     /** `turnRate` i grader/s. */
@@ -185,6 +201,7 @@ export default {
     techCategory: 'TECH2',
     size: 2,
     maxHp: 2250,
+    visionRadius: 14,
     cost: { mass: 540, energy: 3780 },
     buildTime: 675,
     weapon: {
@@ -202,6 +219,7 @@ export default {
     techCategory: 'TECH2',
     size: 2,
     maxHp: 3600,
+    visionRadius: 14,
     cost: { mass: 1900, energy: 13585 },
     buildTime: 1600,
     weapon: {
@@ -219,9 +237,41 @@ export default {
     techCategory: 'TECH2',
     size: 3,
     maxHp: 250,
+    visionRadius: 10,
     cost: { mass: 600, energy: 6000 },
     buildTime: 1150,
     upkeep: { mass: 0, energy: 200 },
     shield: { maxHp: 9000, regenRate: 120, regenStartTime: 3, rechargeTime: 23, radius: 6.5 },
+  },
+  /**
+   * UEB3101, T1 Radar System (SA1 - 1000). RadarRadius 116, VisionRadius 20,
+   * drar 20 energi/s. Uppgraderas till T2 med BuildRate 13.
+   */
+  radar: {
+    name: 'Radar System',
+    unitName: 'SA1 - 1000',
+    techCategory: 'TECH1',
+    size: 2,
+    maxHp: 10,
+    visionRadius: 10,
+    radarRadius: 58,
+    cost: { mass: 80, energy: 720 },
+    buildTime: 80,
+    buildPower: 13,
+    upkeep: { mass: 0, energy: 20 },
+    upgradesTo: 'radarT2',
+  },
+  /** UEB3201, T2 Radar System (SA2 - 2000). RadarRadius 200, VisionRadius 24, drar 150 energi/s. */
+  radarT2: {
+    name: 'Radar System',
+    unitName: 'SA2 - 2000',
+    techCategory: 'TECH2',
+    size: 2,
+    maxHp: 50,
+    visionRadius: 12,
+    radarRadius: 100,
+    cost: { mass: 180, energy: 3600 },
+    buildTime: 780,
+    upkeep: { mass: 0, energy: 150 },
   },
 };

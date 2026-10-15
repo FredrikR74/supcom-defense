@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
-import { createIcon } from './icons.js';
+import { createIcon, getIconTexture } from './icons.js';
+import { INTEL } from '../sim/intel.js';
 import { isIdleBuilder, isIdleFactory, getDef, weaponOf } from '../sim/entities.js';
 import { createModel, createGhost, WRECK_MATERIAL, BUILD_WIRE_MATERIAL } from './models.js';
 import { createInstancedBatch } from './instancedUnits.js';
@@ -226,6 +227,26 @@ export function createEntityView(terrain) {
     return batches.get(type);
   }
 
+  /**
+   * Radarblippar: fiender som bara syns på radar ritas som FA:s generiska
+   * ikon på alla zoomnivåer, utan modell, hälsa eller typ.
+   */
+  const BLIP_CAPACITY = 2048;
+  const blipPositions = new Float32Array(BLIP_CAPACITY * 3);
+  const blipGeometry = new THREE.BufferGeometry();
+  blipGeometry.setAttribute('position', new THREE.BufferAttribute(blipPositions, 3));
+  const blips = new THREE.Points(blipGeometry, new THREE.PointsMaterial({
+    map: getIconTexture('radarBlip'),
+    size: 26,
+    sizeAttenuation: false,
+    transparent: true,
+    alphaTest: 0.02,
+    depthTest: false,
+  }));
+  blips.frustumCulled = false;
+  blips.renderOrder = 10;
+  overlay.add(blips);
+
   const orderLines = createLineBuffer(512, new THREE.LineBasicMaterial({
     color: 0x4ade80, transparent: true, opacity: 0.7, depthTest: false,
   }));
@@ -242,7 +263,11 @@ export function createEntityView(terrain) {
   const buildRings = createLineBuffer(12000, new THREE.LineBasicMaterial({
     color: 0xfacc15, transparent: true, opacity: 0.45,
   }));
-  overlay.add(weaponRings.object, buildRings.object);
+  // Radarns räckvidd för markerade radarbyggnader (och ACU:n, Snoop).
+  const radarRings = createLineBuffer(12000, new THREE.LineBasicMaterial({
+    color: 0x4ade80, transparent: true, opacity: 0.4,
+  }));
+  overlay.add(weaponRings.object, buildRings.object, radarRings.object);
   const RING_SEGMENTS = 56;
 
   /** En ring med radien `r` runt (x, z) som följer marken. */
@@ -265,6 +290,7 @@ export function createEntityView(terrain) {
   function updateRangeRings(world, selection, alpha, owner) {
     weaponRings.begin();
     buildRings.begin();
+    radarRings.begin();
     for (const e of world.entities) {
       if (!selection.has(e.id) || e.owner !== owner) continue;
       const def = getDef(e.type);
@@ -276,9 +302,11 @@ export function createEntityView(terrain) {
         if (weapon.minRange) addRangeRing(weaponRings, x, z, weapon.minRange);
       }
       if (e.kind === 'unit' && def.buildPower > 0 && def.buildRange) addRangeRing(buildRings, x, z, def.buildRange);
+      if (def.radarRadius) addRangeRing(radarRings, x, z, def.radarRadius);
     }
     weaponRings.end();
     buildRings.end();
+    radarRings.end();
   }
 
   // Nanopartiklar som strömmar längs byggstrålarna från byggaren till bygget.
@@ -493,6 +521,7 @@ export function createEntityView(terrain) {
       for (const b of ownBatches.values()) b.begin();
       for (const b of wreckBatches.values()) b.begin();
       instancedPos.clear();
+      let blipCount = 0;
       shieldTime += frameSeconds;
       let shieldCount = 0;
       for (const e of world.entities) {
@@ -504,6 +533,17 @@ export function createEntityView(terrain) {
           continue;
         }
         if (e.kind === 'unit' && e.owner !== owner) {
+          // Krigsdimma: dolda fiender ritas inte alls, de på radar som en blipp.
+          const intel = e.intel ?? INTEL.VISIBLE;
+          if (intel === INTEL.HIDDEN) continue;
+          if (intel === INTEL.RADAR) {
+            if (blipCount < BLIP_CAPACITY) {
+              const { x, z } = lerpPos(e, alpha);
+              blipPositions.set([x, groundY(x, z) + 1, z], blipCount * 3);
+              blipCount++;
+            }
+            continue;
+          }
           const b = batchFor(e.type);
           const { x, z } = lerpPos(e, alpha);
           const y = groundY(x, z);
@@ -563,6 +603,8 @@ export function createEntityView(terrain) {
       for (const b of batches.values()) b.end();
       for (const b of ownBatches.values()) b.end();
       shields.count = shieldCount;
+      blipGeometry.setDrawRange(0, blipCount);
+      blipGeometry.attributes.position.needsUpdate = true;
       shields.instanceMatrix.needsUpdate = true;
       if (shields.instanceColor) shields.instanceColor.needsUpdate = true;
       // Glöm gångfasen för fiender som inte finns längre.

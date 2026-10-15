@@ -220,6 +220,8 @@ describe('kills, attackorder och motanfall', () => {
 
   it('som i FA: en patrullerande enhet anfaller fiender inom sin GuardScanRadius och patrullerar sedan vidare', () => {
     const w = setup();
+    // Dimman (intel.js) testas för sig; här ska enheten se fienden.
+    w.intel = null;
     const tank = addUnit(w, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
     queueCommand(w, { type: 'patrol', owner: PLAYER_ID, ids: [tank.id], x: 30, z: 40 });
     tickWorld(w);
@@ -252,6 +254,8 @@ describe('kills, attackorder och motanfall', () => {
 
   it('fiender på väg mot kärnan vänder och anfaller den som skjuter, sedan fortsätter de', () => {
     const w = setup();
+    // Dimman (intel.js) testas för sig; här ska enheten se fienden.
+    w.intel = null;
     // Fienden är på väg bort från tornet (mot kärnan) och utom sin egen räckvidd.
     const m = enemyAt(w, 50, 50);
     m.orders = [{ type: 'attackCore' }];
@@ -302,6 +306,8 @@ describe('UEF T1-vapen', () => {
 
   it('Lobos granat skadar alla fiender inom splashradien', () => {
     const world = createWorld({ map: firstDefense });
+    // Lobon ser kortare än den skjuter (som i FA); dimman testas i intel.test.js.
+    world.intel = null;
     addUnit(world, 'lobo', { x: 40, z: 40, owner: PLAYER_ID });
     const a = quiet(addUnit(world, 'mantis', { x: 40, z: 50, owner: ENEMY_ID }));
     const b = quiet(addUnit(world, 'mantis', { x: 41.2, z: 50, owner: ENEMY_ID }));

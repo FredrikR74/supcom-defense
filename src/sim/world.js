@@ -17,6 +17,7 @@ import gameConfig from '../data/gameConfig.js';
 import { createDirector, directorSystem } from './director.js';
 import { squadSystem } from './squads.js';
 import { shieldSystem } from './shields.js';
+import { createIntel, intelSystem } from './intel.js';
 
 export { TICKS_PER_SECOND, TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 
@@ -36,6 +37,8 @@ export function createWorld({ seed = 1, map = null, config = {} } = {}) {
     occupancy: terrain ? new Int32Array(terrain.size * terrain.size) : null,
     /** Rutor som är för branta för enheter. */
     steep: terrain ? computeSteepCells(terrain) : null,
+    /** Spelarens sikt och radar per ruta (se intel.js). */
+    intel: terrain ? createIntel(terrain.size) : null,
     /** Flödesfält mot kärnan ({ dist, next }), räknas om när `pathDirty` är satt. */
     flow: null,
     pathDirty: true,
@@ -166,6 +169,7 @@ export function tickWorld(world) {
     directorSystem(world);
     updatePathing(world);
   }
+  intelSystem(world);
   targetingSystem(world);
   patrolEngageSystem(world);
   if (world.map) squadSystem(world);
