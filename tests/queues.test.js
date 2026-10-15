@@ -107,3 +107,27 @@ describe('artilleri och missiler över berg', () => {
     expect(shoot({ mountain: true }).hp).toBe(units.mantis.maxHp);
   });
 });
+
+describe('direkt eld och terrängen', () => {
+  /** Striker vid (40, 40) som skjuter på en Mantis åtta rutor söderut, med eller utan en kulle emellan. */
+  function shoot({ ridge }) {
+    const world = createWorld({ map: firstDefense, config: { director: { graceSeconds: 1e9 } } });
+    world.intel = null;
+    const n = world.terrain.size + 1;
+    for (let z = 30; z <= 60; z++) {
+      for (let x = 30; x <= 50; x++) world.terrain.heights[z * n + x] = ridge && z >= 43 && z <= 45 ? 9 : 5;
+    }
+    addUnit(world, 'striker', { x: 40, z: 40, owner: PLAYER_ID });
+    const target = addUnit(world, 'mantis', { x: 40, z: 48, owner: ENEMY_ID });
+    ticks(world, 40);
+    return target;
+  }
+
+  it('på slät mark träffar skotten', () => {
+    expect(shoot({ ridge: false }).hp).toBeLessThan(units.mantis.maxHp);
+  });
+
+  it('en kulle mellan skytten och målet stoppar skotten, som i FA', () => {
+    expect(shoot({ ridge: true }).hp).toBe(units.mantis.maxHp);
+  });
+});

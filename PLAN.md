@@ -66,7 +66,7 @@ Spelet är spelbart från start till förlust. Det har:
 - **Radar och krigsdimma** som i FA: sikt per enhet, radarblippar och Radar System T1/T2.
 - **Bekvämligheter som i FA:** byggmenyn kan fällas ihop, räckvidden (radar, vapen, sköld) syns när man placerar en byggnad, en turkos stapel visar bygg- och uppgraderingsframsteg, fabriken väljer sin högsta tech-flik, nästa tech-nivås enheter kan köas under en uppgradering, ingenjörens byggkö visas och går att korta, och sysslolösa ingenjörer väljs per tech-nivå.
 - **Patrull:** byggare reparerar skadade byggnader (inte murar) och återvinner, men hjälper inte till med byggen eller uppgraderingar.
-- **Artilleri och missiler** flyger i en absolut båge från mynningen till målet och slår ner i berg som är högre än bågen.
+- **Skott och terräng:** artilleri och missiler flyger i en absolut båge och direktskjutande vapen i en rak linje från mynningen till målet. Skott slår ner i kullar och berg som är högre än banan, som i FA.
 - **T2:** fabriker och Mass Extractors uppgraderas som i FA, T2-ingenjören bygger T2-byggnaderna, Land Factory HQ bygger T2-enheter, sköldar (Shield Generator och Parashield), och Cybran T2 i fiendens pool.
 
 Enheter: UEF ACU, Engineer, Snoop, Mech Marine, MA12 Striker, Lobo och Archer (T1), och T2 Engineer, Pillar, Mongoose, Riptide, Flapjack, Sky Boxer och Parashield (T2). Fiender: Cybran Mantis, Mole och Medusa (T1), och Rhino, Hoplite, Wagner och Viper (T2).

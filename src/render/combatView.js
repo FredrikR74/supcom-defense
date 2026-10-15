@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { isVisibleAt } from '../sim/intel.js';
-import { ballisticHeight } from '../sim/systems/combat.js';
+import { projectileHeight } from '../sim/systems/combat.js';
 
 const OWNER_COLORS = {
   1: new THREE.Color(0x7dd3fc), // UEF: blå plasma
@@ -430,13 +430,12 @@ export function createCombatView(terrain, capacity = 2048) {
         const z = p.prevZ + (p.z - p.prevZ) * alpha;
         if (!isVisibleAt(world, x, z)) continue; // i dimman
         q.setFromAxisAngle(up, Math.atan2(p.tx - p.prevX, p.tz - p.prevZ));
-        let y = ground(x, z) + p.y;
+        // Absolut bana från simuleringen (rak eller båge), annars en fast höjd över marken.
+        let y = p.y0 !== undefined ? projectileHeight(p, x, z) : ground(x, z) + p.y;
         const color = OWNER_COLORS[p.owner] ?? DEFAULT_COLOR;
         if (p.ballistic) {
           // Artillerigranater och missiler flyger i en båge: högst mitt på vägen.
-          if (p.y0 !== undefined) {
-            y = ballisticHeight(p, x, z);
-          } else {
+          if (p.y0 === undefined) {
             const total = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1;
             const t = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / total);
             y += 4 * (total * 0.35) * t * (1 - t);

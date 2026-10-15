@@ -13,18 +13,22 @@ const HIT_TOLERANCE = 0.3;
 const AIM_TOLERANCE = 0.25;
 /** Bågens höjd mitt på vägen, som andel av skottets längd (artilleri och missiler). */
 const ARC_HEIGHT = 0.35;
-/** Terrängen måste vara så här mycket över bågen för att stoppa skottet. */
+/** Terrängen måste vara så här mycket över skottets bana för att stoppa det. */
 const TERRAIN_CLEARANCE = 0.3;
+/** Direktskjutande vapen siktar så här högt över marken vid målet (målets mitt). */
+const TARGET_HEIGHT = 0.6;
 
 /**
- * Absolut höjd för ett ballistiskt skott (artilleri, missiler) vid (x, z): en
- * båge från mynningen (p.y0) till marken vid målet (p.y1). Används av både
- * simuleringen (skottet slår i berg som är högre än bågen) och renderingen.
+ * Absolut höjd för ett skott vid (x, z), från mynningen (p.y0) till målet
+ * (p.y1). Direktskjutande skott flyger i en rak linje, artilleri och missiler
+ * i en båge. Används av både simuleringen (skottet slår ner i terräng som är
+ * högre än banan, som i FA) och renderingen.
  */
-export function ballisticHeight(p, x, z) {
+export function projectileHeight(p, x, z) {
   const total = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1;
   const t = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / total);
-  return p.y0 + (p.y1 - p.y0) * t + 4 * ARC_HEIGHT * total * t * (1 - t);
+  const line = p.y0 + (p.y1 - p.y0) * t;
+  return p.ballistic ? line + 4 * ARC_HEIGHT * total * t * (1 - t) : line;
 }
 
 /** Max antal händelser som sparas om ingen läser dem (t.ex. i tester). */
@@ -196,10 +200,11 @@ export function weaponsSystem(world) {
     }
     if (e.weaponCooldown > 1e-9) continue;
     e.weaponCooldown += 1 / weapon.rateOfFire;
-    // Ballistiska skott flyger i en absolut båge och kan slå i högre terräng.
-    const arc = weapon.ballistic && world.terrain
-      ? { y0: getHeight(world.terrain, e.x, e.z) + (weapon.muzzleHeight ?? 1), y1: getHeight(world.terrain, aim.x, aim.z) }
-      : {};
+    // Skotten flyger i en absolut bana (rak eller båge) och kan slå i terrängen.
+    const arc = world.terrain ? {
+      y0: getHeight(world.terrain, e.x, e.z) + (weapon.muzzleHeight ?? 1),
+      y1: getHeight(world.terrain, aim.x, aim.z) + (weapon.ballistic ? 0 : TARGET_HEIGHT),
+    } : {};
     // En salva kan vara flera projektiler (FA:s ProjectilesPerOnFire).
     for (let k = 0; k < (weapon.projectiles ?? 1); k++) {
       world.projectiles.push({
@@ -247,9 +252,9 @@ export function projectileSystem(world) {
     if (dist > step) {
       p.x += (dx / dist) * step;
       p.z += (dz / dist) * step;
-      // Artilleri och missiler slår ner i berg som är högre än bågen.
+      // Skottet slår ner i kullar och berg som är högre än banan, som i FA.
       const blocked = p.y0 !== undefined &&
-        getHeight(world.terrain, p.x, p.z) > ballisticHeight(p, p.x, p.z) + TERRAIN_CLEARANCE;
+        getHeight(world.terrain, p.x, p.z) > projectileHeight(p, p.x, p.z) + TERRAIN_CLEARANCE;
       if (!blocked) {
         remaining.push(p);
         continue;
