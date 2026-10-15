@@ -1,5 +1,6 @@
 import { getDef } from '../sim/entities.js';
 import { techName } from './tech.js';
+import { isRevealed } from '../sim/intel.js';
 
 /**
  * Namn och HP-stapel (eller byggframsteg) ovanför den entitet musen är över.
@@ -30,7 +31,12 @@ export function createHoverInfo(el) {
       const def = getDef(entity.type);
       name.textContent = (def?.unitName ? `${def.unitName} (${techName(def)})` : def ? techName(def) : entity.type) +
         (entity.vetLevel ? ` ${'★'.repeat(entity.vetLevel)}` : '');
-      if (entity.kind === 'wreck') {
+      fill.parentElement.hidden = !isRevealed(entity);
+      if (!isRevealed(entity)) {
+        // Radarblipp: man vet bara att något finns där, som i FA.
+        name.textContent = 'Radar contact';
+        hp.textContent = 'Right-click: attack';
+      } else if (entity.kind === 'wreck') {
         name.textContent = 'Wreckage';
         fill.style.width = '0%';
         hp.textContent = `Mass ${Math.round(entity.mass)}`;

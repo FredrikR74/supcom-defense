@@ -232,7 +232,13 @@ export function createEntityView(terrain) {
    * ikon på alla zoomnivåer, utan modell, hälsa eller typ.
    */
   const BLIP_CAPACITY = 2048;
+  /** Blippens halva storlek som vinkel (radianer), för att träffa den med ett klick. */
+  const BLIP_PICK_ANGLE = 0.016;
   const blipPositions = new Float32Array(BLIP_CAPACITY * 3);
+  /** Instansindex -> entitets-id, för klick och hover på blipparna. */
+  const blipIds = [];
+  let blipCount = 0;
+  const blipPoint = new THREE.Vector3();
   const blipGeometry = new THREE.BufferGeometry();
   blipGeometry.setAttribute('position', new THREE.BufferAttribute(blipPositions, 3));
   const blips = new THREE.Points(blipGeometry, new THREE.PointsMaterial({
@@ -521,7 +527,7 @@ export function createEntityView(terrain) {
       for (const b of ownBatches.values()) b.begin();
       for (const b of wreckBatches.values()) b.begin();
       instancedPos.clear();
-      let blipCount = 0;
+      blipCount = 0;
       shieldTime += frameSeconds;
       let shieldCount = 0;
       for (const e of world.entities) {
@@ -539,8 +545,12 @@ export function createEntityView(terrain) {
           if (intel === INTEL.RADAR) {
             if (blipCount < BLIP_CAPACITY) {
               const { x, z } = lerpPos(e, alpha);
-              blipPositions.set([x, groundY(x, z) + 1, z], blipCount * 3);
+              const y = groundY(x, z);
+              blipPositions.set([x, y + 1, z], blipCount * 3);
+              blipIds[blipCount] = e.id;
               blipCount++;
+              // `top` över blippen (som ritas 1 över marken), så att etiketter hamnar ovanför den.
+              instancedPos.set(e.id, { x, y, z, top: 1.8 });
             }
             continue;
           }
@@ -635,8 +645,31 @@ export function createEntityView(terrain) {
       for (const b of batches.values()) b.icons.material.opacity = opacity;
     },
 
-    /** Entitets-id under strålen, eller null. */
+    /**
+     * Radarblippen under strålen, eller null. Blipparna har konstant storlek på
+     * skärmen, så träffen räknas som en vinkel från kameran.
+     */
+    pickBlip(raycaster) {
+      const { ray } = raycaster;
+      let best = null;
+      let bestAngle = BLIP_PICK_ANGLE;
+      for (let i = 0; i < blipCount; i++) {
+        blipPoint.fromArray(blipPositions, i * 3);
+        const along = blipPoint.clone().sub(ray.origin).dot(ray.direction);
+        if (along <= 0) continue;
+        const angle = Math.sqrt(ray.distanceSqToPoint(blipPoint)) / along;
+        if (angle < bestAngle) {
+          best = blipIds[i];
+          bestAngle = angle;
+        }
+      }
+      return best;
+    },
+
+    /** Entitets-id under strålen, eller null. Radarblippar ritas överst och går först. */
     pick(raycaster) {
+      const blip = this.pickBlip(raycaster);
+      if (blip != null) return blip;
       const targets = strategicMode ? icons.children : meshes.children;
       const hit = raycaster.intersectObjects(targets, true)[0];
       for (const b of [...batches.values(), ...ownBatches.values(), ...wreckBatches.values()]) {

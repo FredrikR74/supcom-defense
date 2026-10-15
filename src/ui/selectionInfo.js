@@ -6,7 +6,7 @@ import { buildIcon } from './buildIcons.js';
 import { shortName } from './buildMenu.js';
 import { regenRate } from '../sim/veterancy.js';
 import { techName, techRoman } from './tech.js';
-import { isRevealed } from '../sim/intel.js';
+import { isRevealed, isDetected } from '../sim/intel.js';
 
 const fmt = (v) => v.toFixed(1);
 const stars = (level) => '★'.repeat(level ?? 0);
@@ -49,6 +49,12 @@ const assistersOf = (world, factory) => world.entities.filter((u) =>
 
 /** Namn, HP, veterancy, kills och stridsvärden för en entitet. */
 function describe(e, { enemy, world }) {
+  // Radarblipp: bara att det finns en fiende där, inte vad den är.
+  if (!isRevealed(e)) {
+    return '<div class="info-name info-enemy">Radar contact</div>' +
+      '<div class="info-row info-sub">Enemy · on radar only</div>' +
+      '<div class="info-row info-sub">Right-click with units selected: attack</div>';
+  }
   const def = getDef(e.type);
   if (e.kind === 'wreck') {
     return `<div class="info-name">Wreckage <span class="info-sub">${def.unitName ?? def.name}</span></div>` +
@@ -155,7 +161,7 @@ export function createSelectionInfo(el, { onSelectOnly, onDeselect } = {}) {
       const selected = world.entities.filter((e) => selection.has(e.id) && e.owner === PLAYER_ID);
       let inspected = selected.length === 0 && ui.inspectId != null ? getEntity(world, ui.inspectId) : null;
       // En fiende som försvunnit i dimman kan inte inspekteras längre.
-      if (inspected && !isRevealed(inspected)) inspected = null;
+      if (inspected && !isDetected(PLAYER_ID, inspected)) inspected = null;
       if (ui.inspectId != null && !inspected) ui.inspectId = null;
 
       el.hidden = selected.length === 0 && !inspected;

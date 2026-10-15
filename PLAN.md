@@ -81,6 +81,7 @@ Enheter: UEF ACU, Engineer, Snoop, Mech Marine, MA12 Striker, Lobo och Archer (T
   - Dimman ritas som i FA:s "Explored": terrängen syns, men det som ligger utanför egen sikt är mörkare, även på minikartan. Skott, träffar och explosioner i dimman syns och hörs inte.
   - Egna vapen väljer bara fiender som syns eller finns på radar, och släpper ett mål som försvinner i dimman. Lobo och Point Defense skjuter alltså längre än de ser, som i FA, och behöver radar eller andra enheter som ser målet. Fienden (datorn) ser allt.
   - **Radar System:** SA1-1000 (UEB3101, T1: radar 58, 20 energi/s) byggs av ACU:n och ingenjörer och uppgraderas till SA2-2000 (UEB3201, T2: radar 100, 150 energi/s), som T2-ingenjören också kan bygga. Radarn fungerar bara när dess energi räcker. Markerad radar visar sin räckvidd som en grön ring.
+  - Radarblippar går att hovra ("Radar contact") och högerklicka för att anfalla, som i FA. Dolda fiender går inte att träffa med musen.
   - Inte med än: Omni Sensor Array (T3), stealth och jamming, och minnet av fiendebyggnader man sett (fienden har inga byggnader).
   *Test (Vitest):* `tests/intel.test.js`. En fiende utanför sikt och radar är dold, inom radar en blipp, inom sikt syns den helt. Radar utan energi och ofärdig radar ger inget, egna vapen skjuter inte på dolda fiender men på dem på radar, och T1-radarn uppgraderas till T2.
 - [x] **5. T2.** Värden från FAF:s blueprints. Uppgradering ligger i `sim/upgrades.js` och sköldar i `sim/shields.js`.

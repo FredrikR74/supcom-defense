@@ -11,7 +11,7 @@ import { createGhost, setGhostState, applySurfaceDetail } from './models.js';
 import { PLAYER_ID } from '../sim/constants.js';
 import { createNoBuildZones } from './noBuildZones.js';
 import { createFogOfWar } from './fogOfWar.js';
-import { isVisibleAt } from '../sim/intel.js';
+import { isVisibleAt, isDetected } from '../sim/intel.js';
 import { raycastTerrain, isInsideMap, getHeight } from '../sim/terrain.js';
 
 /** Över detta kameraavstånd visas strategiska ikoner i stället för meshes. */
@@ -123,6 +123,7 @@ export function createRenderer(canvas, world) {
       let bestDist = Infinity;
       for (const e of world.entities) {
         if (e.kind !== 'unit' && e.kind !== 'wreck') continue;
+        if (!isDetected(PLAYER_ID, e)) continue; // dolda fiender i dimman går inte att träffa
         const d = Math.hypot(e.x - ground.x, e.z - ground.z) - e.radius;
         if (d <= tolerance && d < bestDist) {
           best = e;
