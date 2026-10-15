@@ -36,6 +36,21 @@ export function cancelUpgrade(world, e) {
     }
   }
   e.upgrade = null;
+  // Enheter som bara den uppgraderade fabriken kan bygga tas bort ur kön.
+  if (e.productionQueue) {
+    const produces = structures[e.type].produces ?? [];
+    e.productionQueue = e.productionQueue.filter((t) => produces.includes(t));
+  }
+}
+
+/**
+ * Enheter som fabriken kan köa just nu: sina egna, och medan den uppgraderas
+ * även den nya fabrikens (de byggs när uppgraderingen är klar).
+ */
+export function queueableUnits(e) {
+  const own = structures[e.type]?.produces ?? [];
+  const next = e.upgrade ? structures[e.upgrade.to].produces ?? [] : [];
+  return [...new Set([...own, ...next])];
 }
 
 /**

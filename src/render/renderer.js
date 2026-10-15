@@ -146,6 +146,8 @@ export function createRenderer(canvas, world) {
      */
     setPlacementGhosts(type, placements = []) {
       noBuildZones.visible = Boolean(type);
+      // Räckvidden visas för den sista platsen (där musen är), inte för hela muren.
+      entities.setPlacementRanges(type, placements.slice(-1).map((p) => p.pos));
       for (const [t, pool] of Object.entries(placementGhosts)) {
         pool.forEach((g, i) => { g.visible = t === type && i < placements.length; });
       }

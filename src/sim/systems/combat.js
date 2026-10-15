@@ -5,11 +5,28 @@ import { recordDamage, disperseVeterancy } from '../veterancy.js';
 import { updateGuardEngagement } from '../guard.js';
 import { enemyShields, absorbProjectile } from '../shields.js';
 import { isDetected } from '../intel.js';
+import { getHeight } from '../terrain.js';
 
 /** Hur nära nedslagspunkten en entitets kant måste vara för att träffas. */
 const HIT_TOLERANCE = 0.3;
 /** Tornet skjuter när det pekar inom så här många radianer från målet. */
 const AIM_TOLERANCE = 0.25;
+/** Bågens höjd mitt på vägen, som andel av skottets längd (artilleri och missiler). */
+const ARC_HEIGHT = 0.35;
+/** Terrängen måste vara så här mycket över bågen för att stoppa skottet. */
+const TERRAIN_CLEARANCE = 0.3;
+
+/**
+ * Absolut höjd för ett ballistiskt skott (artilleri, missiler) vid (x, z): en
+ * båge från mynningen (p.y0) till marken vid målet (p.y1). Används av både
+ * simuleringen (skottet slår i berg som är högre än bågen) och renderingen.
+ */
+export function ballisticHeight(p, x, z) {
+  const total = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1;
+  const t = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / total);
+  return p.y0 + (p.y1 - p.y0) * t + 4 * ARC_HEIGHT * total * t * (1 - t);
+}
+
 /** Max antal händelser som sparas om ingen läser dem (t.ex. i tester). */
 const MAX_EVENTS = 2000;
 
@@ -179,9 +196,14 @@ export function weaponsSystem(world) {
     }
     if (e.weaponCooldown > 1e-9) continue;
     e.weaponCooldown += 1 / weapon.rateOfFire;
+    // Ballistiska skott flyger i en absolut båge och kan slå i högre terräng.
+    const arc = weapon.ballistic && world.terrain
+      ? { y0: getHeight(world.terrain, e.x, e.z) + (weapon.muzzleHeight ?? 1), y1: getHeight(world.terrain, aim.x, aim.z) }
+      : {};
     // En salva kan vara flera projektiler (FA:s ProjectilesPerOnFire).
     for (let k = 0; k < (weapon.projectiles ?? 1); k++) {
       world.projectiles.push({
+        ...arc,
         owner: e.owner,
         sourceId: e.id,
         /** Skyttens typ, så att renderingen kan rita rätt sorts skott. */
@@ -225,11 +247,17 @@ export function projectileSystem(world) {
     if (dist > step) {
       p.x += (dx / dist) * step;
       p.z += (dz / dist) * step;
-      remaining.push(p);
-      continue;
+      // Artilleri och missiler slår ner i berg som är högre än bågen.
+      const blocked = p.y0 !== undefined &&
+        getHeight(world.terrain, p.x, p.z) > ballisticHeight(p, p.x, p.z) + TERRAIN_CLEARANCE;
+      if (!blocked) {
+        remaining.push(p);
+        continue;
+      }
+    } else {
+      p.x = p.tx;
+      p.z = p.tz;
     }
-    p.x = p.tx;
-    p.z = p.tz;
 
     // En sköld tar hela skottet, även splash (se shields.js).
     if (!shieldsBy.has(p.owner)) shieldsBy.set(p.owner, enemyShields(world, p.owner));

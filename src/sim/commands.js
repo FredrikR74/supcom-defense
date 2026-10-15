@@ -4,7 +4,7 @@ import units from '../data/units.js';
 import enhancements from '../data/enhancements.js';
 import { setDifficulty } from './director.js';
 import { enhancementsFor, hasEnhancement } from './enhancements.js';
-import { startUpgrade, cancelUpgrade } from './upgrades.js';
+import { startUpgrade, cancelUpgrade, queueableUnits } from './upgrades.js';
 
 /**
  * Spelarens kommandon läggs i en kö och verkställs i början av nästa tick.
@@ -32,6 +32,7 @@ const HANDLERS = {
   enhance: applyEnhance,
   cancelEnhance: applyCancelEnhance,
   upgrade: applyUpgrade,
+  cancelOrders: applyCancelOrders,
   cancelUpgrade: applyCancelUpgrade,
 };
 
@@ -147,6 +148,18 @@ function applyCancelEnhance(world, { owner, ids, enhancement }) {
   }
 }
 
+/**
+ * `{ type: 'cancelOrders', owner, id, indices }`: ta bort byggorder ur en
+ * byggares kö (FA:s byggkö för ingenjörer). Tas den som byggs just nu bort
+ * står den påbörjade byggnaden kvar, som i FA.
+ */
+function applyCancelOrders(world, { owner, id, indices }) {
+  const e = getEntity(world, id);
+  if (!e || e.kind !== 'unit' || e.owner !== owner) return;
+  const drop = new Set(indices.filter((i) => e.orders[i]?.type === 'build'));
+  e.orders = e.orders.filter((_, i) => !drop.has(i));
+}
+
 /** Egna byggnader bland `ids`. */
 function ownStructures(world, ids, owner) {
   return ids
@@ -235,12 +248,13 @@ function applySell(world, { owner, ids }) {
 
 /**
  * `{ type: 'produce', owner, id, unit, count }`: köa enheter i en fabrik.
- * Går även medan fabriken byggs; produktionen startar när den är klar.
+ * Går även medan fabriken byggs; produktionen startar när den är klar. Medan
+ * en fabrik uppgraderas går även nästa tech-nivås enheter att köa.
  */
 function applyProduce(world, { owner, id, unit, count = 1 }) {
   const e = getEntity(world, id);
   if (!e || e.kind !== 'structure' || e.owner !== owner) return;
-  if (!structures[e.type].produces?.includes(unit)) return;
+  if (!e.productionQueue || !queueableUnits(e).includes(unit)) return;
   for (let i = 0; i < count; i++) e.productionQueue.push(unit);
 }
 

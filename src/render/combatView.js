@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getHeight } from '../sim/terrain.js';
 import { isVisibleAt } from '../sim/intel.js';
+import { ballisticHeight } from '../sim/systems/combat.js';
 
 const OWNER_COLORS = {
   1: new THREE.Color(0x7dd3fc), // UEF: blå plasma
@@ -432,10 +433,14 @@ export function createCombatView(terrain, capacity = 2048) {
         let y = ground(x, z) + p.y;
         const color = OWNER_COLORS[p.owner] ?? DEFAULT_COLOR;
         if (p.ballistic) {
-          // Artillerigranater flyger i en båge: högst mitt på vägen.
-          const total = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1;
-          const t = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / total);
-          y += 4 * (total * 0.35) * t * (1 - t);
+          // Artillerigranater och missiler flyger i en båge: högst mitt på vägen.
+          if (p.y0 !== undefined) {
+            y = ballisticHeight(p, x, z);
+          } else {
+            const total = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1;
+            const t = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / total);
+            y += 4 * (total * 0.35) * t * (1 - t);
+          }
           if (counts.shell < 256) {
             pos.set(x, y, z);
             place(shells, counts.shell++, 1, shellCore.copy(color).lerp(WHITE, 0.35));

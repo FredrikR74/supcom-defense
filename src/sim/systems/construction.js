@@ -162,6 +162,7 @@ function startUpgradeJob(e) {
 function startProductionJob(e) {
   if (!e.built || e.paused || !e.productionQueue?.length) return;
   const type = e.productionQueue[0];
+  if (!structures[e.type].produces.includes(type)) return; // väntar på uppgraderingen
   setJob(e, { kind: 'unit', type, targetId: e.id }, units[type], structures[e.type].buildPower);
 }
 
@@ -231,8 +232,9 @@ const PATROL_SCAN_EXTRA = 8;
 
 /**
  * Patrullerande byggare tar närmaste skadade egna byggnad (inte enheter) eller
- * vrak på vägen. En beväpnad byggare (ACU:n) som har en fiende att skjuta på
- * strider först (se patrolEngageSystem i combat.js).
+ * vrak på vägen. De hjälper inte till med byggen eller uppgraderingar och
+ * reparerar inte murar. En beväpnad byggare (ACU:n) som har en fiende att
+ * skjuta på strider först (se patrolEngageSystem i combat.js).
  */
 function patrolScan(world, e) {
   if (!(units[e.type].buildPower > 0) || e.targetId) return;
@@ -241,7 +243,7 @@ function patrolScan(world, e) {
   let bestDist = radius;
   for (const t of world.entities) {
     if (t === e) continue;
-    const repair = t.owner === e.owner && t.kind === 'structure' && needsRepair(t);
+    const repair = t.owner === e.owner && t.kind === 'structure' && needsRepair(t) && !getDef(t.type).benign;
     if (!repair && t.kind !== 'wreck') continue;
     const d = Math.hypot(t.x - e.x, t.z - e.z) - t.radius;
     if (d < bestDist) {

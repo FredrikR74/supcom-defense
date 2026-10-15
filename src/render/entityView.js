@@ -274,6 +274,11 @@ export function createEntityView(terrain) {
     color: 0x4ade80, transparent: true, opacity: 0.4,
   }));
   overlay.add(weaponRings.object, buildRings.object, radarRings.object);
+  // Räckvidderna för en byggnad man håller på att placera (radar, vapen, sköld).
+  const placeWeapon = createLineBuffer(2000, new THREE.LineBasicMaterial({ color: 0xf87171, transparent: true, opacity: 0.8 }));
+  const placeRadar = createLineBuffer(2000, new THREE.LineBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.8 }));
+  const placeShield = createLineBuffer(2000, new THREE.LineBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.8 }));
+  overlay.add(placeWeapon.object, placeRadar.object, placeShield.object);
   const RING_SEGMENTS = 56;
 
   /** En ring med radien `r` runt (x, z) som följer marken. */
@@ -664,6 +669,24 @@ export function createEntityView(terrain) {
         }
       }
       return best;
+    },
+
+    /**
+     * Visar räckvidderna för byggnaden `type` på platserna `positions` medan
+     * man placerar den: radar, vapen (och minsta räckvidd) och sköld.
+     */
+    setPlacementRanges(type, positions = []) {
+      const def = type ? getDef(type) : null;
+      for (const b of [placeWeapon, placeRadar, placeShield]) b.begin();
+      for (const { x, z } of def ? positions : []) {
+        if (def.radarRadius) addRangeRing(placeRadar, x, z, def.radarRadius);
+        if (def.weapon) {
+          addRangeRing(placeWeapon, x, z, def.weapon.range);
+          if (def.weapon.minRange) addRangeRing(placeWeapon, x, z, def.weapon.minRange);
+        }
+        if (def.shield) addRangeRing(placeShield, x, z, def.shield.radius);
+      }
+      for (const b of [placeWeapon, placeRadar, placeShield]) b.end();
     },
 
     /** Entitets-id under strålen, eller null. Radarblippar ritas överst och går först. */

@@ -96,6 +96,7 @@ function startGame({ map, difficulty }) {
     onSell: sellSelected,
     onUpgrade: (ids) => queueCommand(world, { type: 'upgrade', owner: PLAYER_ID, ids }),
     onCancelUpgrade: (ids) => queueCommand(world, { type: 'cancelUpgrade', owner: PLAYER_ID, ids }),
+    onCancelOrders: (id, indices) => queueCommand(world, { type: 'cancelOrders', owner: PLAYER_ID, id, indices }),
   });
 
   const threatPanel = createThreatPanel($('threat'), $('toast'), {

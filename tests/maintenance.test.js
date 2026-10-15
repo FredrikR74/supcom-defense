@@ -119,14 +119,31 @@ describe('patrull', () => {
   it('en patrullerande ingenjör reparerar och återvinner på vägen och fortsätter sedan', () => {
     const { world } = setup();
     const eng = addUnit(world, 'engineer', { x: 40, z: 40, owner: PLAYER_ID });
-    const wall = addStructure(world, 'wall', { x: 45.5, z: 42.5, owner: PLAYER_ID });
-    wall.hp = 100;
+    const pd = addStructure(world, 'pointDefense', { x: 45.5, z: 42.5, owner: PLAYER_ID });
+    pd.hp = 1200;
     const wreck = addWreck(world, { type: 'mantis', x: 50, z: 38, radius: 0.6, mass: 20 });
     cmd(world, { type: 'patrol', ids: [eng.id], x: 56, z: 40 });
-    ticks(world, 200);
-    expect(wall.hp).toBe(wall.maxHp);
+    ticks(world, 300);
+    expect(pd.hp).toBe(pd.maxHp);
     expect(getEntity(world, wreck.id)).toBeNull();
     expect(eng.orders[0].type).toBe('patrol');
+  });
+
+  it('en patrullerande byggare reparerar inte murar och hjälper inte till med byggen eller uppgraderingar', () => {
+    const { world } = setup();
+    const eng = addUnit(world, 'engineer', { x: 40, z: 40, owner: PLAYER_ID });
+    const wall = addStructure(world, 'wall', { x: 45.5, z: 42.5, owner: PLAYER_ID });
+    wall.hp = 100;
+    const site = addStructure(world, 'pointDefense', { x: 48.5, z: 38.5, owner: PLAYER_ID, built: false });
+    const mex = addStructure(world, 'massExtractor', { x: 56, z: 56, owner: PLAYER_ID });
+    cmd(world, { type: 'upgrade', ids: [mex.id] });
+    cmd(world, { type: 'patrol', ids: [eng.id], x: 56, z: 48 });
+    for (let i = 0; i < 300; i++) {
+      tickWorld(world);
+      expect(eng.buildJob?.kind ?? null, `tick ${i}`).toBeNull();
+    }
+    expect(wall.hp).toBe(100);
+    expect(site.progress).toBe(0);
   });
 
   it('Shift lägger till fler patrullpunkter', () => {

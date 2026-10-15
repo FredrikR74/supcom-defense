@@ -1,25 +1,53 @@
 import { PLAYER_ID } from '../sim/constants.js';
-import { getDef } from '../sim/entities.js';
+import { getDef, getEntity } from '../sim/entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
 import enhancements from '../data/enhancements.js';
 import { enhancementsFor } from '../sim/enhancements.js';
-import { upgradeTarget } from '../sim/upgrades.js';
+import { upgradeTarget, queueableUnits } from '../sim/upgrades.js';
 import { techName } from './tech.js';
-import { renderBuildMenu, renderFactoryMenu, menuTabs, shortName } from './buildMenu.js';
+import { renderBuildMenu, renderFactoryMenu, menuTabs, shortName, TECH_TABS } from './buildMenu.js';
 
 /**
  * Kommandopanel längst ner: byggmenyn för markerade byggare och en markerad
  * ACU:s uppgraderingar (se buildMenu.js), produktionsknappar
  * och repetering för markerade fabriker, Upgrade för byggnader som kan
  * uppgraderas till nästa tech-nivå, och Sell för markerade byggnader.
+ * En markerad byggares byggkö visas som fabrikens kö. Bygg- och fabriksmenyn
+ * kan fällas ihop med fliken överst, så att den inte är i vägen.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
+
+const COLLAPSE_KEY = 'supcom-defense.menuCollapsed';
+const loadCollapsed = () => {
+  try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
+};
+const saveCollapsed = (value) => {
+  try { localStorage.setItem(COLLAPSE_KEY, value ? '1' : '0'); } catch { /* inte viktigt */ }
+};
+
+/** Högsta tech-nivån bland typerna (som FA väljer fliken för en T2-fabrik eller T2-ingenjör). */
+function topTech(types) {
+  let best = 'TECH1';
+  for (const t of types) {
+    const tc = getDef(t)?.techCategory ?? 'TECH1';
+    if (TECH_TABS.findIndex((x) => x.key === tc) > TECH_TABS.findIndex((x) => x.key === best)) best = tc;
+  }
+  return best;
+}
 export function createCommandPanel(el, {
   onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol, onEnhance, onCancelEnhance,
-  onUpgrade, onCancelUpgrade,
+  onUpgrade, onCancelUpgrade, onCancelOrders,
 }) {
   let signature = '';
+  /** Markeringen och den högsta tech-nivån förra gången, för att välja tech-flik. */
+  let lastSelection = '';
+  let lastTop = '';
+  /** Bygg- och fabriksmenyn ihopfälld (sparas mellan spel). */
+  let collapsed = loadCollapsed();
+  /** Framstegsstapel för en uppgradering som pågår, och för byggarens pågående bygge. */
+  let upgradeBar = null;
+  let builderBar = null;
   /** Enhetstyp -> framstegsstapel i dess produktionsknapp; uppdateras varje frame. */
   let progressBars = new Map();
   /** Framstegsstapel i köns första ruta. */
@@ -108,6 +136,48 @@ export function createCommandPanel(el, {
     }
   }
 
+  /**
+   * Byggarens kö (FA visar ingenjörens byggkö som fabrikens): byggorder i
+   * ordning, flera av samma byggnad i rad som en ruta med antal. Högerklick tar
+   * bort den sista i gruppen (Shift/Ctrl: 5), så att den som byggs tas sist.
+   */
+  function builderStrip(unit) {
+    const strip = document.createElement('div');
+    strip.className = 'cmd-queue';
+    strip.title = 'Build queue · Right-click: remove · Shift/Ctrl: 5 at a time';
+    const groups = [];
+    unit.orders.forEach((o, i) => {
+      if (o.type !== 'build') return;
+      const last = groups[groups.length - 1];
+      if (last?.structure === o.structure && last.indices[last.indices.length - 1] === i - 1) last.indices.push(i);
+      else groups.push({ structure: o.structure, indices: [i] });
+    });
+    groups.forEach(({ structure, indices }, g) => {
+      if (g > 0) {
+        const arrow = document.createElement('span');
+        arrow.className = 'queue-arrow';
+        arrow.textContent = '›';
+        strip.appendChild(arrow);
+      }
+      const chip = document.createElement('span');
+      const current = indices[0] === 0;
+      chip.className = 'queue-chip' + (current ? ' queue-current' : '');
+      chip.textContent = shortName(structure) + (indices.length > 1 ? ` ×${indices.length}` : '');
+      if (current) {
+        builderBar = document.createElement('span');
+        builderBar.className = 'queue-progress';
+        chip.appendChild(builderBar);
+      }
+      chip.addEventListener('mousedown', (e) => e.stopPropagation());
+      chip.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        onCancelOrders(unit.id, indices.slice(-Math.min(batch(e), indices.length)));
+      });
+      strip.appendChild(chip);
+    });
+    return strip;
+  }
+
   function button(label, sub, onClick, { active = false, badge = '', title = '' } = {}) {
     const b = document.createElement('button');
     if (title) b.title = title;
@@ -130,7 +200,8 @@ export function createCommandPanel(el, {
       }
       // Även ofärdiga fabriker: man kan köa medan de byggs.
       const factories = selected.filter((e) => e.kind === 'structure' && structures[e.type].produces);
-      const producible = new Set(factories.flatMap((e) => structures[e.type].produces));
+      // Medan en fabrik uppgraderas går nästa tech-nivås enheter också att köa.
+      const producible = new Set(factories.flatMap(queueableUnits));
       const queued = (type) => factories.reduce(
         (n, e) => n + e.productionQueue.filter((t) => t === type).length, 0);
       const repeat = factories.length > 0 && factories.every((f) => f.repeat);
@@ -158,6 +229,11 @@ export function createCommandPanel(el, {
           const order = enhanceOrders.find((o) => o.enhancement === key);
           bar.style.width = `${(order?.progress ?? 0) * 100}%`;
         }
+        if (upgradeBar && upgrading[0]) upgradeBar.style.width = `${upgrading[0].upgrade.progress * 100}%`;
+        if (builderBar && queueBuilder) {
+          const site = queueBuilder.buildJob?.kind === 'structure' ? getEntity(world, queueBuilder.buildJob.targetId) : null;
+          builderBar.style.width = `${(site?.progress ?? 0) * 100}%`;
+        }
         refreshMenu?.();
       };
 
@@ -165,12 +241,24 @@ export function createCommandPanel(el, {
       if (!menuTabs(enhanceable).some((t) => t.key === tab)) tab = 'build';
       // Kön visas för en markerad fabrik (den första om flera är markerade).
       const queueFactory = factories[0] ?? null;
+      const builders = selected.filter((e) => e.kind === 'unit' && units[e.type].builds?.length);
+      // Byggkön visas för den första markerade byggaren som har byggorder.
+      const queueBuilder = queueFactory ? null : builders.find((e) => e.orders.some((o) => o.type === 'build')) ?? null;
+      const builderOrders = queueBuilder?.orders.filter((o) => o.type === 'build').map((o) => [o.structure, o.x, o.z]) ?? [];
+
+      // Ny markering, eller en fabrik som blivit T2: välj den högsta tech-nivån, som i FA.
+      const selectionKey = selected.map((e) => e.id).join(',');
+      const top = topTech(factories.length ? producible : buildable);
+      if (selectionKey !== lastSelection || top !== lastTop) tech = top;
+      lastSelection = selectionKey;
+      lastTop = top;
       const sig = JSON.stringify([
         hasUnits, ui.mode, queueFactory?.id, queueFactory?.productionQueue,
         [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat, paused,
         sellable.length, ui.placing?.type, enhanceable?.id, enhanceable?.enhancements,
         enhanceOrders.map((o) => o.enhancement), tab, tech,
-        upgradable.map((e) => e.id), upgrading.map((e) => e.id),
+        upgradable.map((e) => e.id), upgrading.map((e) => [e.id, e.upgrade.to]),
+        queueBuilder?.id, builderOrders, collapsed,
       ]);
       if (sig === signature) {
         updateProgress();
@@ -183,10 +271,25 @@ export function createCommandPanel(el, {
       enhanceBars = new Map();
       refreshMenu = null;
       queueBar = null;
+      upgradeBar = null;
+      builderBar = null;
       const buttons = document.createElement('div');
       buttons.className = 'cmd-row';
-      const builders = selected.filter((e) => e.kind === 'unit' && units[e.type].builds?.length);
-      if (builders.length) {
+      // Fliken som fäller ihop eller fäller ut bygg- och fabriksmenyn.
+      if (builders.length || factories.length) {
+        const toggle = document.createElement('button');
+        toggle.className = 'cmd-collapse';
+        toggle.textContent = collapsed ? '▴ Show menu' : '▾ Hide menu';
+        toggle.title = collapsed ? 'Show the build menu' : 'Hide the build menu (stays hidden until shown again)';
+        toggle.addEventListener('mousedown', (e) => e.stopPropagation());
+        toggle.addEventListener('click', () => {
+          collapsed = !collapsed;
+          saveCollapsed(collapsed);
+          signature = '';
+        });
+        el.appendChild(toggle);
+      }
+      if (builders.length && !collapsed) {
         const menu = renderBuildMenu({
           buildable: [...buildable],
           powerFor: (type) => builders.filter((e) => units[e.type].builds.includes(type))
@@ -215,7 +318,7 @@ export function createCommandPanel(el, {
           () => onCancelEnhance(enhanceOrders[0].enhancement)));
       }
       let factoryMenu = null;
-      if (factories.length) {
+      if (factories.length && !collapsed) {
         factoryMenu = renderFactoryMenu({
           producible: [...producible],
           queued,
@@ -246,8 +349,12 @@ export function createCommandPanel(el, {
         }));
       }
       if (upgrading.length) {
-        buttons.appendChild(button('Cancel upgrade', shortName(upgrading[0].upgrade.to),
-          () => onCancelUpgrade(upgrading.map((e) => e.id))));
+        const b = button('Cancel upgrade', `Upgrading to ${shortName(upgrading[0].upgrade.to)}`,
+          () => onCancelUpgrade(upgrading.map((e) => e.id)));
+        upgradeBar = document.createElement('span');
+        upgradeBar.className = 'cmd-progress';
+        b.appendChild(upgradeBar);
+        buttons.appendChild(b);
       }
       if (hasUnits) {
         buttons.appendChild(button('Patrol', 'P', () => onPatrol(), { active: ui.mode === 'patrol' }));
@@ -258,6 +365,7 @@ export function createCommandPanel(el, {
       // Kön ligger ovanför knapparna: panelen sitter i skärmens nederkant, så när
       // kön växer flyttar sig inte knapparna under muspekaren.
       if (queueFactory?.productionQueue.length) el.appendChild(queueStrip(queueFactory));
+      if (queueBuilder) el.appendChild(builderStrip(queueBuilder));
       if (factoryMenu) el.appendChild(factoryMenu.root);
       if (buttons.childElementCount) el.appendChild(buttons);
       el.hidden = el.childElementCount === 0;

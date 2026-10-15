@@ -53,8 +53,13 @@ export function createHoverInfo(el) {
       }
 
       const producing = entity.kind === 'structure' && entity.built && entity.productionQueue?.length > 0;
-      prod.hidden = !producing;
-      if (producing) {
+      prod.hidden = !producing && !entity.upgrade;
+      if (entity.upgrade) {
+        // Uppgraderingen går före produktionen (fabriken bygger inget under tiden).
+        const pct = Math.floor(entity.upgrade.progress * 100);
+        prodFill.style.width = `${pct}%`;
+        prodText.textContent = `Upgrading to ${techName(getDef(entity.upgrade.to))} ${pct}%`;
+      } else if (producing) {
         const unitDef = getDef(entity.productionQueue[0]);
         const pct = Math.floor(entity.productionProgress * 100);
         const more = entity.productionQueue.length - 1;
