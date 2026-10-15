@@ -40,6 +40,20 @@ const shieldMaterial = new THREE.MeshBasicMaterial({
 /** Sekunder som skölden tonar bort på innan den tar slut. */
 const SHIELD_FADE_SECONDS = 1;
 
+/**
+ * Sköldbubblor (Shield Generator, Parashield): en halvgenomskinlig kupol som
+ * syns mindre ju mindre HP skölden har kvar och försvinner när den fallit.
+ */
+const bubbleGeometry = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+const bubbleMaterial = new THREE.MeshBasicMaterial({
+  color: 0x60a5fa,
+  transparent: true,
+  opacity: 0.18,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+});
+
 const flagPole = new THREE.CylinderGeometry(0.05, 0.05, 2, 6).translate(0, 1, 0);
 const flagCloth = new THREE.BufferGeometry().setFromPoints([
   new THREE.Vector3(0, 2, 0), new THREE.Vector3(0, 1.4, 0), new THREE.Vector3(0.8, 1.7, 0),
@@ -144,6 +158,8 @@ export function createEntityView(terrain) {
   const rallyFlags = new Map();
   /** Fiendeenheter ritas instansierat, en batch per typ. */
   const batches = new Map();
+  /** Entitets-id -> sköldbubbla. */
+  const bubbles = new Map();
   /** Vrak ritas instansierat i mörkt material, en batch per typ (utan ikoner). */
   const wreckBatches = new Map();
 
@@ -311,7 +327,36 @@ export function createEntityView(terrain) {
     const legL = mesh.getObjectByName('legL');
     const legR = mesh.getObjectByName('legR');
     const walk = legL && legR ? { legL, legR, body: mesh.getObjectByName('torso'), bodyY: mesh.getObjectByName('torso')?.position.y ?? 0, phase: 0, amp: 0, x: null, z: null } : null;
-    views.set(entity.id, { mesh, icon, ring, top, idleIcon, wire, walk, turret: mesh.getObjectByName('turret') });
+    views.set(entity.id, { type: entity.type, mesh, icon, ring, top, idleIcon, wire, walk, turret: mesh.getObjectByName('turret') });
+  }
+
+  function removeView(id) {
+    const v = views.get(id);
+    meshes.remove(v.mesh);
+    icons.remove(v.icon);
+    overlay.remove(v.ring);
+    overlay.remove(v.idleIcon);
+    if (v.wire) overlay.remove(v.wire);
+    views.delete(id);
+  }
+
+  /** Sköldbubblan följer entiteten; den bleknar med sköldens HP. */
+  function updateBubble(e, x, y, z) {
+    const shield = getDef(e.type)?.shield;
+    let bubble = bubbles.get(e.id);
+    if (!shield) return;
+    if (!bubble) {
+      bubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial.clone());
+      bubble.renderOrder = 6;
+      overlay.add(bubble);
+      bubbles.set(e.id, bubble);
+    }
+    const up = (e.kind === 'unit' || e.built) && e.shieldRecharge === 0 && e.shieldHp > 0;
+    bubble.visible = up;
+    if (!up) return;
+    bubble.position.set(x, y, z);
+    bubble.scale.set(shield.radius, shield.radius * 0.75, shield.radius);
+    bubble.material.opacity = 0.06 + 0.16 * (e.shieldHp / shield.maxHp);
   }
 
   /** Var en entitet ritas just nu (vanlig mesh eller instansierad). */
@@ -471,6 +516,8 @@ export function createEntityView(terrain) {
           continue;
         }
         alive.add(e.id);
+        // En uppgraderad byggnad har bytt typ och får en ny modell.
+        if (views.has(e.id) && views.get(e.id).type !== e.type) removeView(e.id);
         if (!views.has(e.id)) create(e);
         const v = views.get(e.id);
         const { x, z } = lerpPos(e, alpha);
@@ -478,6 +525,7 @@ export function createEntityView(terrain) {
         v.mesh.position.set(x, y, z);
         if (e.heading !== undefined) v.mesh.rotation.y = e.heading;
         if (v.walk) animateWalk(v.walk, x, z, frameSeconds);
+        updateBubble(e, x, y, z);
         // Tornets vinkel är i världen; på en enhet är tornet ett barn till den roterade kroppen.
         if (v.wire) {
           v.wire.visible = !e.built;
@@ -497,14 +545,14 @@ export function createEntityView(terrain) {
         v.idleIcon.visible = e.owner === owner && (isIdleBuilder(e) || isIdleFactory(e));
         if (v.idleIcon.visible) v.idleIcon.position.set(x, y + v.top + 1.2, z);
       }
-      for (const [id, v] of views) {
-        if (alive.has(id)) continue;
-        meshes.remove(v.mesh);
-        icons.remove(v.icon);
-        overlay.remove(v.ring);
-        overlay.remove(v.idleIcon);
-        if (v.wire) overlay.remove(v.wire);
-        views.delete(id);
+      for (const id of views.keys()) {
+        if (!alive.has(id)) removeView(id);
+      }
+      for (const [id, bubble] of bubbles) {
+        if (alive.has(id) && getDef(views.get(id).type)?.shield) continue;
+        overlay.remove(bubble);
+        bubble.material.dispose();
+        bubbles.delete(id);
       }
       for (const b of batches.values()) b.end();
       for (const b of ownBatches.values()) b.end();

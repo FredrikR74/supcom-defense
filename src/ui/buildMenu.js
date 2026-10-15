@@ -27,6 +27,21 @@ const DESCRIPTIONS = {
   striker: 'Main battle tank.',
   lobo: 'Mobile artillery. Long range, slow rate of fire.',
   archer: 'Mobile anti-air gun. Fires only at air units.',
+  landFactoryT2: 'Constructs Tech 1 and Tech 2 land units.',
+  massExtractorT2: 'Extracts mass from a mass deposit. Upgradeable.',
+  massExtractorT3: 'Extracts mass from a mass deposit.',
+  powerGeneratorT2: 'Generates large amounts of energy.',
+  massFabricator: 'Converts energy into mass.',
+  pointDefenseT2: 'Heavy direct-fire defensive turret with splash damage.',
+  artilleryT2: 'Long-range stationary artillery. Cannot fire at close targets.',
+  shieldGenerator: 'Projects a shield that absorbs incoming enemy fire.',
+  engineerT2: 'Builds Tech 1 and Tech 2 structures, repairs and reclaims.',
+  pillar: 'Heavy tank.',
+  mongoose: 'Gatling bot. Long-range sustained fire.',
+  riptide: 'Fast, heavily armored amphibious tank.',
+  flapjack: 'Long-range mobile missile launcher. Cannot fire at close targets.',
+  skyBoxer: 'Mobile flak artillery. Fires only at air units.',
+  parashield: 'Mobile shield generator that protects nearby units.',
 };
 
 /** Namn under ikonen, så att man ser vad rutan är utan att hålla musen över den. */
@@ -46,6 +61,28 @@ const LABELS = {
   striker: 'Striker',
   lobo: 'Lobo',
   archer: 'Archer',
+  landFactoryT2: 'Land Factory HQ',
+  massExtractorT2: 'T2 Mass Ext.',
+  massExtractorT3: 'T3 Mass Ext.',
+  powerGeneratorT2: 'T2 Power Gen.',
+  massFabricator: 'Mass Fab.',
+  pointDefenseT2: 'Triad',
+  artilleryT2: 'Klink Hammer',
+  shieldGenerator: 'Shield Gen.',
+  engineerT2: 'T2 Engineer',
+  pillar: 'Pillar',
+  mongoose: 'Mongoose',
+  riptide: 'Riptide',
+  flapjack: 'Flapjack',
+  skyBoxer: 'Sky Boxer',
+  parashield: 'Parashield',
+  rhino: 'Rhino',
+  hoplite: 'Hoplite',
+  wagner: 'Wagner',
+  viper: 'Viper',
+  mantis: 'Mantis',
+  mole: 'Mole',
+  medusa: 'Medusa',
   zephyrAmplifier: 'Zephyr Amp.',
   nanoRepair: 'Nano-Repair',
   resourceAllocation: 'Resource Alloc.',
@@ -56,12 +93,13 @@ export const shortName = (key) => LABELS[key] ?? key;
 
 /** Grupper i rutnätet, i FA:s ordning: fabriker, ekonomi, försvar; enheter: ingenjör, strid, stöd. */
 const GROUPS = [
-  ['landFactory'],
-  ['massExtractor', 'powerGenerator', 'massStorage', 'energyStorage'],
-  ['pointDefense', 'wall'],
-  ['engineer'],
-  ['snoop', 'mechMarine', 'striker'],
-  ['lobo', 'archer'],
+  ['landFactory', 'landFactoryT2'],
+  ['massExtractor', 'massExtractorT2', 'massExtractorT3', 'powerGenerator', 'powerGeneratorT2', 'massFabricator',
+    'massStorage', 'energyStorage'],
+  ['pointDefense', 'pointDefenseT2', 'artilleryT2', 'shieldGenerator', 'wall'],
+  ['engineer', 'engineerT2'],
+  ['snoop', 'mechMarine', 'striker', 'pillar', 'mongoose', 'riptide'],
+  ['lobo', 'archer', 'flapjack', 'skyBoxer', 'parashield'],
 ];
 
 export const TECH_TABS = [
@@ -112,6 +150,7 @@ function defRollover(type, def, power) {
   if (def.storage?.mass) facts.push(`Stores ${def.storage.mass} mass`);
   if (def.storage?.energy) facts.push(`Stores ${def.storage.energy} energy`);
   if (def.weapon) facts.push(weaponFact(def.weapon));
+  if (def.shield) facts.push(`shield ${def.shield.maxHp} HP · radius ${def.shield.radius}`);
   if (def.speed) facts.push(`speed ${def.speed}`);
   if (def.buildPower && def.speed) facts.push(`build rate ${def.buildPower}`);
   return nameLine(def) +

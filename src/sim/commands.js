@@ -4,6 +4,7 @@ import units from '../data/units.js';
 import enhancements from '../data/enhancements.js';
 import { setDifficulty } from './director.js';
 import { enhancementsFor, hasEnhancement } from './enhancements.js';
+import { startUpgrade, cancelUpgrade } from './upgrades.js';
 
 /**
  * Spelarens kommandon läggs i en kö och verkställs i början av nästa tick.
@@ -30,6 +31,8 @@ const HANDLERS = {
   patrol: applyPatrol,
   enhance: applyEnhance,
   cancelEnhance: applyCancelEnhance,
+  upgrade: applyUpgrade,
+  cancelUpgrade: applyCancelUpgrade,
 };
 
 export function applyCommands(world) {
@@ -144,6 +147,26 @@ function applyCancelEnhance(world, { owner, ids, enhancement }) {
   }
 }
 
+/** Egna byggnader bland `ids`. */
+function ownStructures(world, ids, owner) {
+  return ids
+    .map((id) => getEntity(world, id))
+    .filter((e) => e && e.kind === 'structure' && e.owner === owner);
+}
+
+/**
+ * `{ type: 'upgrade', owner, ids }`: färdiga byggnader med `upgradesTo` börjar
+ * uppgradera sig till nästa tech-nivå (se upgrades.js).
+ */
+function applyUpgrade(world, { owner, ids }) {
+  for (const e of ownStructures(world, ids, owner)) startUpgrade(e);
+}
+
+/** `{ type: 'cancelUpgrade', owner, ids }`: avbryt och få tillbaka det som lagts ner. */
+function applyCancelUpgrade(world, { owner, ids }) {
+  for (const e of ownStructures(world, ids, owner)) cancelUpgrade(world, e);
+}
+
 /** `{ type: 'build', owner, ids, structure, x, z, queue }`: (x, z) är byggnadens mitt. */
 function applyBuild(world, { owner, ids, structure, x, z, queue }) {
   const def = structures[structure];
@@ -159,15 +182,19 @@ const isBuilder = (e) => (units[e.type].buildPower ?? 0) > 0;
 /**
  * `{ type: 'assist', owner, ids, targetId, queue }` (assist/guard som i FA):
  * - på en ofärdig byggnad: byggarna hjälper till att bygga den
- * - på en egen enhet eller färdig fabrik: alla följer den. Byggare hjälper med
- *   det den bygger eller producerar och reparerar den; beväpnade anfaller
+ * - på en egen enhet, färdig fabrik eller byggnad som kan uppgraderas: alla
+ *   följer den. Byggare hjälper med det den bygger, producerar eller
+ *   uppgraderar och reparerar den; beväpnade anfaller
  *   fiender som kommer nära den (se guard.js)
  */
 function applyAssist(world, { owner, ids, targetId, queue }) {
   const target = getEntity(world, targetId);
   if (!target || target.owner !== owner) return;
 
-  const guardable = target.kind === 'unit' || (target.built && Boolean(structures[target.type].produces));
+  // Fabriker och byggnader som kan uppgraderas (t.ex. utvinnare) går att assistera.
+  const def0 = structures[target.type];
+  const guardable = target.kind === 'unit' ||
+    (target.built && Boolean(def0.produces || def0.upgradesTo || target.upgrade));
   if (guardable) {
     for (const e of ownUnits(world, ids, owner)) {
       if (e.id !== targetId) giveOrder(e, { type: 'guard', targetId }, queue);

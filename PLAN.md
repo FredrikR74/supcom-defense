@@ -63,8 +63,9 @@ Spelet är spelbart från start till förlust. Det har:
 - **Bygg- och fabriksmeny i FA-stil:** flikar (Build och ACU:ns uppgraderingsplatser), tech-nivåer T1–EXP, ikonrutnät med namn under varje ikon och en informationsruta med kostnad, byggtid och effekt.
 
 - **ACU-uppgraderingar:** Zephyr Amplifier, Nano-Repair System och Resource Allocation System.
+- **T2:** fabriker och Mass Extractors uppgraderas som i FA, T2-ingenjören bygger T2-byggnaderna, Land Factory HQ bygger T2-enheter, sköldar (Shield Generator och Parashield), och Cybran T2 i fiendens pool.
 
-Enheter: UEF ACU, Engineer och MA12 Striker. Fiender: Cybran Mantis, Mole och Medusa.
+Enheter: UEF ACU, Engineer, Snoop, Mech Marine, MA12 Striker, Lobo och Archer (T1), och T2 Engineer, Pillar, Mongoose, Riptide, Flapjack, Sky Boxer och Parashield (T2). Fiender: Cybran Mantis, Mole och Medusa (T1), och Rhino, Hoplite, Wagner och Viper (T2).
 
 ## Kommande
 
@@ -76,10 +77,16 @@ Enheter: UEF ACU, Engineer och MA12 Striker. Fiender: Cybran Mantis, Mole och Me
   *Test (Vitest):* fiendens pool kan skapa UEF-enheter.
 - [ ] **4. Radar och fog of war.** Krigsdimma: man ser bara det som är inom egna enheters och byggnaders siktradie. UEF Radar System visar fiender inom sin radie som radarblippar. Värden från blueprints.
   *Test (Vitest):* en fiende utanför sikt och radar är dold; inom radar syns den som blipp; inom sikt syns den helt.
-- [ ] **5. T2.** UEF T2-byggnader och T2-enheter (t.ex. T2 Point Defense, Shield Generator, T2 Land Factory och T2-stridsvagnar) och motsvarande T2-fiender, med FA-värden. Uppgradering av fabriker från T1 till T2 som i FA.
-  *Test (Vitest):* en T1-fabrik kan uppgraderas till T2 och sedan bygga T2-enheter.
-- [ ] **6. Uppgradera Mass Extractor.** T1 till T2 till T3 som i FA, med uppgraderingskostnad, byggtid och ny produktion och upkeep från blueprints. Produktionen fortsätter under uppgraderingen.
-  *Test (Vitest):* efter uppgraderingen ger utvinnaren T2:s mass och drar T2:s energi.
+- [x] **5. T2.** Värden från FAF:s blueprints. Uppgradering ligger i `sim/upgrades.js` och sköldar i `sim/shields.js`.
+  - **Uppgradering som i FA:** en färdig byggnad med `upgradesTo` bygger uppgraderingen med sin egen byggkraft (FA:s BuildRate) och kostnaden (den nya typens hela pris) dras löpande. Ingenjörer kan assistera, och Cancel upgrade ger tillbaka det som lagts ner. En fabrik bygger inga enheter under tiden men behåller kön. Land Factory (BuildRate 20) blir **Land Factory HQ** (UEB0201: 1410 mass, 11 200 energi, byggtid 2300, BuildRate 40).
+  - **T2 Engineer** (UEL0208, BuildRate 13) byggs i HQ:n och bygger T1- och T2-byggnader: T2 Mass Extractor, EG-200 Fusion Reactor (500 energi/s), Mass Fabricator, Triad (T2 Point Defense), Klink Hammer (Artillery Installation) och SD-Pulse (Shield Generator).
+  - **T2-enheter för UEF:** Pillar, Mongoose, Riptide, Flapjack, Sky Boxer och Parashield. **Cybran T2 i fiendens pool:** Rhino (från minut 10), Hoplite (12), Wagner (14) och Viper (16).
+  - **Sköldar:** sköldens HP, regen efter `regenStartTime`, och omladdning på `rechargeTime` när den fallit. Skott som slår ner innanför skölden tar skölden i stället (även splash), men skott inifrån går ut. Vid energibrist faller skölden.
+  - **Förenklingar:** enheter med salvor eller flera vapen (Mongoose, Hoplite, Wagner, Flapjack) har ett vapen med samma DPS som i FA. Missiler flyger i båge som artilleri. Mongooses granatkastare och Wagners torped är inte med.
+  - **Inte med än:** T2 Land Factory (support factory), T2 Air och Naval Factory, luftvärn och missilförsvar (kräver steg 2), radar och stealth (kräver steg 4) samt Banger (Cybrans flak, inga mål utan flyg).
+  *Test (Vitest):* `tests/t2.test.js`. En T1-fabrik uppgraderas till HQ och bygger sedan T2-enheter. Uppgraderingen kostar rätt, stoppar produktionen, går fortare med assist och kan avbrytas. T2-ingenjören bygger T2-byggnader, sköldar tar skott utifrån men släpper ut egna skott, och fiendens pool har Cybran T2.
+- [x] **6. Uppgradera Mass Extractor.** T1 → T2 → T3 som i FA (UEB1103 → UEB1202 → UEB1302), med BuildRate 10 och 15. T2 ger 6 mass/s och drar 9 energi/s (900 mass, byggtid 900), T3 ger 18 mass/s och drar 54 energi/s (4600 mass, byggtid 2875). Produktionen fortsätter under uppgraderingen. T3 fås bara genom uppgradering, eftersom T3-ingenjörer inte finns än.
+  *Test (Vitest):* efter uppgraderingen ger utvinnaren T2:s (och sedan T3:s) mass och drar motsvarande energi.
 - [ ] **7. Fler kartor med mer variation.** Fler och större kartor med olika terräng (raviner, höjder och flera vägar) och olika antal spawnpunkter. **Räckvidd och projektilfart** är i dag hårdkodat halverade för första kartans storlek, så lagra FA:s ohalverade värden i data och låt en skalfaktor per karta räkna fram dem.
   *Test (Vitest):* alla kartor klarar karttesterna (spawnpunkter når kärnan); samma enhet får rätt räckvidd på kartor med olika skala.
 - [x] **8. ACU-uppgraderingar.** UEF ACU:ns enhancements med värden från FAF:s blueprint (`UEL0001_unit.bp`) och effekter från `UEL0001_script.lua`. Uppgraderingarna ligger i `src/data/enhancements.js`. ACU:n bygger dem på sig själv med sin byggkraft och står still under tiden. Kostnaden dras löpande, och ingenjörer kan assistera. En flyttorder eller annan order avbryter inte uppgraderingen, utan läggs efter den. Bara Cancel upgrade (eller högerklick på knappen) avbryter, och då får man tillbaka det som lagts ner. Varje plats (höger arm, vänster arm, rygg) rymmer en uppgradering, och en ny ersätter den gamla. Uppgraderingarna försvinner när ACU:n dör, precis som veterancy.
@@ -87,7 +94,7 @@ Enheter: UEF ACU, Engineer och MA12 Striker. Fiender: Cybran Mantis, Mole och Me
   - **Nano-Repair System** (vänster arm): 800 mass, 24 000 energi, byggtid 800. +1 500 max-HP och +40 regen.
   - **Resource Allocation System** (höger arm): 5 000 mass, 175 000 energi, byggtid 2 800. +14 mass/s och +2 500 energi/s.
 
-  Senare: T2/T3 Engineering Suite (med steg 5), sköldarna (med T2 Shield Generator i steg 5), C-D1 Shoulder Drone (med steg 2), Tactical Missile Launcher och "Billy" (kräver missilvapen). Personal Teleporter tas inte med.
+  Senare: T2/T3 Engineering Suite, sköldarna (sköldsystemet finns nu, se steg 5), C-D1 Shoulder Drone (med steg 2), Tactical Missile Launcher och "Billy" (kräver missilvapen). Personal Teleporter tas inte med.
   *Test (Vitest):* `tests/enhancements.test.js`. Uppgraderingen tar `buildTime / byggkraft`, kostar rätt och ger rätt effekt. En ny uppgradering på samma plats ersätter den gamla. En flyttorder avbryter inte, men cancelEnhance gör det och ger tillbaka kostnaden. En assisterande ingenjör gör den snabbare, och den försvinner när ACU:n återuppstår.
 
 ## Arbetsflöde per steg

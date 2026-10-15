@@ -4,15 +4,20 @@ import structures from '../data/structures.js';
 import units from '../data/units.js';
 import enhancements from '../data/enhancements.js';
 import { enhancementsFor } from '../sim/enhancements.js';
-import { renderBuildMenu, renderFactoryMenu, menuTabs } from './buildMenu.js';
+import { upgradeTarget } from '../sim/upgrades.js';
+import { renderBuildMenu, renderFactoryMenu, menuTabs, shortName } from './buildMenu.js';
 
 /**
  * Kommandopanel längst ner: byggmenyn för markerade byggare och en markerad
  * ACU:s uppgraderingar (se buildMenu.js), produktionsknappar
- * och repetering för markerade fabriker, och Sell för markerade byggnader.
+ * och repetering för markerade fabriker, Upgrade för byggnader som kan
+ * uppgraderas till nästa tech-nivå, och Sell för markerade byggnader.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
-export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol, onEnhance, onCancelEnhance }) {
+export function createCommandPanel(el, {
+  onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol, onEnhance, onCancelEnhance,
+  onUpgrade, onCancelUpgrade,
+}) {
   let signature = '';
   /** Enhetstyp -> framstegsstapel i dess produktionsknapp; uppdateras varje frame. */
   let progressBars = new Map();
@@ -102,8 +107,9 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
     }
   }
 
-  function button(label, sub, onClick, { active = false, badge = '' } = {}) {
+  function button(label, sub, onClick, { active = false, badge = '', title = '' } = {}) {
     const b = document.createElement('button');
+    if (title) b.title = title;
     b.className = 'cmd' + (active ? ' cmd-active' : '');
     b.innerHTML = `<span class="cmd-label">${label}</span><span class="cmd-sub">${sub}</span>` +
       (badge ? `<span class="cmd-badge">${badge}</span>` : '');
@@ -132,6 +138,10 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       const enhanceable = selected.find((e) => e.kind === 'unit' && enhancementsFor(e.type).length) ?? null;
       const enhanceOrders = enhanceable?.orders.filter((o) => o.type === 'enhance') ?? [];
       const sellable = selected.filter((e) => e.kind === 'structure' && getDef(e.type).cost && !getDef(e.type).unsellable);
+      // Byggnader som kan uppgraderas (alla till samma typ som den första) och som uppgraderas just nu.
+      const upgradeTo = selected.map(upgradeTarget).find(Boolean) ?? null;
+      const upgradable = selected.filter((e) => upgradeTarget(e) === upgradeTo && upgradeTo);
+      const upgrading = selected.filter((e) => e.kind === 'structure' && e.upgrade);
 
       // Framsteget ändras varje frame, så det uppdateras utan att panelen byggs om.
       const updateProgress = () => {
@@ -159,6 +169,7 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
         [...buildable], [...producible].map((t) => [t, queued(t)]), factories.length, repeat, paused,
         sellable.length, ui.placing?.type, enhanceable?.id, enhanceable?.enhancements,
         enhanceOrders.map((o) => o.enhancement), tab, tech,
+        upgradable.map((e) => e.id), upgrading.map((e) => e.id),
       ]);
       if (sig === signature) {
         updateProgress();
@@ -224,6 +235,18 @@ export function createCommandPanel(el, { onBuild, onProduce, onCancelProduce, on
       if (factories.length) {
         buttons.appendChild(button('Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
         buttons.appendChild(button('Pause', paused ? 'Paused' : 'Running', () => onPause(!paused), { active: paused }));
+      }
+      if (upgradable.length) {
+        const def = structures[upgradeTo];
+        const time = def.buildTime / structures[upgradable[0].type].buildPower;
+        buttons.appendChild(button('Upgrade', shortName(upgradeTo), () => onUpgrade(upgradable.map((e) => e.id)), {
+          title: `Upgrade to ${def.name} (Tech ${def.techCategory.slice(-1)}): ${def.cost.mass} mass, ` +
+            `${def.cost.energy} energy, ${Math.round(time)} s` + (upgradable.length > 1 ? ` each (${upgradable.length})` : ''),
+        }));
+      }
+      if (upgrading.length) {
+        buttons.appendChild(button('Cancel upgrade', shortName(upgrading[0].upgrade.to),
+          () => onCancelUpgrade(upgrading.map((e) => e.id))));
       }
       if (hasUnits) {
         buttons.appendChild(button('Patrol', 'P', () => onPatrol(), { active: ui.mode === 'patrol' }));

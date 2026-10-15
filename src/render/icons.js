@@ -190,6 +190,58 @@ const DRAW = {
   },
 };
 
+/**
+ * Tech-nivå som i FA:s strategiska ikoner: små vita streck under ikonen
+ * (två för T2, tre för T3) ovanpå grundikonen `draw`.
+ */
+function withTech(draw, level) {
+  return (ctx, s) => {
+    draw(ctx, s);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#0b0f14';
+    ctx.lineWidth = 1.5;
+    const w = 5;
+    const gap = 3;
+    const x0 = s / 2 - (level * w + (level - 1) * gap) / 2;
+    for (let i = 0; i < level; i++) {
+      ctx.fillRect(x0 + i * (w + gap), s - 10, w, 8);
+      ctx.strokeRect(x0 + i * (w + gap), s - 10, w, 8);
+    }
+  };
+}
+
+/** UEF mobil sköld: blå kvadrat med en sköldbåge över. */
+function mobileShield(ctx, s) {
+  DRAW.mechMarine(ctx, s);
+  ctx.strokeStyle = '#93c5fd';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2 + 4, s / 2 - 8, Math.PI * 1.1, Math.PI * 1.9);
+  ctx.stroke();
+}
+
+Object.assign(DRAW, {
+  landFactoryT2: withTech(DRAW.landFactory, 2),
+  massExtractorT2: withTech(DRAW.massExtractor, 2),
+  massExtractorT3: withTech(DRAW.massExtractor, 3),
+  powerGeneratorT2: withTech(DRAW.powerGenerator, 2),
+  massFabricator: withTech(structureIcon('#a3e635', 0.7), 2),
+  pointDefenseT2: withTech(DRAW.pointDefense, 2),
+  artilleryT2: withTech(structureIcon('#f97316', 0.8), 2),
+  shieldGenerator: withTech(structureIcon('#93c5fd', 0.8), 2),
+  engineerT2: withTech(DRAW.engineer, 2),
+  pillar: withTech(DRAW.striker, 2),
+  riptide: withTech(DRAW.striker, 2),
+  mongoose: withTech(DRAW.mechMarine, 2),
+  flapjack: withTech(DRAW.lobo, 2),
+  skyBoxer: withTech(DRAW.archer, 2),
+  parashield: withTech(mobileShield, 2),
+  rhino: withTech(DRAW.mantis, 2),
+  hoplite: withTech(DRAW.mantis, 2),
+  wagner: withTech(DRAW.mantis, 2),
+  viper: withTech(DRAW.medusa, 2),
+});
+
 const textures = {};
 
 export function getIconTexture(kind) {

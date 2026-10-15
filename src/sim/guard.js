@@ -17,12 +17,13 @@ const areEnemies = (a, b) => a.owner !== b.owner && a.owner !== 0 && b.owner !==
 /**
  * Assist (guard) som i FA: en enhet som assisterar en annan egen enhet eller
  * fabrik följer den och
- * - byggare hjälper till med det den bygger, producerar eller uppgraderar, och reparerar
+ * - byggare hjälper till med det den bygger, producerar eller uppgraderar (enhetens
+ *   uppgraderingar och byggnaders uppgradering till nästa tech-nivå), och reparerar
  *   den när den är skadad
  * - beväpnade anfaller fiender som kommer nära den (se updateGuardEngagement)
  *
  * Returnerar vart enheten ska gå och vad den ska göra där:
- * { x, z, reach, target, mode, site } där mode är 'build', 'factory', 'enhance', 'repair',
+ * { x, z, reach, target, mode, site } där mode är 'build', 'factory', 'upgrade', 'enhance', 'repair',
  * 'engage' eller 'follow', eller null om den assisterade försvunnit.
  */
 export function guardDestination(world, unit, order) {
@@ -40,6 +41,9 @@ export function guardDestination(world, unit, order) {
   }
   if (builder && target.buildJob?.kind === 'unit') {
     return { x: target.x, z: target.z, reach: range + target.radius, target, site: null, mode: 'factory' };
+  }
+  if (builder && target.buildJob?.kind === 'upgrade' && target.upgrade) {
+    return { x: target.x, z: target.z, reach: range + target.radius, target, site: null, mode: 'upgrade' };
   }
   if (builder && target.buildJob?.kind === 'enhance' && target.buildJob.targetId === target.id) {
     return { x: target.x, z: target.z, reach: range + target.radius, target, site: null, mode: 'enhance' };

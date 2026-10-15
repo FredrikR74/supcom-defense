@@ -11,7 +11,15 @@
  *   bygger på buildTime / 10 sekunder
  * - `benign`: skjuts inte på automatiskt (FA-kategorin BENIGN, t.ex. murar)
  * - `storage`: ökar spelarens lagerkapacitet när byggnaden är klar (FA:s Economy.Storage*)
+ * - `upgradesTo`: byggnaden kan uppgraderas till den typen (FA:s UpgradesTo), se
+ *   sim/upgrades.js. Uppgraderingen kostar den nya typens `cost` och `buildTime`
+ *   och byggs med byggnadens egen `buildPower` (FA:s BuildRate); ingenjörer kan assistera.
+ * - `shield`: sköld, se units.js och sim/shields.js.
  */
+
+const T1_LAND_UNITS = ['engineer', 'snoop', 'mechMarine', 'striker', 'lobo', 'archer'];
+const T2_LAND_UNITS = ['engineerT2', 'pillar', 'mongoose', 'riptide', 'flapjack', 'skyBoxer', 'parashield'];
+
 export default {
   /**
    * Kärnan som ska försvaras: UEF Quantum Gateway (UEB0304). Kostnad och byggtid
@@ -36,9 +44,24 @@ export default {
     cost: { mass: 240, energy: 2100 },
     buildTime: 300,
     buildPower: 20,
-    produces: ['engineer', 'snoop', 'mechMarine', 'striker', 'lobo', 'archer'],
+    produces: T1_LAND_UNITS,
+    upgradesTo: 'landFactoryT2',
   },
-  /** UEB1103. Producerar 2 mass/s och drar 2 energi/s. */
+  /**
+   * UEB0201, T2 Land Factory HQ. Fås bara genom att uppgradera en Land Factory.
+   * Bygger T1- och T2-enheter med BuildRate 40.
+   */
+  landFactoryT2: {
+    name: 'Land Factory HQ',
+    techCategory: 'TECH2',
+    size: 4,
+    maxHp: 8000,
+    cost: { mass: 1410, energy: 11200 },
+    buildTime: 2300,
+    buildPower: 40,
+    produces: [...T1_LAND_UNITS, ...T2_LAND_UNITS],
+  },
+  /** UEB1103. Producerar 2 mass/s och drar 2 energi/s. Uppgraderas med BuildRate 10. */
   massExtractor: {
     name: 'Mass Extractor',
     techCategory: 'TECH1',
@@ -46,8 +69,36 @@ export default {
     maxHp: 400,
     cost: { mass: 36, energy: 360 },
     buildTime: 60,
+    buildPower: 10,
     production: { mass: 2, energy: 0 },
     upkeep: { mass: 0, energy: 2 },
+    requiresDeposit: true,
+    upgradesTo: 'massExtractorT2',
+  },
+  /** UEB1202. 6 mass/s, drar 9 energi/s. Uppgraderas till T3 med BuildRate 15. */
+  massExtractorT2: {
+    name: 'Mass Extractor',
+    techCategory: 'TECH2',
+    size: 2,
+    maxHp: 2000,
+    cost: { mass: 900, energy: 5400 },
+    buildTime: 900,
+    buildPower: 15,
+    production: { mass: 6, energy: 0 },
+    upkeep: { mass: 0, energy: 9 },
+    requiresDeposit: true,
+    upgradesTo: 'massExtractorT3',
+  },
+  /** UEB1302. 18 mass/s, drar 54 energi/s. Fås bara genom uppgradering (T3-ingenjörer finns inte än). */
+  massExtractorT3: {
+    name: 'Mass Extractor',
+    techCategory: 'TECH3',
+    size: 2,
+    maxHp: 7000,
+    cost: { mass: 4600, energy: 31625 },
+    buildTime: 2875,
+    production: { mass: 18, energy: 0 },
+    upkeep: { mass: 0, energy: 54 },
     requiresDeposit: true,
   },
   /** UEB1101. */
@@ -59,6 +110,28 @@ export default {
     cost: { mass: 75, energy: 750 },
     buildTime: 125,
     production: { mass: 0, energy: 20 },
+  },
+  /** UEB1201. 500 energi/s. Fotavtrycket 3 × 3 (FA:s Footprint). */
+  powerGeneratorT2: {
+    name: 'Power Generator',
+    unitName: 'EG - 200 Fusion Reactor',
+    techCategory: 'TECH2',
+    size: 3,
+    maxHp: 2500,
+    cost: { mass: 1200, energy: 12000 },
+    buildTime: 2198,
+    production: { mass: 0, energy: 500 },
+  },
+  /** UEB1104. Gör 1 mass/s av 100 energi/s (mindre vid energibrist, som en utvinnare). */
+  massFabricator: {
+    name: 'Mass Fabricator',
+    techCategory: 'TECH2',
+    size: 2,
+    maxHp: 360,
+    cost: { mass: 200, energy: 4000 },
+    buildTime: 500,
+    production: { mass: 1, energy: 0 },
+    upkeep: { mass: 0, energy: 100 },
   },
   /** UEB1106. Lagrar 500 mass. */
   massStorage: {
@@ -101,5 +174,54 @@ export default {
     buildTime: 250,
     /** `turnRate` i grader/s. */
     weapon: { damage: 50, rateOfFire: 10 / 3, range: 13, projectileSpeed: 17.5, turnRate: 180, muzzleHeight: 0.8 },
+  },
+  /**
+   * UEB2301, T2 Point Defense. Gauss Cannon: tre projektiler à 70 skada
+   * (DamageRadius 2), 10/17 skott/s, räckvidd 50, mynningshastighet 35.
+   */
+  pointDefenseT2: {
+    name: 'Point Defense',
+    unitName: 'Triad',
+    techCategory: 'TECH2',
+    size: 2,
+    maxHp: 2250,
+    cost: { mass: 540, energy: 3780 },
+    buildTime: 675,
+    weapon: {
+      damage: 70, projectiles: 3, rateOfFire: 10 / 17, range: 25, damageRadius: 1,
+      projectileSpeed: 17.5, turnRate: 130, muzzleHeight: 1.2,
+    },
+  },
+  /**
+   * UEB2303, T2 Artillery Installation. APDS Artillery: 2000 skada
+   * (DamageRadius 3), ett skott per 20 s, räckvidd 50–115, mynningshastighet 27,8.
+   */
+  artilleryT2: {
+    name: 'Artillery Installation',
+    unitName: 'Klink Hammer',
+    techCategory: 'TECH2',
+    size: 2,
+    maxHp: 3600,
+    cost: { mass: 1900, energy: 13585 },
+    buildTime: 1600,
+    weapon: {
+      damage: 2000, rateOfFire: 10 / 200, range: 57.5, minRange: 25, damageRadius: 1.5,
+      projectileSpeed: 13.9, turnRate: 6, muzzleHeight: 1.6, ballistic: true,
+    },
+  },
+  /**
+   * UEB4202, T2 Shield Generator. Sköld: 9000 HP, regen 120/s efter 3 s, laddas
+   * om på 23 s när den fallit, ShieldSize 26. Drar 200 energi/s.
+   */
+  shieldGenerator: {
+    name: 'Shield Generator',
+    unitName: 'SD - Pulse',
+    techCategory: 'TECH2',
+    size: 3,
+    maxHp: 250,
+    cost: { mass: 600, energy: 6000 },
+    buildTime: 1150,
+    upkeep: { mass: 0, energy: 200 },
+    shield: { maxHp: 9000, regenRate: 120, regenStartTime: 3, rechargeTime: 23, radius: 6.5 },
   },
 };

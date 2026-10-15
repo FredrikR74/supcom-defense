@@ -116,9 +116,10 @@ export function isIdleBuilder(e) {
     !e.buildJob && !e.targetId;
 }
 
-/** En färdig fabrik som inte har något i produktionskön. */
+/** En färdig fabrik som inte har något i produktionskön och inte uppgraderas. */
 export function isIdleFactory(e) {
-  return e.kind === 'structure' && e.built && Array.isArray(e.productionQueue) && e.productionQueue.length === 0;
+  return e.kind === 'structure' && e.built && Array.isArray(e.productionQueue) && e.productionQueue.length === 0 &&
+    !e.upgrade;
 }
 
 /** Kan entiteten repareras just nu (skadad, färdig och med en kostnad att räkna på)? */

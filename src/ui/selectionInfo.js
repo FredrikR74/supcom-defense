@@ -80,6 +80,12 @@ function describe(e, { enemy, world }) {
   if (enhancing) html += row('Upgrading', `${enhancements[enhancing.enhancement].name} ${Math.floor(enhancing.progress * 100)}%`);
   if (enemy && def.cost) html += row('Mass value', def.cost.mass);
   if (e.kind === 'structure' && !e.built) html += row('Building', `${Math.floor(e.progress * 100)}%`);
+  if (e.upgrade) html += row('Upgrading', `${shortName(e.upgrade.to)} ${Math.floor(e.upgrade.progress * 100)}%`);
+  if (def.shield && e.shieldHp !== undefined) {
+    html += row('Shield', e.shieldRecharge > 0
+      ? `<span class="info-warn">down, recharging ${Math.ceil(e.shieldRecharge)} s</span>`
+      : `${Math.ceil(e.shieldHp)} / ${def.shield.maxHp}`);
+  }
   return html;
 }
 

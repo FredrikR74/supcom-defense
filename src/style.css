@@ -371,6 +371,7 @@ html, body {
 .info-label { display: inline-block; min-width: 64px; color: #9ca3af; }
 .info-gives .info-mass, .info-gives .info-energy { color: #4ade80; }
 .info-takes .info-mass, .info-takes .info-energy { color: #f87171; }
+.info-warn { color: #f87171; }
 
 /* Sysslolösa byggare: knappar uppe till vänster */
 #idle {

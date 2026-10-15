@@ -3,6 +3,7 @@ import { createSpatialHash } from '../spatialHash.js';
 import { getDef, getEntity, removeEntity, addWreck, weaponOf } from '../entities.js';
 import { recordDamage, disperseVeterancy } from '../veterancy.js';
 import { updateGuardEngagement } from '../guard.js';
+import { enemyShields, absorbProjectile } from '../shields.js';
 
 /** Hur nära nedslagspunkten en entitets kant måste vara för att träffas. */
 const HIT_TOLERANCE = 0.3;
@@ -209,6 +210,8 @@ export function projectileSystem(world) {
   if (world.projectiles.length === 0) return;
   const { hash, maxRadius } = buildHash(world);
   const remaining = [];
+  /** Fiendens sköldar per skyttens ägare (räknas bara om något slår ner). */
+  const shieldsBy = new Map();
   for (const p of world.projectiles) {
     p.prevX = p.x;
     p.prevZ = p.z;
@@ -224,6 +227,14 @@ export function projectileSystem(world) {
     }
     p.x = p.tx;
     p.z = p.tz;
+
+    // En sköld tar hela skottet, även splash (se shields.js).
+    if (!shieldsBy.has(p.owner)) shieldsBy.set(p.owner, enemyShields(world, p.owner));
+    const shield = absorbProjectile(world, shieldsBy.get(p.owner), p);
+    if (shield) {
+      emit(world, { type: 'shieldHit', owner: p.owner, x: p.x, z: p.z, y: p.y, shieldId: shield.id });
+      continue;
+    }
 
     // Utan splash träffas den närmaste fienden vid nedslaget; med splash
     // (damageRadius) alla fiender vars kant är inom radien.

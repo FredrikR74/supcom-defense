@@ -46,11 +46,18 @@ export default {
      * spelaren inte kan campa vid gatewayen (tower defense-avsteg från FA).
      */
     spawnShieldSeconds: 4,
-    /** Fiendetyper (Cybran T1), vikt och från vilken minut de kan komma. */
+    /**
+     * Fiendetyper (Cybran T1 och T2), vikt och från vilken minut de kan komma.
+     * T2 kommer när en spelare i FA brukar ha en T2-fabrik.
+     */
     unitPool: [
       { type: 'mole', weight: 2 },
       { type: 'mantis', weight: 6 },
       { type: 'medusa', weight: 2, fromMinute: 4 },
+      { type: 'rhino', weight: 3, fromMinute: 10 },
+      { type: 'hoplite', weight: 2, fromMinute: 12 },
+      { type: 'wagner', weight: 2, fromMinute: 14 },
+      { type: 'viper', weight: 1, fromMinute: 16 },
     ],
   },
   /**

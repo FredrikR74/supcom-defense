@@ -44,6 +44,8 @@ const LOAD_KNEE = 2;
 const VOICE_LIMITS = {
   mantis: 4, hunter: 4, mole: 3, striker: 4, pointDefense: 3, acu: 2,
   medusa: 3, lobo: 3, mechMarine: 3, snoop: 2, archer: 3,
+  pillar: 4, mongoose: 3, riptide: 3, flapjack: 2, skyBoxer: 3, pointDefenseT2: 3, artilleryT2: 2,
+  rhino: 4, hoplite: 3, wagner: 3, viper: 2,
   explosion: 5,
 };
 const DEFAULT_VOICE_LIMIT = 2;
@@ -153,6 +155,17 @@ export const WEAPON_SOUNDS = {
   mechMarine: { kind: 'rifle', pitch: 1, gain: 4.9 },
   snoop: { kind: 'rifle', pitch: 1.3, gain: 2.8 },
   archer: { kind: 'flak', pitch: 1, gain: 4 },
+  pillar: { kind: 'tank', pitch: 0.9, gain: 0.8 },
+  mongoose: { kind: 'rifle', pitch: 0.85, gain: 4 },
+  riptide: { kind: 'rifle', pitch: 0.7, gain: 4.5 },
+  flapjack: { kind: 'artillery', pitch: 1.3, gain: 0.7 },
+  skyBoxer: { kind: 'flak', pitch: 0.85, gain: 4 },
+  pointDefenseT2: { kind: 'plasma', pitch: 0.6, gain: 3.4 },
+  artilleryT2: { kind: 'artillery', pitch: 0.6, gain: 1 },
+  rhino: { kind: 'laser', pitch: 0.8, gain: 1.4 },
+  hoplite: { kind: 'artillery', pitch: 1.4, gain: 0.6 },
+  wagner: { kind: 'laser', pitch: 0.7, gain: 1.4 },
+  viper: { kind: 'artillery', pitch: 1.25, gain: 0.7 },
 };
 
 export function createSound() {

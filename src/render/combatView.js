@@ -7,6 +7,7 @@ const OWNER_COLORS = {
 };
 const DEFAULT_COLOR = new THREE.Color(0xffffff);
 const WHITE = new THREE.Color(0xffffff);
+const SHIELD_FLASH = new THREE.Color(0x93c5fd);
 
 /**
  * Hur varje vapens skott ser ut (efter skyttens typ):
@@ -23,6 +24,13 @@ const PROJECTILE_STYLES = {
   mantis: { kind: 'beam', scale: 1 },
   hunter: { kind: 'beam', scale: 1 },
   mole: { kind: 'beam', scale: 0.7 },
+  pillar: { kind: 'orb', scale: 1.15 },
+  mongoose: { kind: 'orb', scale: 0.6 },
+  riptide: { kind: 'orb', scale: 0.7 },
+  skyBoxer: { kind: 'orb', scale: 0.8 },
+  pointDefenseT2: { kind: 'orb', scale: 1.4 },
+  rhino: { kind: 'beam', scale: 1.3 },
+  wagner: { kind: 'beam', scale: 1.4 },
 };
 const defaultStyle = (owner) => ({ kind: owner === 2 ? 'beam' : 'orb', scale: 1 });
 
@@ -399,6 +407,9 @@ export function createCombatView(terrain, capacity = 2048) {
               gravity: -10, color: SPARK, endColor: color, from: 0.16, to: 0.08, life: rand(0.2, 0.35),
             });
           }
+        } else if (ev.type === 'shieldHit') {
+          // Skölden tar skottet: en blå blixt i bubblan.
+          fire.spawn({ x: ev.x, y: y + ev.y, z: ev.z, color: SHIELD_FLASH, from: 0.8, to: 1.8, life: 0.2 });
         } else if (ev.type === 'death') {
           const structure = ev.kind === 'structure';
           const s = Math.max(0.55, (ev.size ?? 0.6) * (structure ? 1 : 1.1));

@@ -24,6 +24,7 @@ import { showStartMenu } from './ui/startMenu.js';
 import maps from './data/maps/index.js';
 import gameConfig from './data/gameConfig.js';
 import enhancements from './data/enhancements.js';
+import structures from './data/structures.js';
 
 /** Spelhastigheter man stegar mellan med +/− (1× är normal). */
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
@@ -92,6 +93,8 @@ function startGame({ map, difficulty }) {
       queueCommand(world, { type: 'cancelEnhance', owner: PLAYER_ID, ids: selectedIds(), enhancement }),
     onPatrol: startPatrol,
     onSell: sellSelected,
+    onUpgrade: (ids) => queueCommand(world, { type: 'upgrade', owner: PLAYER_ID, ids }),
+    onCancelUpgrade: (ids) => queueCommand(world, { type: 'cancelUpgrade', owner: PLAYER_ID, ids }),
   });
 
   const threatPanel = createThreatPanel($('threat'), $('toast'), {
@@ -235,6 +238,11 @@ function startGame({ map, difficulty }) {
       if (ev.type === 'acuDeath') threatPanel.toast(`ACU destroyed! Respawning in ${ev.seconds} s`);
       if (ev.type === 'acuRespawn') threatPanel.toast('ACU respawned at the Quantum Gateway');
       if (ev.type === 'enhanced' && ev.owner === PLAYER_ID) threatPanel.toast(`Upgrade complete: ${enhancements[ev.enhancement].name}`);
+      if (ev.type === 'upgraded' && ev.owner === PLAYER_ID) {
+        const def = structures[ev.structure];
+        threatPanel.toast(`Upgrade complete: ${def.name} (Tech ${def.techCategory.slice(-1)})`);
+      }
+      if (ev.type === 'shieldDown' && ev.owner === PLAYER_ID) threatPanel.toast('Shield down!');
     }
     measure('sound', () => sound.handleEvents(world.events, view.rig.target));
     view.render(world, alpha, selection, time.paused ? 0 : frameSeconds, measure);

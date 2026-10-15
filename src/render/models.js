@@ -130,6 +130,18 @@ function strut(a, b, t, material, round = false) {
 }
 
 /**
+ * Skalar en färdig modell (delarna överst i modellen) runt origo, t.ex. för en
+ * större variant av en enhet. Rörliga delar behåller sina namn och leder.
+ */
+function scaleParts(parts, s) {
+  for (const o of parts) {
+    o.position.multiplyScalar(s);
+    o.scale.multiplyScalar(s);
+  }
+  return parts;
+}
+
+/**
  * Cybran-insektsben i tre led: från höften rakt ut, upp till knät, ut och ner
  * till vristen och en spetsig fot i marken. Varje knä har ett rött ljus.
  * Varje ben är en egen grupp ('leg0'...) med leden i höften, så att det kan
@@ -905,6 +917,505 @@ const MODELS = {
       strut([0, 0.2, 0.62], [0, 0.2, 0.66], 0.07, glow, true),
     ], 0, 0.5, 0);
     return [...mergeByMaterial([base, taper(0.36, 0.4, 0.1, armor, 0, 0.45, 0, 8)]), turret];
+  },
+  // ---- UEF T2 och T3: byggnader ----
+
+  /**
+   * UEF Land Factory HQ: T1-fabriken med ett kommandotorn på vänster block,
+   * en andra traverskran, tjockare pansar på blocken och dubbla lagfärgsränder.
+   */
+  landFactoryT2() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const extra = [
+      // Kommandotorn med fönsterband och antennmast.
+      chamferBox(0.8, 1.1, 0.8, armor, -1.55, 2.45, 0.2, 0.05),
+      chamferBox(0.84, 0.08, 0.84, teamPanel, -1.55, 2.2, 0.2, 0.01),
+      chamferBox(0.82, 0.12, 0.6, glow, -1.55, 2.75, 0.32, 0.01),
+      chamferBox(0.6, 0.12, 0.6, armorDark, -1.55, 3.06, 0.2, 0.03),
+      strut([-1.55, 3.1, 0.2], [-1.55, 3.9, 0.2], 0.04, armorDark, true),
+      chamferBox(0.07, 0.07, 0.07, glow, -1.55, 3.92, 0.2, 0.01),
+      // Andra traverskranen framför den första.
+      chamferBox(0.2, 0.9, 0.2, armor, -1.55, 1.5, 1.4, 0.03),
+      chamferBox(0.2, 1.12, 0.2, armor, 1.55, 1.39, 1.4, 0.03),
+      chamferBox(3.3, 0.18, 0.26, armor, 0, 2.0, 1.4, 0.04),
+      chamferBox(2.6, 0.07, 0.03, teamPanel, 0, 2.0, 1.55, 0.01),
+      chamferBox(0.4, 0.22, 0.36, armorDark, 0.5, 1.82, 1.4, 0.03),
+      strut([0.5, 1.7, 1.4], [0.5, 1.2, 1.4], 0.08, armorDark),
+      chamferBox(0.13, 0.1, 0.13, glow, 0.5, 1.15, 1.4, 0.03),
+    ];
+    // Pansarplåtar och en extra lagfärgsrand på blockens utsidor.
+    for (const side of [-1, 1]) {
+      extra.push(
+        chamferBox(0.06, 0.4, 2.4, armorDark, side * 2.03, 0.5, 0.4, 0.02),
+        chamferBox(0.03, 0.1, 3.0, teamPanel, side * 2.07, 0.5, 0.4, 0.01),
+      );
+    }
+    return [...MODELS.landFactory(), ...mergeByMaterial(extra)];
+  },
+
+  /** UEF T2 Mass Extractor: T1-utvinnaren med en högre pumpkrona, ett andra lagfärgsband och fyra stöttor. */
+  massExtractorT2() {
+    const { armor, armorDark, teamPanel, massGlow } = MATERIALS;
+    const octagon = (r, h, material, y) => rotated(taper(r, r * 1.04, h, material, 0, y, 0, 8), 0, Math.PI / 8);
+    const extra = [
+      octagon(0.36, 0.5, armor, 1.72),
+      octagon(0.39, 0.08, teamPanel, 1.62),
+      octagon(0.28, 0.1, armorDark, 2.02),
+      taper(0.18, 0.18, 0.06, massGlow, 0, 2.08, 0, 12),
+    ];
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2;
+      extra.push(strut([Math.sin(a) * 0.75, 0.38, Math.cos(a) * 0.75], [Math.sin(a) * 0.36, 1.85, Math.cos(a) * 0.36], 0.07, armorDark));
+    }
+    return [...MODELS.massExtractor(), ...mergeByMaterial(extra)];
+  },
+
+  /** UEF T3 Mass Extractor: T2-utvinnaren med ett glödande massband runt foten och tre lagfärgsband. */
+  massExtractorT3() {
+    const { armor, armorDark, teamPanel, massGlow } = MATERIALS;
+    const octagon = (r, h, material, y) => rotated(taper(r, r, h, material, 0, y, 0, 8), 0, Math.PI / 8);
+    const extra = [
+      octagon(0.95, 0.06, massGlow, 0.27),
+      octagon(0.46, 0.06, teamPanel, 0.9),
+      octagon(0.3, 0.3, armor, 2.25),
+      octagon(0.32, 0.05, teamPanel, 2.2),
+      taper(0.14, 0.14, 0.05, massGlow, 0, 2.42, 0, 12),
+    ];
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + i * Math.PI / 2;
+      extra.push(chamferBox(0.16, 0.5, 0.16, armorDark, Math.sin(a) * 0.86, 0.5, Math.cos(a) * 0.86, 0.03));
+    }
+    return [...MODELS.massExtractorT2(), ...mergeByMaterial(extra)];
+  },
+
+  /**
+   * UEF EG-200 Fusion Reactor (T2 Power Generator): bred fot med en kupolformad
+   * reaktor med glödande ringar, fyra kyltorn i hörnen och rör in till reaktorn.
+   */
+  powerGeneratorT2() {
+    const { armor, armorDark, teamPanel, energyGlow } = MATERIALS;
+    const parts = [
+      chamferBox(2.9, 0.25, 2.9, armorDark, 0, 0.125, 0, 0.06),
+      rotated(taper(1.05, 1.2, 0.55, armor, 0, 0.52, 0, 8), 0, Math.PI / 8),
+      taper(0.85, 1.0, 0.55, armor, 0, 1.07, 0, 24),
+      taper(0.4, 0.85, 0.45, armorDark, 0, 1.57, 0, 24), // kupol
+      cylinder(0.3, 0.06, energyGlow, 0, 1.82, 0, 16),
+      cylinder(1.02, 0.07, teamPanel, 0, 0.82, 0, 24),
+    ];
+    for (const y of [0.98, 1.16]) parts.push(cylinder(0.94, 0.05, energyGlow, 0, y, 0, 24));
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const x = sx * 1.05;
+      const z = sz * 1.05;
+      parts.push(
+        taper(0.22, 0.3, 1.2, armor, x, 0.85, z, 12),
+        taper(0.24, 0.24, 0.06, teamPanel, x, 0.9, z, 12),
+        cylinder(0.17, 0.04, energyGlow, x, 1.46, z, 12),
+        strut([x * 0.85, 0.5, z * 0.85], [x * 0.45, 0.65, z * 0.45], 0.09, armorDark, true),
+      );
+    }
+    return mergeByMaterial(parts);
+  },
+
+  /** UEF Mass Fabricator: pansrad kub med en glödande masskärna i en bur och kylplåtar. */
+  massFabricator() {
+    const { armor, armorDark, teamPanel, massGlow } = MATERIALS;
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 0), massGlow);
+    core.position.y = 1.15;
+    const parts = [
+      chamferBox(1.8, 0.2, 1.8, armorDark, 0, 0.1, 0, 0.05),
+      chamferBox(1.3, 0.55, 1.3, armor, 0, 0.47, 0, 0.05),
+      chamferBox(1.34, 0.08, 1.34, teamPanel, 0, 0.62, 0, 0.01),
+      chamferBox(0.9, 0.1, 0.9, armorDark, 0, 0.8, 0, 0.03),
+      core,
+    ];
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      parts.push(
+        strut([sx * 0.4, 0.82, sz * 0.4], [sx * 0.2, 1.55, sz * 0.2], 0.07, armorDark),
+        chamferBox(0.06, 0.4, 0.4, armorDark, sx * 0.7, 0.45, sz * 0.3, 0.01),
+      );
+    }
+    parts.push(chamferBox(0.5, 0.08, 0.5, armorDark, 0, 1.58, 0, 0.02));
+    return mergeByMaterial(parts);
+  },
+
+  /** UEF Triad (T2 Point Defense): kraftig åttkantig sockel och ett torn ('turret') med tre gausskanoner. */
+  pointDefenseT2() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const base = [
+      chamferBox(1.8, 0.2, 1.8, armorDark, 0, 0.1, 0, 0.05),
+      rotated(taper(0.7, 0.8, 0.6, armorDark, 0, 0.5, 0, 8), 0, Math.PI / 8),
+      rotated(taper(0.66, 0.7, 0.08, teamPanel, 0, 0.7, 0, 8), 0, Math.PI / 8),
+      taper(0.55, 0.62, 0.12, armor, 0, 0.84, 0, 16),
+    ];
+    const turret = namedGroup('turret', [
+      prism([[-0.5, 0], [0.32, 0], [0.48, 0.2], [0.34, 0.42], [-0.42, 0.42], [-0.55, 0.22]], 0.7, armor, 0, 0.04),
+      chamferBox(0.03, 0.12, 0.5, teamPanel, -0.355, 0.22, -0.06, 0.01),
+      chamferBox(0.03, 0.12, 0.5, teamPanel, 0.355, 0.22, -0.06, 0.01),
+      chamferBox(0.2, 0.1, 0.2, armorDark, 0.18, 0.47, -0.25, 0.02), // sensor
+      ...[[-0.15, 0.17], [0.15, 0.17], [0, 0.3]].flatMap(([x, y]) => [
+        strut([x, y, 0.3], [x, y, 1.0], 0.1, armorDark, true),
+        strut([x, y, 0.62], [x, y, 0.72], 0.14, armor, true),
+        strut([x, y, 1.0], [x, y, 1.04], 0.08, glow, true),
+      ]),
+    ], 0, 0.9, 0);
+    return [...mergeByMaterial(base), turret];
+  },
+
+  /**
+   * UEF Klink Hammer (T2 Artillery Installation): bred plattform med stödben och
+   * ett tungt torn ('turret') med ett långt rör snett uppåt och rekylcylindrar.
+   */
+  artilleryT2() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const base = [
+      chamferBox(1.9, 0.25, 1.9, armorDark, 0, 0.125, 0, 0.05),
+      rotated(taper(0.75, 0.85, 0.4, armor, 0, 0.45, 0, 8), 0, Math.PI / 8),
+      rotated(taper(0.78, 0.78, 0.06, teamPanel, 0, 0.62, 0, 8), 0, Math.PI / 8),
+    ];
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      base.push(strut([sx * 0.55, 0.5, sz * 0.55], [sx * 0.85, 0.05, sz * 0.85], 0.09, armorDark));
+    }
+    const turret = namedGroup('turret', [
+      chamferBox(0.8, 0.45, 0.9, armor, 0, 0.25, -0.1, 0.04),
+      chamferBox(0.84, 0.08, 0.6, teamPanel, 0, 0.42, -0.2, 0.01),
+      chamferBox(0.06, 0.4, 0.5, armorDark, -0.44, 0.35, 0.05, 0.01),
+      chamferBox(0.06, 0.4, 0.5, armorDark, 0.44, 0.35, 0.05, 0.01),
+      strut([0, 0.4, 0.1], [0, 1.3, 1.5], 0.16, armorDark, true), // rör
+      strut([0, 0.45, 0.15], [0, 0.7, 0.55], 0.26, armor, true), // rekylhylsa
+      strut([0, 1.26, 1.44], [0, 1.36, 1.6], 0.22, armorDark, true), // mynningsbroms
+      strut([-0.2, 0.25, -0.2], [-0.14, 0.62, 0.42], 0.06, armor, true),
+      strut([0.2, 0.25, -0.2], [0.14, 0.62, 0.42], 0.06, armor, true),
+      chamferBox(0.08, 0.06, 0.04, glow, 0.25, 0.5, 0.36, 0.01),
+    ], 0, 0.65, 0);
+    return [...mergeByMaterial(base), turret];
+  },
+
+  /**
+   * UEF SD-Pulse (T2 Shield Generator): fot med fyra kraftblock, en hög pylon
+   * med glödande ringar och en emitter i toppen som projicerar skölden.
+   */
+  shieldGenerator() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const emitter = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28, 1), glow);
+    emitter.position.y = 2.65;
+    const parts = [
+      chamferBox(2.8, 0.25, 2.8, armorDark, 0, 0.125, 0, 0.06),
+      rotated(taper(0.7, 0.95, 0.5, armor, 0, 0.5, 0, 8), 0, Math.PI / 8),
+      taper(0.32, 0.45, 1.6, armor, 0, 1.55, 0, 12), // pylon
+      taper(0.48, 0.48, 0.08, teamPanel, 0, 0.82, 0, 12),
+      taper(0.5, 0.2, 0.25, armorDark, 0, 2.45, 0, 12),
+      emitter,
+    ];
+    for (const y of [1.15, 1.55, 1.95]) {
+      const ring = rotated(new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.04, 6, 24), glow), Math.PI / 2);
+      ring.position.y = y;
+      parts.push(ring);
+    }
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      parts.push(
+        chamferBox(0.6, 0.55, 0.6, armor, sx * 0.95, 0.52, sz * 0.95, 0.04),
+        chamferBox(0.62, 0.06, 0.62, teamPanel, sx * 0.95, 0.65, sz * 0.95, 0.01),
+        chamferBox(0.2, 0.06, 0.2, glow, sx * 0.95, 0.82, sz * 0.95, 0.01),
+        strut([sx * 0.75, 0.75, sz * 0.75], [sx * 0.3, 1.2, sz * 0.3], 0.06, armorDark, true),
+      );
+    }
+    return mergeByMaterial(parts);
+  },
+
+  // ---- UEF T2: enheter ----
+
+  /** UEF T2 Engineer: T1-ingenjören i större skala med en andra kranarm och tjockare pansar. */
+  engineerT2() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const extra = mergeByMaterial([
+      taper(0.07, 0.09, 0.07, armorDark, -0.12, 0.38, -0.12, 10),
+      strut([-0.12, 0.42, -0.12], [-0.12, 0.66, 0.06], 0.05, armor),
+      strut([-0.12, 0.66, 0.06], [-0.12, 0.56, 0.3], 0.045, armor),
+      strut([-0.12, 0.56, 0.3], [-0.12, 0.52, 0.35], 0.06, armorDark, true),
+      strut([-0.12, 0.52, 0.35], [-0.12, 0.51, 0.36], 0.045, glow, true),
+      chamferBox(0.5, 0.03, 0.14, teamPanel, 0, 0.345, 0.2, 0.005),
+      chamferBox(0.46, 0.06, 0.08, armorDark, 0, 0.3, 0.46, 0.01), // plogsköld
+    ]);
+    return scaleParts([...MODELS.engineer(), ...extra], 1.18);
+  },
+
+  /**
+   * UEF Pillar (Heavy Tank): bredare och högre än Striker, med tjocka sidokjolar
+   * och ett kantigt torn ('turret') med två parallella gausskanoner.
+   */
+  pillar() {
+    const { armor, armorDark, tread, teamPanel, glow } = MATERIALS;
+    const hull = [];
+    for (const side of [-1, 1]) {
+      const x = side * 0.45;
+      hull.push(
+        prism([[-0.88, 0.13], [-0.78, 0.02], [0.78, 0.02], [0.9, 0.15], [0.8, 0.32], [-0.8, 0.32]], 0.28, tread, x),
+        prism([[-0.86, 0.22], [0.86, 0.22], [0.92, 0.36], [0.82, 0.44], [-0.84, 0.44]], 0.12, armor, side * 0.6, 0.015), // sidokjol
+        chamferBox(0.03, 0.06, 1.3, teamPanel, side * 0.665, 0.33, 0, 0.005),
+      );
+    }
+    hull.push(
+      prism([[-0.82, 0.22], [0.6, 0.22], [0.9, 0.38], [0.72, 0.55], [-0.74, 0.55], [-0.86, 0.44]], 0.68, armor, 0, 0.03),
+      rotated(chamferBox(0.44, 0.02, 0.2, teamPanel, 0, 0.5, 0.81, 0.005), 0.9),
+      chamferBox(0.5, 0.05, 0.36, armorDark, 0, 0.57, -0.52, 0.01),
+    );
+    for (const x of [-0.24, 0.24]) hull.push(chamferBox(0.08, 0.05, 0.03, glow, x, 0.36, 0.88, 0.01));
+    const barrels = [-0.09, 0.09].flatMap((x) => [
+      rotated(cylinder(0.045, 0.85, armor, x, 0.13, 0.78, 10), Math.PI / 2),
+      chamferBox(0.08, 0.07, 0.1, armorDark, x, 0.13, 1.2, 0.01),
+    ]);
+    const turret = namedGroup('turret', [
+      prism([[-0.38, 0], [0.3, 0], [0.42, 0.13], [0.3, 0.25], [-0.3, 0.25], [-0.42, 0.14]], 0.52, armor, 0, 0.03),
+      chamferBox(0.02, 0.1, 0.42, teamPanel, -0.265, 0.13, -0.02, 0.005),
+      chamferBox(0.02, 0.1, 0.42, teamPanel, 0.265, 0.13, -0.02, 0.005),
+      chamferBox(0.32, 0.16, 0.14, armorDark, 0, 0.13, 0.42), // mantel
+      chamferBox(0.09, 0.09, 0.1, armorDark, -0.14, 0.3, -0.2, 0.01),
+      chamferBox(0.05, 0.03, 0.02, glow, -0.14, 0.31, -0.145, 0.005),
+      ...barrels,
+    ], 0, 0.55, -0.06);
+    return [...mergeByMaterial(hull), turret];
+  },
+
+  /**
+   * UEF Mongoose (Gatling Bot): kraftig tvåbent robot med en överkropp ('turret')
+   * som bär en gatlingkanon på höger arm och en granatkastare på vänster.
+   */
+  mongoose() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const HIP_Y = 0.6;
+    const leg = (name, x) => namedGroup(name, [
+      chamferBox(0.14, 0.14, 0.16, armorDark, 0, 0, 0, 0.02),
+      prism([[-0.08, -0.02], [0.1, -0.02], [0.12, -0.28], [-0.06, -0.3]], 0.16, armor, 0, 0.02),
+      prism([[-0.06, -0.3], [0.1, -0.3], [0.06, -0.52], [-0.08, -0.52]], 0.15, armor, 0, 0.02),
+      prism([[-0.11, -0.6], [0.18, -0.6], [0.19, -0.56], [0.08, -0.51], [-0.09, -0.51]], 0.18, armorDark, 0, 0.01),
+    ], x, HIP_Y, 0);
+    const gatling = [];
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const dx = Math.cos(a) * 0.035;
+      const dy = Math.sin(a) * 0.035;
+      gatling.push(strut([0.28 + dx, 0.12 + dy, 0.2], [0.28 + dx, 0.12 + dy, 0.55], 0.022, armorDark, true));
+    }
+    const upper = namedGroup('turret', [
+      chamferBox(0.28, 0.1, 0.18, armorDark, 0, 0.03, 0, 0.02),
+      prism([[-0.16, 0.1], [0.13, 0.1], [0.19, 0.24], [0.15, 0.44], [-0.16, 0.44]], 0.4, armor, 0, 0.025),
+      chamferBox(0.22, 0.02, 0.2, teamPanel, 0, 0.45, 0, 0.005),
+      prism([[-0.06, 0.44], [0.1, 0.44], [0.13, 0.5], [0.08, 0.56], [-0.06, 0.55]], 0.14, armor, 0, 0.01),
+      chamferBox(0.08, 0.015, 0.01, glow, 0, 0.5, 0.135, 0.002),
+      // Höger: gatlingkanon med trumma.
+      chamferBox(0.14, 0.14, 0.18, armor, 0.27, 0.36, 0, 0.02),
+      chamferBox(0.15, 0.15, 0.24, armorDark, 0.28, 0.12, 0.08, 0.02),
+      rotated(cylinder(0.06, 0.05, armor, 0.28, 0.12, 0.2, 10), Math.PI / 2),
+      ...gatling,
+      // Vänster: granatkastare.
+      chamferBox(0.14, 0.14, 0.18, armor, -0.27, 0.36, 0, 0.02),
+      chamferBox(0.13, 0.13, 0.26, armor, -0.28, 0.14, 0.06, 0.02),
+      chamferBox(0.02, 0.07, 0.22, teamPanel, -0.35, 0.14, 0.06, 0.004),
+      strut([-0.28, 0.14, 0.18], [-0.28, 0.16, 0.36], 0.07, armorDark, true),
+    ], 0, HIP_Y, 0);
+    return [leg('legR', -0.12), leg('legL', 0.12), upper];
+  },
+
+  /**
+   * UEF Riptide (Amphibious Tank): svävande skrov med pontoner på sidorna,
+   * glödande lyftmunstycken under och ett lågt torn ('turret') med kravallkanon.
+   */
+  riptide() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const hull = [
+      prism([[-0.75, 0.22], [0.55, 0.22], [0.82, 0.32], [0.68, 0.46], [-0.7, 0.46], [-0.8, 0.36]], 0.62, armor, 0, 0.03),
+      chamferBox(0.42, 0.04, 0.36, armorDark, 0, 0.48, -0.48, 0.01),
+      rotated(chamferBox(0.36, 0.02, 0.16, teamPanel, 0, 0.42, 0.72, 0.005), 0.8),
+    ];
+    for (const side of [-1, 1]) {
+      hull.push(
+        prism([[-0.82, 0.14], [0.78, 0.14], [0.9, 0.24], [0.8, 0.36], [-0.78, 0.36], [-0.86, 0.26]], 0.22, armor, side * 0.43, 0.02),
+        chamferBox(0.03, 0.04, 1.3, teamPanel, side * 0.545, 0.3, 0, 0.005),
+      );
+      for (const z of [-0.5, 0.5]) hull.push(taper(0.1, 0.14, 0.06, glow, side * 0.43, 0.11, z, 10));
+    }
+    const turret = namedGroup('turret', [
+      prism([[-0.3, 0], [0.22, 0], [0.32, 0.1], [0.22, 0.19], [-0.24, 0.19], [-0.32, 0.1]], 0.44, armor, 0, 0.03),
+      chamferBox(0.46, 0.03, 0.2, teamPanel, 0, 0.19, -0.08, 0.005),
+      chamferBox(0.16, 0.12, 0.1, armorDark, 0, 0.1, 0.32),
+      rotated(cylinder(0.06, 0.5, armorDark, 0, 0.1, 0.58, 10), Math.PI / 2),
+      rotated(cylinder(0.075, 0.08, armor, 0, 0.1, 0.8, 10), Math.PI / 2),
+    ], 0, 0.46, -0.05);
+    return [...mergeByMaterial(hull), turret];
+  },
+
+  /**
+   * UEF Flapjack (Mobile Missile Launcher): sexhjulig lastbil med hytt och en
+   * uppfälld missillåda med sex rör baktill.
+   */
+  flapjack() {
+    const { armor, armorDark, tread, teamPanel, glow } = MATERIALS;
+    const parts = [
+      chamferBox(0.56, 0.1, 1.25, armorDark, 0, 0.24, 0, 0.02),
+      prism([[0.3, 0.29], [0.58, 0.29], [0.66, 0.38], [0.56, 0.54], [0.3, 0.54]], 0.48, armor, 0, 0.025),
+      rotated(chamferBox(0.38, 0.02, 0.09, glow, 0, 0.46, 0.615, 0.004), 0.95),
+      chamferBox(0.5, 0.06, 0.7, armor, 0, 0.32, -0.18, 0.01),
+      chamferBox(0.52, 0.02, 0.08, teamPanel, 0, 0.36, 0.2, 0.005),
+      // Missillådan, uppfälld snett mot himlen.
+      rotated(chamferBox(0.46, 0.3, 0.7, armor, 0, 0.62, -0.2, 0.03), -0.5),
+      rotated(chamferBox(0.48, 0.04, 0.5, teamPanel, 0, 0.79, -0.27, 0.01), -0.5),
+      strut([0, 0.34, -0.45], [0, 0.55, -0.32], 0.08, armorDark, true),
+    ];
+    for (const [x, y] of [[-0.14, 0.62], [0, 0.62], [0.14, 0.62], [-0.14, 0.52], [0, 0.52], [0.14, 0.52]]) {
+      parts.push(rotated(cylinder(0.05, 0.03, armorDark, x, y + 0.08, 0.13, 8), Math.PI / 2 - 0.5));
+    }
+    for (const side of [-1, 1]) {
+      for (const z of [-0.45, -0.1, 0.4]) {
+        parts.push(rotated(cylinder(0.15, 0.12, tread, side * 0.3, 0.15, z, 12), 0, 0, Math.PI / 2));
+        parts.push(rotated(cylinder(0.07, 0.13, armorDark, side * 0.305, 0.15, z, 8), 0, 0, Math.PI / 2));
+      }
+      parts.push(prism([[-0.62, 0.26], [0.6, 0.26], [0.54, 0.32], [-0.56, 0.32]], 0.1, armor, side * 0.31, 0.01));
+    }
+    return mergeByMaterial(parts);
+  },
+
+  /** UEF Sky Boxer (Mobile AA Flak Artillery): bandvagn med ett flaktorn ('turret') med två grova rör uppåt. */
+  skyBoxer() {
+    const { armor, armorDark, tread, teamPanel, glow } = MATERIALS;
+    const parts = [
+      prism([[-0.55, 0.15], [0.42, 0.15], [0.56, 0.27], [0.46, 0.4], [-0.5, 0.42]], 0.52, armor, 0, 0.025),
+      chamferBox(0.4, 0.04, 0.3, armorDark, 0, 0.43, -0.36, 0.01),
+    ];
+    for (const side of [-1, 1]) {
+      parts.push(
+        prism([[-0.6, 0.09], [-0.52, 0.01], [0.52, 0.01], [0.62, 0.09], [0.55, 0.24], [-0.55, 0.24]], 0.2, tread, side * 0.36),
+        prism([[-0.58, 0.22], [0.58, 0.22], [0.62, 0.28], [0.54, 0.31], [-0.56, 0.31]], 0.22, armor, side * 0.37, 0.015),
+        chamferBox(0.05, 0.015, 0.8, teamPanel, side * 0.42, 0.32, 0, 0.004),
+      );
+    }
+    const turret = namedGroup('turret', [
+      taper(0.24, 0.28, 0.12, armorDark, 0, 0.06, 0, 10),
+      chamferBox(0.44, 0.28, 0.4, armor, 0, 0.26, 0, 0.04),
+      chamferBox(0.46, 0.03, 0.26, teamPanel, 0, 0.41, -0.04, 0.005),
+      ...[-0.14, 0.14].flatMap((x) => [
+        strut([x, 0.3, 0.08], [x, 0.8, 0.45], 0.1, armorDark, true),
+        strut([x, 0.32, 0.1], [x, 0.48, 0.22], 0.14, armor, true),
+        strut([x, 0.78, 0.43], [x, 0.84, 0.48], 0.13, armorDark, true),
+      ]),
+      chamferBox(0.06, 0.04, 0.03, glow, 0, 0.36, 0.2, 0.01),
+    ], 0, 0.42, -0.05);
+    return [...mergeByMaterial(parts), turret];
+  },
+
+  /** UEF Parashield (Mobile Shield Generator): liten svävare med en sköldemitter på en mast. */
+  parashield() {
+    const { armor, armorDark, teamPanel, glow } = MATERIALS;
+    const emitter = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 1), glow);
+    emitter.position.set(0, 0.95, -0.05);
+    const ring = rotated(new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.025, 6, 20), armorDark), Math.PI / 2);
+    ring.position.set(0, 0.95, -0.05);
+    const parts = [
+      prism([[-0.45, 0.18], [0.35, 0.18], [0.5, 0.26], [0.4, 0.36], [-0.4, 0.38]], 0.46, armor, 0, 0.025),
+      chamferBox(0.42, 0.02, 0.3, teamPanel, 0, 0.385, -0.05, 0.005),
+      taper(0.14, 0.2, 0.12, armorDark, 0, 0.44, -0.05, 10),
+      strut([0, 0.5, -0.05], [0, 0.85, -0.05], 0.05, armorDark, true),
+      emitter,
+      ring,
+    ];
+    for (const side of [-1, 1]) {
+      parts.push(prism([[-0.48, 0.1], [0.42, 0.1], [0.5, 0.18], [0.42, 0.28], [-0.44, 0.28]], 0.14, armorDark, side * 0.3, 0.015));
+      for (const z of [-0.3, 0.3]) parts.push(taper(0.06, 0.09, 0.04, glow, side * 0.3, 0.08, z, 8));
+    }
+    return mergeByMaterial(parts);
+  },
+
+  // ---- Cybran T2 (fiender) ----
+
+  /**
+   * Cybran Rhino (Heavy Tank): lågt, kilformat skrov på band med vassa
+   * pansarplåtar och ett torn ('turret') med en partikelkanon.
+   */
+  rhino() {
+    const { cybran, cybranDark, enemyPanel, enemyGlow } = MATERIALS;
+    const hull = [
+      prism([[-0.85, 0.2], [0.55, 0.2], [0.95, 0.3], [0.7, 0.5], [-0.7, 0.52], [-0.9, 0.38]], 0.7, cybran, 0, 0.03),
+      chamferBox(0.04, 0.03, 0.9, enemyGlow, 0, 0.53, -0.1, 0.01),
+      ...[-0.1, 0.1].map((x) => chamferBox(0.05, 0.03, 0.02, enemyGlow, x, 0.36, 0.93, 0.005)),
+    ];
+    for (const side of [-1, 1]) {
+      const plate = prism([[-0.8, 0], [0.75, 0], [0.6, 0.16], [-0.85, 0.12]], 0.04, enemyPanel, 0, 0.01);
+      plate.position.set(side * 0.4, 0.42, 0);
+      plate.rotation.z = side * 0.45;
+      hull.push(
+        prism([[-0.9, 0.1], [-0.8, 0.0], [0.8, 0.0], [0.92, 0.12], [0.82, 0.28], [-0.82, 0.28]], 0.26, cybranDark, side * 0.47),
+        plate,
+      );
+    }
+    const turret = namedGroup('turret', [
+      prism([[-0.4, 0], [0.22, 0], [0.38, 0.1], [0.2, 0.24], [-0.36, 0.22]], 0.5, cybranDark, 0, 0.03),
+      chamferBox(0.04, 0.03, 0.4, enemyGlow, 0, 0.25, -0.1, 0.01),
+      strut([0, 0.11, 0.3], [0, 0.11, 1.05], 0.08, cybran, true),
+      strut([0, 0.11, 0.55], [0, 0.11, 0.75], 0.13, cybranDark, true),
+      strut([0, 0.11, 1.05], [0, 0.11, 1.09], 0.07, enemyGlow, true),
+    ], 0, 0.5, -0.08);
+    return [...mergeByMaterial(hull), turret];
+  },
+
+  /** Cybran Hoplite (Rocket Bot): smal insektsrobot med ett raketpaket på ryggen och tre röda ögon. */
+  hoplite() {
+    const { cybran, cybranDark, enemyPanel, enemyGlow } = MATERIALS;
+    const parts = [
+      prism([[-0.4, 0.55], [0.22, 0.5], [0.42, 0.6], [0.32, 0.74], [-0.1, 0.82], [-0.42, 0.76]], 0.42, cybran, 0, 0.03),
+      prism([[0.3, 0.56], [0.52, 0.58], [0.54, 0.66], [0.38, 0.72]], 0.22, cybranDark, 0, 0.02),
+      ...[-0.06, 0, 0.06].map((x) => chamferBox(0.03, 0.03, 0.02, enemyGlow, x, 0.64, 0.53, 0.005)),
+      // Raketpaketet: en låda med nio rör riktade framåt-uppåt.
+      rotated(chamferBox(0.46, 0.34, 0.4, cybranDark, 0, 1.02, -0.22, 0.03), -0.35),
+      rotated(chamferBox(0.48, 0.04, 0.3, enemyPanel, 0, 1.2, -0.28, 0.01), -0.35),
+    ];
+    for (const x of [-0.13, 0, 0.13]) {
+      for (const y of [0.94, 1.06]) parts.push(chamferBox(0.07, 0.07, 0.04, enemyGlow, x, y + 0.08, -0.02, 0.01));
+    }
+    const legs = insectLegs([[-0.18, 0.2], [0.18, 0.2], [-0.18, -0.24], [0.18, -0.24]], { hipY: 0.58, reach: 0.62, kneeY: 0.86, t: 0.07 });
+    return [...mergeByMaterial(parts), ...legs];
+  },
+
+  /**
+   * Cybran Wagner (Amphibious Tank): bred, rundad kropp på fyra kraftiga ben med
+   * en raketkastare och en elektronkanon i fronten.
+   */
+  wagner() {
+    const { cybran, cybranDark, enemyPanel, enemyGlow } = MATERIALS;
+    const parts = [
+      prism([[-0.65, 0.5], [0.45, 0.48], [0.7, 0.6], [0.55, 0.8], [-0.5, 0.86], [-0.7, 0.7]], 0.75, cybran, 0, 0.04),
+      chamferBox(0.8, 0.06, 0.6, cybranDark, 0, 0.5, 0, 0.02),
+      chamferBox(0.05, 0.03, 0.8, enemyGlow, 0, 0.87, -0.05, 0.01),
+      // Raketkastare till vänster, elektronkanon till höger.
+      chamferBox(0.22, 0.2, 0.36, cybranDark, -0.28, 0.82, 0.35, 0.03),
+      chamferBox(0.16, 0.03, 0.03, enemyGlow, -0.28, 0.82, 0.54, 0.005),
+      strut([0.24, 0.72, 0.4], [0.24, 0.72, 0.9], 0.09, cybranDark, true),
+      strut([0.24, 0.72, 0.9], [0.24, 0.72, 0.94], 0.07, enemyGlow, true),
+    ];
+    for (const side of [-1, 1]) {
+      const plate = prism([[-0.55, 0], [0.4, 0], [0.3, 0.16], [-0.6, 0.12]], 0.04, enemyPanel, 0, 0.01);
+      plate.position.set(side * 0.38, 0.62, 0);
+      plate.rotation.z = side * 0.5;
+      parts.push(plate);
+    }
+    const legs = insectLegs([[-0.3, 0.3], [0.3, 0.3], [-0.3, -0.32], [0.3, -0.32]], { hipY: 0.58, reach: 0.72, kneeY: 0.88, t: 0.09 });
+    return [...mergeByMaterial(parts), ...legs];
+  },
+
+  /** Cybran Viper (Mobile Missile Launcher): lång insektskropp med en upprest missilramp på ryggen. */
+  viper() {
+    const { cybran, cybranDark, enemyPanel, enemyGlow } = MATERIALS;
+    const parts = [
+      prism([[-0.7, 0.48], [0.4, 0.46], [0.62, 0.56], [0.48, 0.7], [-0.6, 0.74]], 0.55, cybran, 0, 0.03),
+      chamferBox(0.6, 0.04, 0.5, enemyPanel, 0, 0.75, -0.1, 0.01),
+      ...[-0.06, 0.06].map((x) => chamferBox(0.04, 0.03, 0.02, enemyGlow, x, 0.58, 0.6, 0.005)),
+      // Missilramp: två missiler i en ram, snett uppåt.
+      strut([0, 0.75, -0.4], [0, 1.0, -0.1], 0.08, cybranDark, true),
+      ...[-0.12, 0.12].flatMap((x) => [
+        strut([x, 0.82, -0.55], [x, 1.25, 0.2], 0.1, cybranDark, true),
+        strut([x, 1.25, 0.2], [x, 1.31, 0.3], 0.07, enemyGlow, true),
+      ]),
+    ];
+    const legs = insectLegs([[-0.24, 0.26], [0.24, 0.26], [-0.24, -0.34], [0.24, -0.34]], { hipY: 0.55, reach: 0.66, kneeY: 0.84, t: 0.075 });
+    return [...mergeByMaterial(parts), ...legs];
   },
 };
 

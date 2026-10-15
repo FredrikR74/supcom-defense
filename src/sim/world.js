@@ -16,6 +16,7 @@ import { TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 import gameConfig from '../data/gameConfig.js';
 import { createDirector, directorSystem } from './director.js';
 import { squadSystem } from './squads.js';
+import { shieldSystem } from './shields.js';
 
 export { TICKS_PER_SECOND, TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 
@@ -178,6 +179,7 @@ export function tickWorld(world) {
   retaliationSystem(world);
   deathSystem(world);
   regenSystem(world);
+  shieldSystem(world);
   acuSystem(world);
   world.tick++;
 }
