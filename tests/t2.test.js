@@ -264,3 +264,24 @@ describe('T2-fiender', () => {
     expect(world.director.spawned.rhino).toBeGreaterThan(0);
   });
 });
+
+describe('tech-nivå syns som i FA', () => {
+  it('varje enhet och byggnad har en strategisk ikon med rätt antal tech-streck', async () => {
+    const { iconTechLevel } = await import('../src/render/icons.js');
+    const level = { TECH1: 1, TECH2: 2, TECH3: 3 };
+    for (const [type, def] of [...Object.entries(units), ...Object.entries(structures)]) {
+      const expected = type === 'acu' || type === 'wall' ? 0 : level[def.techCategory];
+      expect(iconTechLevel(type), type).toBe(expected);
+    }
+  });
+
+  it('namnet har tech-nivån först, som FA:s "T2 Heavy Tank"', async () => {
+    const { techName } = await import('../src/ui/tech.js');
+    expect(techName(units.pillar)).toBe('T2 Heavy Tank');
+    expect(techName(units.rhino)).toBe('T2 Heavy Tank');
+    expect(techName(units.striker)).toBe('T1 Medium Tank');
+    expect(techName(units.engineerT2)).toBe('T2 Engineer');
+    expect(techName(structures.massExtractorT3)).toBe('T3 Mass Extractor');
+    expect(techName(units.acu)).toBe('Armored Command Unit');
+  });
+});

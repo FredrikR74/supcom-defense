@@ -1456,9 +1456,27 @@ export const BUILD_WIRE_MATERIAL = new THREE.MeshBasicMaterial({
 /** Mörkt, matt material för vrak. */
 export const WRECK_MATERIAL = new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 1, metalness: 0.2 });
 
+/**
+ * Modellskala per typ: T2-enheter är tydligt större än T1-enheterna med samma
+ * roll, som i FA (t.ex. Hoplite mot Mantis, Mongoose mot Mech Marine).
+ */
+const MODEL_SCALE = {
+  pillar: 1.1,
+  mongoose: 1.35,
+  riptide: 1.1,
+  flapjack: 1.15,
+  skyBoxer: 1.15,
+  parashield: 1.15,
+  rhino: 1.1,
+  hoplite: 1.35,
+  wagner: 1.3,
+  viper: 1.2,
+};
+
 export function createModel(type) {
   const group = new THREE.Group();
   group.add(...MODELS[type]());
+  group.scale.setScalar(MODEL_SCALE[type] ?? 1);
   return group;
 }
 

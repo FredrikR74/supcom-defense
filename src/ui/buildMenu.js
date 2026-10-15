@@ -3,6 +3,7 @@ import units from '../data/units.js';
 import enhancements from '../data/enhancements.js';
 import { enhancementsFor, hasEnhancement, SLOT_NAMES } from '../sim/enhancements.js';
 import { buildIcon } from './buildIcons.js';
+import { techName } from './tech.js';
 
 /**
  * Bygg- och fabriksmenyn i FA:s stil: flikar överst (Build och, för ACU:n,
@@ -132,7 +133,7 @@ function costRow(cost, time) {
 }
 
 function nameLine(def, sub = '') {
-  const name = def.unitName ? `${def.unitName} <span class="ro-sub">${def.name}</span>` : def.name;
+  const name = def.unitName ? `${def.unitName} <span class="ro-sub">${techName(def)}</span>` : techName(def);
   return `<div class="ro-name">${name}${sub ? ` <span class="ro-sub">${sub}</span>` : ''}</div>`;
 }
 

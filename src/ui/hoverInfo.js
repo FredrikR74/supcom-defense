@@ -1,4 +1,5 @@
 import { getDef } from '../sim/entities.js';
+import { techName } from './tech.js';
 
 /**
  * Namn och HP-stapel (eller byggframsteg) ovanför den entitet musen är över.
@@ -27,7 +28,7 @@ export function createHoverInfo(el) {
       el.hidden = !entity;
       if (!entity) return;
       const def = getDef(entity.type);
-      name.textContent = (def?.unitName ? `${def.unitName} (${def.name})` : def?.name ?? entity.type) +
+      name.textContent = (def?.unitName ? `${def.unitName} (${techName(def)})` : def ? techName(def) : entity.type) +
         (entity.vetLevel ? ` ${'★'.repeat(entity.vetLevel)}` : '');
       if (entity.kind === 'wreck') {
         name.textContent = 'Wreckage';
@@ -52,7 +53,7 @@ export function createHoverInfo(el) {
         const pct = Math.floor(entity.productionProgress * 100);
         const more = entity.productionQueue.length - 1;
         prodFill.style.width = `${pct}%`;
-        prodText.textContent = `${unitDef.name} ${pct}%${more > 0 ? ` (+${more} queued)` : ''}`;
+        prodText.textContent = `${unitDef.unitName ?? techName(unitDef)} ${pct}%${more > 0 ? ` (+${more} queued)` : ''}`;
       }
       el.style.transform = `translate(${screen.x}px, ${screen.y}px) translate(-50%, -100%)`;
     },

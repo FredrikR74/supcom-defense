@@ -5,6 +5,7 @@ import units from '../data/units.js';
 import enhancements from '../data/enhancements.js';
 import { enhancementsFor } from '../sim/enhancements.js';
 import { upgradeTarget } from '../sim/upgrades.js';
+import { techName } from './tech.js';
 import { renderBuildMenu, renderFactoryMenu, menuTabs, shortName } from './buildMenu.js';
 
 /**
@@ -62,7 +63,7 @@ export function createCommandPanel(el, {
       const def = units[type];
       const chip = document.createElement('span');
       chip.className = 'queue-chip' + (start === 0 ? ' queue-current' : '');
-      chip.textContent = (def.unitName ?? def.name) + (count > 1 ? ` ×${count}` : '');
+      chip.textContent = (def.unitName ?? techName(def)) + (count > 1 ? ` ×${count}` : '');
       if (start === 0) {
         queueBar = document.createElement('span');
         queueBar.className = 'queue-progress';

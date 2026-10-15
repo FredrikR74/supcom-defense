@@ -158,6 +158,9 @@ export function createEntityView(terrain) {
   const rallyFlags = new Map();
   /** Fiendeenheter ritas instansierat, en batch per typ. */
   const batches = new Map();
+  /** Strategisk vy och ikonernas opacitet just nu (se setStrategic). */
+  let strategicMode = false;
+  let iconOpacity = 0;
   /** Entitets-id -> sköldbubbla. */
   const bubbles = new Map();
   /** Vrak ritas instansierat i mörkt material, en batch per typ (utan ikoner). */
@@ -215,6 +218,7 @@ export function createEntityView(terrain) {
     if (!batches.has(type)) {
       const batch = createInstancedBatch(type);
       batch.icons.visible = true; // synligheten styrs av föräldragrupperna
+      batch.icons.material.opacity = iconOpacity;
       meshes.add(batch.group);
       icons.add(batch.icons);
       batches.set(type, batch);
@@ -296,6 +300,8 @@ export function createEntityView(terrain) {
     const mesh = createModel(entity.type);
     mesh.userData.entityId = entity.id;
     const icon = createIcon(entity.type);
+    icon.material.transparent = true;
+    icon.material.opacity = iconOpacity;
     icon.userData.entityId = entity.id;
     // Egen kopia av geometrin, så att ringen kan följa markens höjd runt enheten.
     const ring = new THREE.Mesh(ringGeometry.clone(), ringMaterial);
@@ -537,7 +543,7 @@ export function createEntityView(terrain) {
         }
         if (v.turret) v.turret.rotation.y = (e.turretHeading ?? e.heading ?? 0) - (e.kind === 'unit' ? e.heading ?? 0 : 0);
         // Ofärdiga byggnader växer upp ur marken.
-        v.mesh.scale.y = e.kind === 'structure' && !e.built ? 0.1 + 0.9 * e.progress : 1;
+        if (e.kind === 'structure') v.mesh.scale.y = e.built ? 1 : 0.1 + 0.9 * e.progress;
         if (e.kind === 'unit') ownBatchFor(e.type).add(e.id, x, y, z, v.mesh.rotation.y, null, v.mesh);
         v.icon.position.set(x, y + 1, z);
         v.ring.visible = selection.has(e.id);
@@ -570,14 +576,26 @@ export function createEntityView(terrain) {
       updateQueuedGhosts(world, owner);
     },
 
-    setStrategic(strategic) {
+    /**
+     * Strategisk vy: bara ikoner. Annars modellerna, och från mellanzoom även
+     * ikonerna ovanpå dem med opaciteten `fade` (0–1), som när FA tonar in ikonerna.
+     */
+    setStrategic(strategic, fade = strategic ? 1 : 0) {
+      strategicMode = strategic;
       meshes.visible = !strategic;
-      icons.visible = strategic;
+      const opacity = strategic ? 1 : fade > 0 ? 0.55 + 0.45 * fade : 0;
+      icons.visible = opacity > 0;
+      if (opacity === iconOpacity) return;
+      iconOpacity = opacity;
+      for (const icon of icons.children) {
+        if (icon.material) icon.material.opacity = opacity;
+      }
+      for (const b of batches.values()) b.icons.material.opacity = opacity;
     },
 
     /** Entitets-id under strålen, eller null. */
     pick(raycaster) {
-      const targets = icons.visible ? icons.children : meshes.children;
+      const targets = strategicMode ? icons.children : meshes.children;
       const hit = raycaster.intersectObjects(targets, true)[0];
       for (const b of [...batches.values(), ...ownBatches.values(), ...wreckBatches.values()]) {
         const id = hit && b.idForHit(hit);

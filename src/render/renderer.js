@@ -14,6 +14,11 @@ import { raycastTerrain, isInsideMap, getHeight } from '../sim/terrain.js';
 
 /** Över detta kameraavstånd visas strategiska ikoner i stället för meshes. */
 export const STRATEGIC_DISTANCE = 110;
+/**
+ * Som FA:s IconFadeInZoom: från det här avståndet tonas de strategiska ikonerna
+ * in ovanpå modellerna, så att typ och tech-nivå syns innan man zoomat ut helt.
+ */
+export const ICON_FADE_DISTANCE = 70;
 
 export function createRenderer(canvas, world) {
   const { map, terrain } = world;
@@ -179,7 +184,8 @@ export function createRenderer(canvas, world) {
       measure('render: entities', () => entities.sync(world, alpha, selection, PLAYER_ID, frameSeconds));
       pathDebug.update(world);
       markers.setStrategic(strategic);
-      entities.setStrategic(strategic);
+      const fade = THREE.MathUtils.clamp((rig.distance - ICON_FADE_DISTANCE) / (STRATEGIC_DISTANCE - ICON_FADE_DISTANCE), 0, 1);
+      entities.setStrategic(strategic, fade);
       // Händelser (skott, träffar, explosioner) blir effekter och töms sedan.
       measure('render: effects', () => {
         combat.handleEvents(world.events);

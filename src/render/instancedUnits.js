@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { createModel, poseLeg } from './models.js';
 import { getIconTexture } from './icons.js';
 
-/** Strategisk ikonstorlek i pixlar. */
-const ICON_PIXELS = 18;
+/** Strategisk ikonstorlek i pixlar (samma som de egna ikonerna, se ICON_SCALE i icons.js). */
+const ICON_PIXELS = 31;
 
 /**
  * Många enheter av samma typ ritade med en InstancedMesh per modelldel
@@ -12,7 +12,7 @@ const ICON_PIXELS = 18;
 export function createInstancedBatch(type, { capacity = 2048, material = null, scaleY = 1 } = {}) {
   const group = new THREE.Group();
   const model = createModel(type);
-  model.scale.y = scaleY;
+  model.scale.y *= scaleY;
   model.updateMatrixWorld(true);
 
   // Rörliga delar (namngivna grupper direkt under modellen: torn, bål, ben)
@@ -47,7 +47,7 @@ export function createInstancedBatch(type, { capacity = 2048, material = null, s
     size: ICON_PIXELS,
     sizeAttenuation: false,
     transparent: true,
-    alphaTest: 0.3,
+    alphaTest: 0.02,
     depthTest: false,
   }));
   icons.frustumCulled = false;

@@ -5,6 +5,7 @@ import enhancements from '../data/enhancements.js';
 import { buildIcon } from './buildIcons.js';
 import { shortName } from './buildMenu.js';
 import { regenRate } from '../sim/veterancy.js';
+import { techName, techRoman } from './tech.js';
 
 const fmt = (v) => v.toFixed(1);
 const stars = (level) => '★'.repeat(level ?? 0);
@@ -52,7 +53,7 @@ function describe(e, { enemy, world }) {
     return `<div class="info-name">Wreckage <span class="info-sub">${def.unitName ?? def.name}</span></div>` +
       row('Mass', Math.round(e.mass));
   }
-  const name = def.unitName ? `${def.unitName} <span class="info-sub">${def.name}</span>` : def.name;
+  const name = def.unitName ? `${def.unitName} <span class="info-sub">${techName(def)}</span>` : techName(def);
   const regen = regenRate(e);
   let html = `<div class="info-name ${enemy ? 'info-enemy' : ''}">${name} <span class="info-vet">${stars(e.vetLevel)}</span></div>`;
   if (enemy) html += `<div class="info-row info-sub">${def.faction ?? 'Enemy'} · enemy</div>`;
@@ -108,10 +109,11 @@ function selectionGrid(selected) {
     const frac = g.maxHp > 0 ? g.hp / g.maxHp : 0;
     const color = frac > 0.6 ? '#4ade80' : frac > 0.3 ? '#facc15' : '#ef4444';
     const def = getDef(g.type);
-    const name = def.unitName ?? def.name;
+    const name = def.unitName ?? techName(def);
     return `<span class="sel-tile" data-type="${g.type}" title="${name}: ${g.n} · ${Math.round(frac * 100)}% health · ` +
       `Click: select only these · Shift/right-click: deselect">` +
       `<span class="sel-icon">${buildIcon(g.type)}</span>` +
+      (techRoman(def) ? `<span class="sel-tech">${techRoman(def)}</span>` : '') +
       (g.n > 1 ? `<span class="sel-count">${g.n}</span>` : '') +
       `<span class="sel-label">${shortName(g.type)}</span>` +
       `<span class="sel-bar"><span style="width:${Math.round(frac * 100)}%;background:${color}"></span></span></span>`;
