@@ -1,6 +1,7 @@
 import { getDef } from '../sim/entities.js';
 import { techName } from './tech.js';
 import { isRevealed } from '../sim/intel.js';
+import enhancements from '../data/enhancements.js';
 
 /**
  * Namn och HP-stapel (eller byggframsteg) ovanför den entitet musen är över.
@@ -53,8 +54,13 @@ export function createHoverInfo(el) {
       }
 
       const producing = entity.kind === 'structure' && entity.built && entity.productionQueue?.length > 0;
-      prod.hidden = !producing && !entity.upgrade;
-      if (entity.upgrade) {
+      const enhancing = entity.kind === 'unit' && entity.orders?.[0]?.type === 'enhance' ? entity.orders[0] : null;
+      prod.hidden = !producing && !entity.upgrade && !enhancing;
+      if (enhancing) {
+        const pct = Math.floor(enhancing.progress * 100);
+        prodFill.style.width = `${pct}%`;
+        prodText.textContent = `Upgrading: ${enhancements[enhancing.enhancement].name} ${pct}%`;
+      } else if (entity.upgrade) {
         // Uppgraderingen går före produktionen (fabriken bygger inget under tiden).
         const pct = Math.floor(entity.upgrade.progress * 100);
         prodFill.style.width = `${pct}%`;

@@ -822,6 +822,11 @@ html, body {
 .acu-bar { height: 6px; background: #0b1220; border: 1px solid #334155; border-radius: 2px; overflow: hidden; }
 .acu-fill { display: block; height: 100%; width: 100%; background: #4ade80; }
 .acu-hp { font-size: 11px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.acu-upgrade { display: flex; flex-direction: column; gap: 2px; }
+.acu-upgrade[hidden] { display: none; }
+.acu-upbar { height: 4px; background: #0b1220; border: 1px solid #334155; border-radius: 2px; overflow: hidden; }
+.acu-upfill { display: block; height: 100%; width: 0; background: #67e8f9; }
+.acu-uptext { font-size: 10px; color: #67e8f9; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Flera markerade: en ruta per typ med antal och samlad hälsa (selectionInfo.js) */
 #info:has(.sel-grid) { max-width: 340px; }

@@ -9,8 +9,12 @@ import { isRevealed } from '../sim/intel.js';
  */
 const PROGRESS_COLOR = 0x67e8f9;
 
-/** Hur långt en byggnad kommit med sitt bygge eller sin uppgradering, annars null. */
+/**
+ * Hur långt en byggnad kommit med sitt bygge eller sin uppgradering, eller
+ * ACU:n med sin uppgradering (enhancement), annars null.
+ */
 function buildProgress(e) {
+  if (e.kind === 'unit') return e.orders[0]?.type === 'enhance' ? e.orders[0].progress : null;
   if (e.kind !== 'structure') return null;
   if (e.upgrade) return e.upgrade.progress;
   return e.built ? null : e.progress;

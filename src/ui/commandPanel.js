@@ -48,6 +48,8 @@ export function createCommandPanel(el, {
   /** Framstegsstapel för en uppgradering som pågår, och för byggarens pågående bygge. */
   let upgradeBar = null;
   let builderBar = null;
+  /** Framstegsstapel på Cancel upgrade-knappen för ACU:ns uppgradering. */
+  let enhanceButtonBar = null;
   /** Enhetstyp -> framstegsstapel i dess produktionsknapp; uppdateras varje frame. */
   let progressBars = new Map();
   /** Framstegsstapel i köns första ruta. */
@@ -229,6 +231,9 @@ export function createCommandPanel(el, {
           const order = enhanceOrders.find((o) => o.enhancement === key);
           bar.style.width = `${(order?.progress ?? 0) * 100}%`;
         }
+        // Bara den som pågår (först i ACU:ns order) har framsteg.
+        const enhancing = enhanceable?.orders[0]?.type === 'enhance' ? enhanceable.orders[0] : null;
+        if (enhanceButtonBar) enhanceButtonBar.style.width = `${(enhancing?.progress ?? 0) * 100}%`;
         if (upgradeBar && upgrading[0]) upgradeBar.style.width = `${upgrading[0].upgrade.progress * 100}%`;
         if (builderBar && queueBuilder) {
           const site = queueBuilder.buildJob?.kind === 'structure' ? getEntity(world, queueBuilder.buildJob.targetId) : null;
@@ -273,6 +278,7 @@ export function createCommandPanel(el, {
       queueBar = null;
       upgradeBar = null;
       builderBar = null;
+      enhanceButtonBar = null;
       const buttons = document.createElement('div');
       buttons.className = 'cmd-row';
       // Fliken som fäller ihop eller fäller ut bygg- och fabriksmenyn.
@@ -314,8 +320,12 @@ export function createCommandPanel(el, {
         refreshMenu = menu.refresh;
       }
       if (enhanceOrders.length) {
-        buttons.appendChild(button('Cancel upgrade', enhancements[enhanceOrders[0].enhancement].name,
-          () => onCancelEnhance(enhanceOrders[0].enhancement)));
+        const b = button('Cancel upgrade', enhancements[enhanceOrders[0].enhancement].name,
+          () => onCancelEnhance(enhanceOrders[0].enhancement));
+        enhanceButtonBar = document.createElement('span');
+        enhanceButtonBar.className = 'cmd-progress';
+        b.appendChild(enhanceButtonBar);
+        buttons.appendChild(b);
       }
       let factoryMenu = null;
       if (factories.length && !collapsed) {
