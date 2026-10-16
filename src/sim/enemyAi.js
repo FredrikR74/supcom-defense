@@ -290,16 +290,29 @@ export function assessSquad(world, squad, members) {
     if (members.some((e) => outranges(e, d))) continue;
     if (path.some((p) => covers(d, p.x, p.z)) || members.some((e) => covers(d, e.x, e.z))) threats.push(d);
   }
+  // Enheter som truppen ser nära sig, och de den redan har backat från (minnet,
+  // `squad.threatIds`) så länge de lever och inte har gått långt bort. Utan
+  // minnet skulle truppen backa ur synhåll, glömma hotet, gå fram igen och
+  // backa igen, om och om igen.
+  const remembered = squad.threatIds ?? new Set();
   for (const u of world.entities) {
-    if (u.kind !== 'unit' || u.owner !== PLAYER_ID || u.hp <= 0 || !groundDps(u) || !isDetected(ENEMY_ID, u)) continue;
-    if (Math.hypot(u.x - squad.x, u.z - squad.z) <= cfg.threatScanRadius) threats.push(u);
+    if (u.kind !== 'unit' || u.owner !== PLAYER_ID || u.hp <= 0 || !groundDps(u)) continue;
+    const d = Math.hypot(u.x - squad.x, u.z - squad.z);
+    const seen = isDetected(ENEMY_ID, u) && d <= cfg.threatScanRadius;
+    if (seen || (remembered.has(u.id) && d <= cfg.threatScanRadius * THREAT_MEMORY_MULT)) threats.push(u);
   }
   return {
     own: power(members),
     threat: power(threats),
     threats: threats.map((t) => ({ x: t.x, z: t.z, range: groundWeapon(t).range + t.radius })),
+    unitIds: threats.filter((t) => t.kind === 'unit').map((t) => t.id),
   };
 }
+
+/** En enhet som truppen backat från räknas till hotet så länge den är inom så här många gånger threatScanRadius. */
+const THREAT_MEMORY_MULT = 3;
+/** En reträtt varar minst så här länge (sekunder) innan truppen bedömer om den kan gå fram. */
+const MIN_RETREAT_SECONDS = 3;
 
 /** Ska truppen (som marscherar eller strider) dra sig tillbaka? */
 function shouldRetreat(world, squad, a, cfg) {
@@ -321,10 +334,13 @@ export function planSquad(world, squad, members) {
   const a = assessSquad(world, squad, members);
   if (squad.state === 'retreat' || squad.state === 'wait') {
     const waited = (world.tick - squad.retreatTick) / TICKS_PER_SECOND;
-    if (a.own >= a.threat * cfg.advanceRatio || waited >= cfg.maxWaitSeconds) {
+    for (const id of a.unitIds) squad.threatIds.add(id);
+    const strong = a.own >= a.threat * cfg.advanceRatio && waited >= MIN_RETREAT_SECONDS;
+    if (strong || waited >= cfg.maxWaitSeconds) {
       // Stark nog (eller trött på att vänta): framåt igen, och ingen ny reträtt på ett tag.
       squad.state = 'march';
       squad.threats = null;
+      squad.threatIds = null;
       if (waited >= cfg.maxWaitSeconds) squad.noRetreatUntil = world.tick + cfg.recommitSeconds * TICKS_PER_SECOND;
     } else {
       squad.threats = a.threats;
@@ -334,6 +350,7 @@ export function planSquad(world, squad, members) {
     squad.state = 'retreat';
     squad.retreatTick = world.tick;
     squad.threats = a.threats;
+    squad.threatIds = new Set(a.unitIds);
     squad.plan = null;
     squad.raid = null;
     // Släpp allt framför truppordern (anfall, vedergällning) och backa.

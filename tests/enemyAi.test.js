@@ -274,6 +274,21 @@ describe('reträtt och sammanslagning', () => {
     expect(['march', 'engaged']).toContain(weak.state);
   }, 30000);
 
+  it('växlar inte fram och tillbaka mellan reträtt och marsch framför en ACU (som då missar)', () => {
+    const w = setup();
+    const acu = addUnit(w, 'acu', { ...alongPath(w, 0, 30), owner: PLAYER_ID });
+    const squad = spawnSquad(w, Array(8).fill('mantis'), 0);
+    let changes = 0;
+    let last = squad.state;
+    ticks(w, 10 * 40, () => {
+      if (squad.state !== last && (squad.state === 'retreat' || last === 'retreat')) changes++;
+      last = squad.state;
+    });
+    expect(acu.hp).toBeGreaterThan(0);
+    expect(changes).toBeLessThanOrEqual(2); // in i reträtten och ut till väntan, en gång
+    expect(squad.state).toBe('wait');
+  }, 30000);
+
   it('går fram ändå när den har väntat för länge', () => {
     const { w } = fortress({ maxWaitSeconds: 5 });
     const squad = spawnSquad(w, Array(3).fill('mantis'), 0);
