@@ -201,3 +201,89 @@ describe('truppens planering', () => {
     expect(raided).toBe(false);
   }, 30000);
 });
+
+describe('avståndshållning', () => {
+  it('en Hoplite backar undan en Pillar som skjuter kortare och tar ingen skada', () => {
+    const w = setup();
+    const spot = alongPath(w, 0, 25); // långt från kärnan, som annars är ett bättre mål
+    const hoplite = enemy(w, 'hoplite', spot.x, spot.z);
+    const pillar = addUnit(w, 'pillar', { x: spot.x + 18, z: spot.z, owner: PLAYER_ID });
+    pillar.orders.push({ type: 'attack', targetId: hoplite.id });
+    let kited = false;
+    ticks(w, 10 * 12, () => { if (hoplite.kite) kited = true; });
+    expect(kited).toBe(true);
+    expect(hoplite.hp).toBe(hoplite.maxHp);
+    expect(pillar.hp).toBeLessThan(pillar.maxHp);
+  });
+
+  it('backar inte från en enhet som når lika långt', () => {
+    const w = setup();
+    const spot = alongPath(w, 0, 40);
+    const mantis = enemy(w, 'mantis', spot.x, spot.z);
+    addUnit(w, 'striker', { x: spot.x + 8, z: spot.z, owner: PLAYER_ID });
+    let kited = false;
+    ticks(w, 10 * 3, () => { if (mantis.kite) kited = true; });
+    expect(kited).toBe(false);
+  });
+});
+
+describe('reträtt och sammanslagning', () => {
+  /** Tre kända PD runt vägen (för starka för en liten trupp), utan hotkostnad. */
+  function fortress(enemyAi = {}) {
+    const w = setup({ threatCostPerDps: 0, ...enemyAi });
+    const spot = alongPath(w, 0, 40);
+    const pds = [[0, 2], [2, -2], [-2, -2]].map(([dx, dz]) => known(w, 'pointDefense', spot.x + dx, spot.z + dz));
+    ticks(w, 1);
+    return { w, pds };
+  }
+  const inRange = (w, pds, e) => pds.some((pd) => Math.hypot(e.x - pd.x, e.z - pd.z) <= structures.pointDefense.weapon.range + e.radius);
+
+  it('en för svag trupp stannar utom räckhåll och väntar i stället för att anfalla', () => {
+    const { w, pds } = fortress();
+    const squad = spawnSquad(w, Array(3).fill('mantis'), 0);
+    const all = squad.members.map((m) => getEntity(w, m.id));
+    let entered = false;
+    ticks(w, 10 * 40, () => { if (all.some((e) => inRange(w, pds, e))) entered = true; });
+    expect(squad.state).toBe('wait');
+    expect(entered).toBe(false);
+    expect(all.every((e) => e.hp === e.maxHp)).toBe(true);
+  }, 30000);
+
+  it('backar ut ur räckhåll när den upptäcker att den är för svag', () => {
+    const { w, pds } = fortress();
+    const squad = spawnSquad(w, Array(3).fill('mantis'), 0);
+    // Glöm försvaret tills truppen står mitt framför det.
+    for (const pd of pds) pd.enemySeen = false;
+    const all = squad.members.map((m) => getEntity(w, m.id));
+    let retreated = false;
+    ticks(w, 10 * 60, () => { if (squad.state === 'retreat') retreated = true; });
+    expect(retreated).toBe(true);
+    expect(squad.state).toBe('wait');
+    expect(all.filter((e) => e.hp > 0).every((e) => !inRange(w, pds, e))).toBe(true);
+  }, 30000);
+
+  it('slås ihop med nästa trupp och går fram när de tillsammans är starka nog', () => {
+    const { w } = fortress();
+    const weak = spawnSquad(w, Array(3).fill('mantis'), 0);
+    ticks(w, 10 * 15);
+    expect(weak.state).toBe('wait');
+    spawnSquad(w, Array(20).fill('mantis'), 0);
+    let merged = false;
+    ticks(w, 10 * 40, () => { if (w.squads.length === 1 && weak.members.length === 23) merged = true; });
+    expect(merged).toBe(true);
+    expect(['march', 'engaged']).toContain(weak.state);
+  }, 30000);
+
+  it('går fram ändå när den har väntat för länge', () => {
+    const { w } = fortress({ maxWaitSeconds: 5 });
+    const squad = spawnSquad(w, Array(3).fill('mantis'), 0);
+    let waited = false;
+    let advanced = false;
+    ticks(w, 10 * 20, () => {
+      if (squad.state === 'wait') waited = true;
+      if (waited && (squad.state === 'march' || squad.state === 'engaged')) advanced = true;
+    });
+    expect(waited).toBe(true);
+    expect(advanced).toBe(true);
+  }, 30000);
+});

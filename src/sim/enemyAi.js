@@ -1,5 +1,6 @@
 import { getDef, getEntity, weaponOf } from './entities.js';
-import { ENEMY_ID, PLAYER_ID } from './constants.js';
+import { ENEMY_ID, PLAYER_ID, TICKS_PER_SECOND } from './constants.js';
+import { standable, clearLine, cellIndex } from './pathing.js';
 import { isDetected } from './intel.js';
 import { enemyShields } from './shields.js';
 import { weaponDps, enemyAiConfig, knownDefenses } from './threat.js';
@@ -143,6 +144,10 @@ export const isKnownTarget = (t) => Boolean(t) && t.hp > 0 && t.owner === PLAYER
  *
  * Orderna är vanliga attackorder med `squadPlan` satt ('siege', 'assault' eller
  * 'raid'), så att truppen vet vilka den själv har gett.
+ *
+ * Truppen jämför också sin styrka med hotet framför sig (se assessSquad). Är
+ * den för svag drar den sig tillbaka längs vägen den kom och väntar på
+ * förstärkning; trupper som möts där slås ihop (se squads.js).
  */
 
 const isPlanOrder = (o) => o?.type === 'attack' && Boolean(o.squadPlan);
@@ -245,6 +250,65 @@ function stillBlocking(world, squad, members, b, steps) {
   return findBlocker(world, squad, [b], steps) === b;
 }
 
+/** Skada per sekund mot markenheter (0 för obeväpnade och luftvärn). */
+const groundDps = (e) => {
+  const w = groundWeapon(e);
+  return w && (e.kind === 'unit' || e.built) ? weaponDps(w) : 0;
+};
+
+/**
+ * Styrka enligt Lanchesters kvadratlag: total skada per sekund gånger total
+ * HP. Två grupper med samma styrka nöter ut varandra.
+ */
+export function power(entities) {
+  let dps = 0;
+  let hp = 0;
+  for (const e of entities) {
+    dps += groundDps(e);
+    hp += e.hp;
+  }
+  return dps * hp;
+}
+
+/**
+ * Truppens styrka mot hotet framför den: kända försvar som når vägen (inom
+ * `lookaheadCells`) eller någon i truppen, och spelarens beväpnade enheter som
+ * fienden ser inom `threatScanRadius` från ankaret. Försvar som någon i truppen
+ * når längre än räknas inte (dem belägrar truppen i stället).
+ */
+export function assessSquad(world, squad, members) {
+  const cfg = enemyAiConfig(world);
+  const threats = [];
+  const n = world.terrain.size;
+  const path = [];
+  let i = cellIndex(world, squad.x, squad.z);
+  for (let s = 0; s <= cfg.lookaheadCells && i >= 0; s++) {
+    path.push({ x: (i % n) + 0.5, z: Math.floor(i / n) + 0.5 });
+    i = world.flow.next[i];
+  }
+  for (const d of knownDefenses(world)) {
+    if (members.some((e) => outranges(e, d))) continue;
+    if (path.some((p) => covers(d, p.x, p.z)) || members.some((e) => covers(d, e.x, e.z))) threats.push(d);
+  }
+  for (const u of world.entities) {
+    if (u.kind !== 'unit' || u.owner !== PLAYER_ID || u.hp <= 0 || !groundDps(u) || !isDetected(ENEMY_ID, u)) continue;
+    if (Math.hypot(u.x - squad.x, u.z - squad.z) <= cfg.threatScanRadius) threats.push(u);
+  }
+  return {
+    own: power(members),
+    threat: power(threats),
+    threats: threats.map((t) => ({ x: t.x, z: t.z, range: groundWeapon(t).range + t.radius })),
+  };
+}
+
+/** Ska truppen (som marscherar eller strider) dra sig tillbaka? */
+function shouldRetreat(world, squad, a, cfg) {
+  if (a.threat <= 0 || a.own >= a.threat * cfg.retreatRatio) return false;
+  if (world.tick < (squad.noRetreatUntil ?? 0)) return false;
+  // Nära kärnan finns ingen återvändo.
+  return world.flow.dist[cellIndex(world, squad.x, squad.z)] > cfg.commitDistance;
+}
+
 /**
  * Uppdaterar truppens plan (`squad.plan`, `squad.raid`) och medlemmarnas order.
  * Körs med jämna mellanrum, inte under samlingen vid gatewayen.
@@ -252,6 +316,33 @@ function stillBlocking(world, squad, members, b, steps) {
 export function planSquad(world, squad, members) {
   const cfg = enemyAiConfig(world);
   if (squad.state === 'muster' || world.pathDirty || (world.tick + squad.id) % cfg.retargetTicks !== 0) return;
+
+  // Reträtt: för svag mot hotet framför (eller väntar redan på förstärkning).
+  const a = assessSquad(world, squad, members);
+  if (squad.state === 'retreat' || squad.state === 'wait') {
+    const waited = (world.tick - squad.retreatTick) / TICKS_PER_SECOND;
+    if (a.own >= a.threat * cfg.advanceRatio || waited >= cfg.maxWaitSeconds) {
+      // Stark nog (eller trött på att vänta): framåt igen, och ingen ny reträtt på ett tag.
+      squad.state = 'march';
+      squad.threats = null;
+      if (waited >= cfg.maxWaitSeconds) squad.noRetreatUntil = world.tick + cfg.recommitSeconds * TICKS_PER_SECOND;
+    } else {
+      squad.threats = a.threats;
+      return;
+    }
+  } else if (shouldRetreat(world, squad, a, cfg)) {
+    squad.state = 'retreat';
+    squad.retreatTick = world.tick;
+    squad.threats = a.threats;
+    squad.plan = null;
+    squad.raid = null;
+    // Släpp allt framför truppordern (anfall, vedergällning) och backa.
+    for (const e of members) {
+      const k = e.orders.findIndex((o) => o.type === 'squad');
+      if (k > 0) e.orders = e.orders.slice(k);
+    }
+    return;
+  }
   const defenses = knownDefenses(world);
 
   // Belägring eller anfall mot ett hinder på vägen.
@@ -301,5 +392,42 @@ export function planSquad(world, squad, members) {
     const role = roles.get(e.id);
     if (role) assign(e, role === 'raid' ? squad.raid.targetId : plan.targetId, role);
     else clearPlan(e);
+  }
+}
+
+/**
+ * Avståndshållning (kiting): en fiende som skjuter längre än den spelarenhet
+ * den siktar på backar när enheten kommer nära sin räckvidd, så att den kan
+ * fortsätta skjuta utan att bli beskjuten. Den backar till sin egen räckvidd,
+ * rakt bort från målet eller snett om vägen är blockerad, men aldrig in i ett
+ * känt försvar. Punkten läggs i `e.kite` och rörelsesystemet går dit.
+ */
+export function kiteSystem(world) {
+  if (!world.flow) return;
+  const cfg = enemyAiConfig(world);
+  let defenses = null;
+  for (const e of world.entities) {
+    if (e.kind !== 'unit' || e.owner !== ENEMY_ID) continue;
+    e.kite = null;
+    const w = e.targetId ? groundWeapon(e) : null;
+    if (!w) continue;
+    const t = getEntity(world, e.targetId);
+    if (!t || t.kind !== 'unit' || t.hp <= 0) continue;
+    const tw = weaponOf(t);
+    if (!tw || Boolean(tw.antiAir) !== Boolean(getDef(e.type)?.air)) continue;
+    const want = w.range + t.radius - 0.5; // så långt bort som möjligt, men inom egen räckvidd
+    if (want <= tw.range + e.radius + 0.5) continue; // når inte tydligt längre
+    const dist = Math.hypot(e.x - t.x, e.z - t.z);
+    if (dist - e.radius > tw.range + cfg.kiteBuffer || dist >= want) continue;
+    defenses ??= knownDefenses(world);
+    const base = Math.atan2(e.x - t.x, e.z - t.z);
+    for (const off of [0, 0.5, -0.5, 1, -1, 1.5, -1.5]) {
+      const x = t.x + Math.sin(base + off) * want;
+      const z = t.z + Math.cos(base + off) * want;
+      if (!standable(world, x, z) || !clearLine(world, e.x, e.z, x, z)) continue;
+      if (defenses.some((d) => covers(d, x, z))) continue;
+      e.kite = { x, z };
+      break;
+    }
   }
 }

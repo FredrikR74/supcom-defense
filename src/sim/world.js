@@ -16,6 +16,7 @@ import { TICK_SECONDS, PLAYER_ID, ENEMY_ID } from './constants.js';
 import gameConfig from '../data/gameConfig.js';
 import { createDirector, directorSystem } from './director.js';
 import { squadSystem } from './squads.js';
+import { kiteSystem } from './enemyAi.js';
 import { shieldSystem } from './shields.js';
 import { createIntel, intelSystem } from './intel.js';
 
@@ -172,7 +173,10 @@ export function tickWorld(world) {
   intelSystem(world);
   targetingSystem(world);
   patrolEngageSystem(world);
-  if (world.map) squadSystem(world);
+  if (world.map) {
+    squadSystem(world);
+    kiteSystem(world);
+  }
   movementSystem(world);
   separationSystem(world);
   constructionDemand(world);

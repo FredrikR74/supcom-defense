@@ -1,5 +1,5 @@
 import { addUnit, getEntity, getDef } from './entities.js';
-import { cellIndex, isBlockedCell, flowTarget } from './pathing.js';
+import { cellIndex, flowTarget, standable, clearLine } from './pathing.js';
 import { TICK_SECONDS, TICKS_PER_SECOND, ENEMY_ID } from './constants.js';
 import { planSquad, hasPlanOrder } from './enemyAi.js';
 
@@ -38,6 +38,11 @@ const LAG_DISTANCE = 4;
 const DISENGAGE_SECONDS = 2;
 /** Sidledsförskjutningen prövas i de här andelarna när platsen är blockerad. */
 const SQUEEZE = [1, 0.6, 0.3, 0];
+/** Avstånd mellan punkterna i ankarets spår, och högst så många punkter. */
+const TRAIL_STEP = 2;
+const TRAIL_MAX = 80;
+/** Vid reträtt backar truppen tills formationen är så här långt utanför hotets räckvidd. */
+const SAFE_MARGIN = 3;
 
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -61,60 +66,6 @@ function flowHeading(world, x, z) {
   const dz = ahead.z - z;
   if (Math.hypot(dx, dz) < 0.5) return null;
   return Math.atan2(dx, dz);
-}
-
-/** Kan en enhet stå på (x, z) och nå kärnan därifrån? */
-function standable(world, x, z) {
-  const n = world.terrain.size;
-  if (x < 0 || z < 0 || x >= n || z >= n) return false;
-  const i = cellIndex(world, x, z);
-  return !isBlockedCell(world, i) && world.flow.dist[i] < Infinity;
-}
-
-/**
- * Är den raka linjen från a till b fri från hinder? Går igenom varje ruta som
- * linjen rör (även hörn), så att ingen genväg skär genom en brant eller byggnad.
- * De sista `stopShort` enheterna (t.ex. en byggnad man ska skjuta på) räknas inte.
- */
-function clearLine(world, ax, az, bx, bz, stopShort = 0) {
-  const d = Math.hypot(bx - ax, bz - az);
-  if (stopShort > 0) {
-    if (d <= stopShort) return true;
-    bx = ax + ((bx - ax) * (d - stopShort)) / d;
-    bz = az + ((bz - az) * (d - stopShort)) / d;
-  }
-  if (!standable(world, ax, az) || !standable(world, bx, bz)) return false;
-  let cx = Math.floor(ax);
-  let cz = Math.floor(az);
-  const ex = Math.floor(bx);
-  const ez = Math.floor(bz);
-  const dx = bx - ax;
-  const dz = bz - az;
-  const stepX = Math.sign(dx);
-  const stepZ = Math.sign(dz);
-  const tDeltaX = stepX ? Math.abs(1 / dx) : Infinity;
-  const tDeltaZ = stepZ ? Math.abs(1 / dz) : Infinity;
-  let tMaxX = stepX ? (stepX > 0 ? cx + 1 - ax : ax - cx) * tDeltaX : Infinity;
-  let tMaxZ = stepZ ? (stepZ > 0 ? cz + 1 - az : az - cz) * tDeltaZ : Infinity;
-  for (let guard = 0; (cx !== ex || cz !== ez) && guard < 1000; guard++) {
-    if (Math.abs(tMaxX - tMaxZ) < 1e-9) {
-      // Genom ett hörn: båda grannrutorna måste vara fria.
-      if (!standable(world, cx + stepX + 0.5, cz + 0.5) || !standable(world, cx + 0.5, cz + stepZ + 0.5)) return false;
-      cx += stepX;
-      cz += stepZ;
-      tMaxX += tDeltaX;
-      tMaxZ += tDeltaZ;
-    } else if (tMaxX < tMaxZ) {
-      cx += stepX;
-      tMaxX += tDeltaX;
-    } else {
-      cz += stepZ;
-      tMaxZ += tDeltaZ;
-    }
-    if (tMaxX > 1 + 1e-9 && tMaxZ > 1 + 1e-9 && (cx !== ex || cz !== ez)) break;
-    if (!standable(world, cx + 0.5, cz + 0.5)) return false;
-  }
-  return true;
 }
 
 /**
@@ -149,6 +100,10 @@ function slotPosition(squad, slot, squeeze = 1) {
 
 const weaponRange = (type) => getDef(type)?.weapon?.range ?? 0;
 
+/** Kortast räckvidd längst fram (Mantis före Medusa), stabilt efter ordningen i listan. */
+const byRange = (types) => types.map((type, k) => ({ type, k }))
+  .sort((a, b) => weaponRange(a.type) - weaponRange(b.type) || a.k - b.k);
+
 /**
  * Skapar en trupp vid spawnpunkt `spawnIndex` med enheterna `types`, direkt på
  * sina platser i formationen (eller vid gatewayen om platsen är blockerad).
@@ -164,10 +119,10 @@ export function spawnSquad(world, types, spawnIndex) {
     state: 'muster',
     timer: world.director.config.musterSeconds,
     members: [],
+    /** Ankarets väg hittills (en punkt per TRAIL_STEP), för reträtt. */
+    trail: [{ x: muster.x, z: muster.z }],
   };
-  // Kortast räckvidd längst fram (Mantis före Medusa), stabilt efter typens ordning.
-  const sorted = types.map((type, k) => ({ type, k }))
-    .sort((a, b) => weaponRange(a.type) - weaponRange(b.type) || a.k - b.k);
+  const sorted = byRange(types);
   const slots = formationSlots(sorted.length);
   const shieldUntil = world.tick + Math.round((world.director.config.spawnShieldSeconds ?? 0) * TICKS_PER_SECOND);
   sorted.forEach(({ type }, k) => {
@@ -203,11 +158,20 @@ function slotGoal(world, squad, e, slot) {
   return { mode: 'flow' };
 }
 
+/** Lägger ankarets position i spåret om det har gått minst TRAIL_STEP sedan förra punkten. */
+function recordTrail(squad) {
+  squad.trail ??= [];
+  const last = squad.trail[squad.trail.length - 1];
+  if (last && Math.hypot(squad.x - last.x, squad.z - last.z) < TRAIL_STEP) return;
+  squad.trail.push({ x: squad.x, z: squad.z });
+  if (squad.trail.length > TRAIL_MAX) squad.trail.shift();
+}
+
 /** Flyttar ankaret längs flödesfältet med sträckan `budget`. */
 function advanceAnchor(world, squad, budget) {
   for (let steps = 0; budget > 1e-9 && steps < 8; steps++) {
     const p = flowTarget(world, squad.x, squad.z);
-    if (!p) return;
+    if (!p) break;
     const dx = p.x - squad.x;
     const dz = p.z - squad.z;
     const d = Math.hypot(dx, dz);
@@ -218,9 +182,87 @@ function advanceAnchor(world, squad, budget) {
     } else {
       squad.x += (dx / d) * budget;
       squad.z += (dz / d) * budget;
-      return;
+      break;
     }
   }
+  recordTrail(squad);
+}
+
+/** Formationens radie: hur långt från ankaret den yttersta platsen ligger. */
+const formationRadius = (squad) => Math.max(0, ...squad.members.map((m) => Math.hypot(m.slot.lateral, m.slot.forward)));
+
+/** Står hela formationen utanför räckvidden för de hot truppen backar från? */
+function isSafe(squad) {
+  const r = formationRadius(squad) + SAFE_MARGIN;
+  return !(squad.threats ?? []).some((t) => Math.hypot(squad.x - t.x, squad.z - t.z) <= t.range + r);
+}
+
+/**
+ * Reträtt: ankaret backar längs sitt spår tills formationen är utom räckhåll
+ * för hotet ('retreat'), och står sedan still och väntar ('wait'). Medlemmarna
+ * håller formationen och skjuter på det som kommer inom räckvidd medan de backar.
+ */
+function stepRetreat(world, squad, members) {
+  if (!isSafe(squad) && squad.trail?.length) squad.state = 'retreat';
+  if (squad.state === 'retreat') {
+    let budget = Math.min(...members.map((e) => e.speed)) * TICK_SECONDS;
+    while (budget > 1e-9 && !isSafe(squad) && squad.trail.length) {
+      const p = squad.trail[squad.trail.length - 1];
+      const d = Math.hypot(p.x - squad.x, p.z - squad.z);
+      if (d <= budget) {
+        squad.x = p.x;
+        squad.z = p.z;
+        budget -= d;
+        squad.trail.pop();
+      } else {
+        squad.x += ((p.x - squad.x) / d) * budget;
+        squad.z += ((p.z - squad.z) / d) * budget;
+        budget = 0;
+      }
+    }
+    if (isSafe(squad) || !squad.trail.length) squad.state = 'wait';
+  }
+  squad.members.forEach((m, k) => {
+    const e = members[k];
+    const g = slotGoal(world, squad, e, m.slot);
+    let goal = { mode: 'hold' };
+    if (g.mode === 'slot') goal = g;
+    else if (clearLine(world, e.x, e.z, squad.x, squad.z)) goal = { mode: 'slot', x: squad.x, z: squad.z, reach: 1 };
+    // `retreat`: medlemmen går till sin plats även om den har ett mål (se movement.js).
+    squadOrder(e).goal = { ...goal, retreat: true };
+  });
+}
+
+/**
+ * Trupper som kommer nära en trupp som har dragit sig tillbaka slås ihop med
+ * den: medlemmarna får nya platser i en gemensam formation, och truppen
+ * bedömer sin styrka igen (se enemyAi.js).
+ */
+function mergeSquads(world) {
+  const dist = world.config?.enemyAi?.mergeDistance ?? 0;
+  if (!(dist > 0)) return;
+  for (const a of world.squads) {
+    if (a.merged || (a.state !== 'wait' && a.state !== 'retreat')) continue;
+    for (const b of world.squads) {
+      if (b === a || b.merged || b.state === 'muster') continue;
+      if (Math.hypot(a.x - b.x, a.z - b.z) > dist) continue;
+      absorb(world, a, b);
+      b.merged = true;
+    }
+  }
+  if (world.squads.some((s) => s.merged)) world.squads = world.squads.filter((s) => !s.merged);
+}
+
+function absorb(world, a, b) {
+  const entities = [...a.members, ...b.members].map((m) => getEntity(world, m.id));
+  for (const e of entities) {
+    const k = e.orders.findIndex((o) => o.type === 'squad');
+    e.orders = e.orders.slice(k); // truppens egna order (anfall, räd) gäller inte längre
+    e.orders[0].squadId = a.id;
+  }
+  const sorted = byRange(entities.map((e) => e.type));
+  const slots = formationSlots(entities.length);
+  a.members = sorted.map(({ k }, j) => ({ id: entities[k].id, slot: slots[j] }));
 }
 
 /** Ny ankarpunkt efter strid: den medlem som kommit längst mot kärnan. */
@@ -239,6 +281,7 @@ function regroup(world, squad, members) {
   squad.x = best.x;
   squad.z = best.z;
   squad.heading = flowHeading(world, squad.x, squad.z) ?? squad.heading;
+  recordTrail(squad);
 }
 
 export function squadSystem(world) {
@@ -255,11 +298,16 @@ export function squadSystem(world) {
     }
   }
   world.squads = remaining;
+  mergeSquads(world);
 }
 
 function stepSquad(world, squad) {
   const members = squad.members.map((m) => getEntity(world, m.id));
   planSquad(world, squad, members);
+  if (squad.state === 'retreat' || squad.state === 'wait') {
+    stepRetreat(world, squad, members);
+    return;
+  }
   const engaged = members.filter(isEngaged);
   // De andra går inte mot mål som truppen själv har delat ut (belägring, räd).
   const leads = engaged.filter((f) => !hasPlanOrder(f) && !(squad.plan?.mode === 'siege' &&

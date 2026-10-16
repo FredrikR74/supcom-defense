@@ -105,6 +105,25 @@ export default {
     /** Högst så många enheter skickas mot en radar. */
     raidSize: 2,
     /**
+     * Reträtt (styrka = total DPS × total HP, Lanchesters kvadratlag): truppen
+     * drar sig tillbaka när dess styrka är under hotets × retreatRatio, och går
+     * fram igen när den är minst hotets × advanceRatio (efter sammanslagning).
+     */
+    retreatRatio: 0.6,
+    advanceRatio: 1,
+    /** Spelarens enheter inom så här långt från truppen räknas till hotet. */
+    threatScanRadius: 20,
+    /** Längre än så här väntar truppen inte; sedan går den fram ändå. */
+    maxWaitSeconds: 60,
+    /** Efter en sådan väntan drar truppen sig inte tillbaka igen på så här länge. */
+    recommitSeconds: 30,
+    /** Närmare kärnan än så här (i flödesfältet) drar sig ingen tillbaka. */
+    commitDistance: 20,
+    /** Trupper vars ankare är så här nära en väntande trupp slås ihop med den. */
+    mergeDistance: 12,
+    /** En enhet som skjuter längre än sitt mål backar när målet är så här nära sin räckvidd. */
+    kiteBuffer: 1.5,
+    /**
      * Vägarnas hotkostnad: en ruta som en känd fientlig försvarsbyggnad når
      * kostar (1 + dps × detta) gånger så mycket att gå igenom. Fienden går
      * därför runt en dödszon om omvägen är kort, men rakt igenom om den är lång.

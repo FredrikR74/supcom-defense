@@ -69,7 +69,21 @@ export function movementSystem(world) {
     e.prevZ = e.z;
     // Fiender på väg mot kärnan och beväpnade patrullerare stannar och skjuter.
     const first = e.orders[0]?.type;
-    if ((first === 'attackCore' || first === 'squad' || first === 'patrol') && e.targetId) continue;
+    // Fiender som backar (se enemyAi.js) går undan även när de skjuter.
+    if (e.kite) {
+      const dx = e.kite.x - e.x;
+      const dz = e.kite.z - e.z;
+      const dist = Math.hypot(dx, dz);
+      const step = Math.min(dist, e.speed * TICK_SECONDS);
+      if (dist > 1e-9) {
+        e.x += (dx / dist) * step;
+        e.z += (dz / dist) * step;
+        e.heading = Math.atan2(dx, dz);
+      }
+      continue;
+    }
+    const retreating = first === 'squad' && e.orders[0].goal?.retreat;
+    if ((first === 'attackCore' || first === 'squad' || first === 'patrol') && e.targetId && !retreating) continue;
 
     let budget = e.speed * TICK_SECONDS;
     for (let steps = 0; budget > 0 && e.orders.length > 0 && steps < 8; steps++) {

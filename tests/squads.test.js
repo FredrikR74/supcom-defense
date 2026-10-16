@@ -5,6 +5,7 @@ import { cellIndex, isBlockedCell } from '../src/sim/pathing.js';
 import { spawnSquad, formationSlots } from '../src/sim/squads.js';
 import { projectileSystem } from '../src/sim/systems/combat.js';
 import firstDefense from '../src/data/maps/firstDefense.js';
+import units from '../src/data/units.js';
 import maps from '../src/data/maps/index.js';
 
 /** Ingen director-våg som stör testerna. */
@@ -111,8 +112,14 @@ describe('trupper', () => {
     for (let t = 0; t < 10 * 160; t++) {
       tickWorld(w);
       if (t % 10) continue;
+      // Trupper som väntar på förstärkning (se enemyAi.js) och obeväpnade spanare får stå still.
+      const waiting = new Set();
+      for (const s of w.squads) if (s.state === 'wait' || s.state === 'retreat') for (const m of s.members) waiting.add(m.id);
       for (const e of w.entities) {
-        if (e.owner !== ENEMY_ID || e.kind !== 'unit') continue;
+        if (e.owner !== ENEMY_ID || e.kind !== 'unit' || waiting.has(e.id) || !units[e.type].weapon) {
+          last.delete(e.id);
+          continue;
+        }
         const prev = last.get(e.id);
         if (!prev || Math.hypot(prev.x - e.x, prev.z - e.z) > 0.5) last.set(e.id, { x: e.x, z: e.z, tick: w.tick });
         else if (w.tick - prev.tick >= 150 && !e.targetId) stalled++;

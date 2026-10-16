@@ -337,6 +337,7 @@ export function retaliationSystem(world) {
     e.lastAttackerId = null;
     const first = e.orders[0]?.type;
     if (first !== 'attackCore' && first !== 'squad') continue;
+    if (e.orders[0].goal?.retreat) continue; // en trupp som drar sig tillbaka jagar ingen
     const weapon = activeWeapon(e);
     if (!weapon || e.targetId) continue; // obeväpnad, eller har redan något att skjuta på
     const attacker = getEntity(world, attackerId);

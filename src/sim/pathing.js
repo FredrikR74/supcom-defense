@@ -172,6 +172,60 @@ export function isBlockedCell(world, i) {
   return world.steep[i] === 1 || world.occupancy[i] !== 0;
 }
 
+/** Kan en enhet stå på (x, z) och nå kärnan därifrån? */
+export function standable(world, x, z) {
+  const n = world.terrain.size;
+  if (x < 0 || z < 0 || x >= n || z >= n) return false;
+  const i = cellIndex(world, x, z);
+  return !isBlockedCell(world, i) && world.flow.dist[i] < Infinity;
+}
+
+/**
+ * Är den raka linjen från a till b fri från hinder? Går igenom varje ruta som
+ * linjen rör (även hörn), så att ingen genväg skär genom en brant eller byggnad.
+ * De sista `stopShort` enheterna (t.ex. en byggnad man ska skjuta på) räknas inte.
+ */
+export function clearLine(world, ax, az, bx, bz, stopShort = 0) {
+  const d = Math.hypot(bx - ax, bz - az);
+  if (stopShort > 0) {
+    if (d <= stopShort) return true;
+    bx = ax + ((bx - ax) * (d - stopShort)) / d;
+    bz = az + ((bz - az) * (d - stopShort)) / d;
+  }
+  if (!standable(world, ax, az) || !standable(world, bx, bz)) return false;
+  let cx = Math.floor(ax);
+  let cz = Math.floor(az);
+  const ex = Math.floor(bx);
+  const ez = Math.floor(bz);
+  const dx = bx - ax;
+  const dz = bz - az;
+  const stepX = Math.sign(dx);
+  const stepZ = Math.sign(dz);
+  const tDeltaX = stepX ? Math.abs(1 / dx) : Infinity;
+  const tDeltaZ = stepZ ? Math.abs(1 / dz) : Infinity;
+  let tMaxX = stepX ? (stepX > 0 ? cx + 1 - ax : ax - cx) * tDeltaX : Infinity;
+  let tMaxZ = stepZ ? (stepZ > 0 ? cz + 1 - az : az - cz) * tDeltaZ : Infinity;
+  for (let guard = 0; (cx !== ex || cz !== ez) && guard < 1000; guard++) {
+    if (Math.abs(tMaxX - tMaxZ) < 1e-9) {
+      // Genom ett hörn: båda grannrutorna måste vara fria.
+      if (!standable(world, cx + stepX + 0.5, cz + 0.5) || !standable(world, cx + 0.5, cz + stepZ + 0.5)) return false;
+      cx += stepX;
+      cz += stepZ;
+      tMaxX += tDeltaX;
+      tMaxZ += tDeltaZ;
+    } else if (tMaxX < tMaxZ) {
+      cx += stepX;
+      tMaxX += tDeltaX;
+    } else {
+      cz += stepZ;
+      tMaxZ += tDeltaZ;
+    }
+    if (tMaxX > 1 + 1e-9 && tMaxZ > 1 + 1e-9 && (cx !== ex || cz !== ez)) break;
+    if (!standable(world, cx + 0.5, cz + 0.5)) return false;
+  }
+  return true;
+}
+
 /**
  * Skulle rutorna `cells` (t.ex. en ny byggnads fotavtryck) stänga någon
  * spawnpunkts väg till kärnan? Bredden-först från kärnan.
