@@ -1,4 +1,5 @@
 import structures from '../data/structures.js';
+import { threatCosts } from './threat.js';
 
 /**
  * Vägar för fiender: ett passerbarhetsrutnät och ett flödesfält mot kärnan.
@@ -7,8 +8,6 @@ import structures from '../data/structures.js';
 
 /** Största höjdskillnad inom en ruta som enheter kan köra över. */
 export const MAX_UNIT_SLOPE = 1.0;
-/** Fiender räknas som framme när de står intill kärnan (avstånd i flödesfältet). */
-export const ARRIVE_DISTANCE = 1.5;
 
 const NEIGHBORS = [
   [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
@@ -121,25 +120,35 @@ function createHeap() {
 }
 
 /**
- * Flödesfält mot kärnan (Dijkstra). `dist[i]` är vägavståndet från ruta i till
+ * Flödesfält mot kärnan (Dijkstra). `dist[i]` är vägkostnaden från ruta i till
  * kärnan (Infinity om oåtkomlig) och `next[i]` rutan man ska gå till härnäst (-1 om ingen).
+ * `goal[i]` är 1 för kärnans rutor.
+ *
+ * Rutor som en försvarsbyggnad som fienden känner till når kostar mer att gå
+ * igenom (se threat.js), så vägen går runt dödszoner när omvägen är kort nog.
  */
 export function computeFlowField(world) {
   const n = world.terrain.size;
   const goals = goalCells(world);
   const passable = makePassable(world, goals, null);
+  const threat = threatCosts(world);
   const dist = new Float32Array(n * n).fill(Infinity);
   const next = new Int32Array(n * n).fill(-1);
+  const goal = new Uint8Array(n * n);
   const heap = createHeap();
   for (const g of goals) {
     dist[g] = 0;
+    goal[g] = 1;
     heap.push(0, g);
   }
   while (heap.size > 0) {
     const i = heap.pop();
     const d = dist[i];
     forEachNeighbor(n, i, passable, (j, cost) => {
-      const nd = d + cost;
+      // Fienden går från j till i: kostnaden för att gå genom ruta j.
+      // Avrundad som i dist (Float32Array): annars kan samma väg se kortare ut
+      // om och om igen och rutor läggas tillbaka i kön i det oändliga.
+      const nd = Math.fround(d + (threat ? cost * (1 + threat[j]) : cost));
       if (nd < dist[j]) {
         dist[j] = nd;
         next[j] = i;
@@ -147,7 +156,7 @@ export function computeFlowField(world) {
       }
     });
   }
-  return { dist, next };
+  return { dist, next, goal };
 }
 
 /** Räknar om flödesfältet om något har ändrats sedan sist. */
@@ -205,13 +214,13 @@ export function wouldBlockPaths(world, cells) {
 
 /**
  * Nästa punkt för en fiende som följer flödesfältet, eller null om den är framme
- * (eller helt instängd). Står den i en blockerad ruta väljs bästa grannen.
+ * (står intill kärnan) eller helt instängd. Står den i en blockerad ruta väljs bästa grannen.
  */
 export function flowTarget(world, x, z) {
   const n = world.terrain.size;
-  const { dist, next } = world.flow;
+  const { dist, next, goal } = world.flow;
   const i = cellIndex(world, x, z);
-  if (dist[i] <= ARRIVE_DISTANCE) return null;
+  if (goal[i] || (next[i] >= 0 && goal[next[i]])) return null;
 
   let j = next[i];
   if (j < 0) {

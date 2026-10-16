@@ -1,6 +1,7 @@
 import { addUnit, getEntity, getDef } from './entities.js';
 import { cellIndex, isBlockedCell, flowTarget } from './pathing.js';
 import { TICK_SECONDS, TICKS_PER_SECOND, ENEMY_ID } from './constants.js';
+import { planSquad, hasPlanOrder } from './enemyAi.js';
 
 /**
  * Fiendens trupper (squads). En våg spawnar samlad i formation framför en
@@ -18,6 +19,9 @@ import { TICK_SECONDS, TICKS_PER_SECOND, ENEMY_ID } from './constants.js';
  *
  * Medlemmar har ordern { type: 'squad', squadId }; squadSystem lägger målpunkten
  * för detta tick i ordern (`goal`), och rörelsesystemet går dit.
+ *
+ * Truppen planerar också mot försvar och radar som fienden känner till
+ * (belägring, anfall och räd, se enemyAi.js).
  */
 
 /** Avstånd mellan platser i formationen (sidled och djup). */
@@ -255,7 +259,11 @@ export function squadSystem(world) {
 
 function stepSquad(world, squad) {
   const members = squad.members.map((m) => getEntity(world, m.id));
+  planSquad(world, squad, members);
   const engaged = members.filter(isEngaged);
+  // De andra går inte mot mål som truppen själv har delat ut (belägring, räd).
+  const leads = engaged.filter((f) => !hasPlanOrder(f) && !(squad.plan?.mode === 'siege' &&
+    (f.targetId ?? f.orders[0]?.targetId) === squad.plan.targetId));
 
   if (engaged.length > 0) {
     squad.engagedTimer = DISENGAGE_SECONDS;
@@ -275,8 +283,11 @@ function stepSquad(world, squad) {
     const order = squadOrder(e);
     if (squad.state === 'engaged' && !isEngaged(e)) {
       // Gå mot närmaste striderande kamrats mål, annars framåt längs flödesfältet.
-      order.goal = engageGoal(world, e, engaged);
-      return;
+      // Strider bara de som har ett uppdrag från truppen står resten kvar i formationen.
+      if (leads.length > 0 || engaged.length === 0) {
+        order.goal = engageGoal(world, e, leads);
+        return;
+      }
     }
     order.goal = slotGoal(world, squad, e, m.slot);
     // Den som väntar framför ankaret ('hold') är inte efter; räknades den som

@@ -80,12 +80,31 @@ describe('krigsdimma', () => {
     expect(lobo.targetId).toBe(target.id);
   });
 
-  it('fienden ser allt (dimman gäller bara spelaren)', () => {
+  it('fienden ser bara det dess enheter ser, men kommer ihåg byggnader', () => {
     const { world } = setup();
     const pd = addStructure(world, 'pointDefense', { x: 40.5, z: 40.5, owner: PLAYER_ID });
+    // Medusan når PD:n (räckvidd 15) men ser bara 9 rutor.
     const medusa = enemy(world, 'medusa', 40.5, 40.5 + 14);
     ticks(world, 2);
+    expect(pd.enemyIntel).toBe(INTEL.HIDDEN);
+    expect(medusa.targetId).toBe(null);
+
+    // En Mantis går fram och ser PD:n; sedan kommer fienden ihåg den.
+    const spotter = enemy(world, 'mantis', 40.5, 40.5 + 8);
+    ticks(world, 2);
+    expect(pd.enemySeen).toBe(true);
     expect(medusa.targetId).toBe(pd.id);
+    spotter.hp = 0;
+    ticks(world, 2);
+    expect(pd.enemyIntel).toBe(INTEL.HIDDEN);
+    expect(medusa.targetId).toBe(pd.id);
+  });
+
+  it('Molens radar visar spelarens enheter som blippar för fienden', () => {
+    const { world, acu } = setup();
+    enemy(world, 'mole', acu.x + 18, acu.z);
+    ticks(world, 1);
+    expect(acu.enemyIntel).toBe(INTEL.RADAR);
   });
 
   it('räknaren för fiender visar bara dem spelaren känner till', () => {

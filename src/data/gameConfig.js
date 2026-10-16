@@ -69,4 +69,46 @@ export default {
   acuRespawnSeconds: 30,
   /** Svårighetsgrad 0–100 vid start (kan ändras under spelet). */
   difficulty: 50,
+
+  /**
+   * Fiendens målval och planering (se sim/enemyAi.js). Ett mål är värt
+   * (hur mycket skada det gör på skytten per sekund + ett strategiskt värde),
+   * delat med de HP som är kvar när skotten som redan är på väg har slagit ner.
+   * Värdena nedan är i samma enhet som skada per sekund.
+   */
+  enemyAi: {
+    values: {
+      /** Radar: ta ut spelarens ögon. */
+      radar: 60,
+      /** Sköldgenerator: utan den slutar allt bakom skölden att vara skyddat. */
+      shield: 40,
+      /** Ingenjörer och ACU:n bygger och reparerar försvaret. */
+      builder: 25,
+      factory: 15,
+      economy: 10,
+      other: 5,
+      /** Kärnan: värd mest av byggnaderna utan vapen (hela spelets mål). */
+      core: 1500,
+    },
+    /** Poängen delas med (1 + avståndet × detta), så närmare mål vinner vid lika. */
+    distanceFalloff: 0.03,
+    /** Ett mål som redan dör av skotten på väg dit får poängen gånger detta (ingen överdödning). */
+    overkillFactor: 0.05,
+    /** Ett nytt mål måste vara så här mycket bättre för att skytten ska byta. */
+    switchMargin: 1.25,
+    /** Skyttarna väljer om mål så här ofta (tick). */
+    retargetTicks: 5,
+    /** Truppen ser efter hinder så här många rutor framåt längs vägen. */
+    lookaheadCells: 30,
+    /** Truppen går så här långt ur vägen för att ta ut en radar den känner till. */
+    radarDetour: 20,
+    /** Högst så många enheter skickas mot en radar. */
+    raidSize: 2,
+    /**
+     * Vägarnas hotkostnad: en ruta som en känd fientlig försvarsbyggnad når
+     * kostar (1 + dps × detta) gånger så mycket att gå igenom. Fienden går
+     * därför runt en dödszon om omvägen är kort, men rakt igenom om den är lång.
+     */
+    threatCostPerDps: 0.012,
+  },
 };

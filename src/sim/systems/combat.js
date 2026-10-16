@@ -6,6 +6,8 @@ import { updateGuardEngagement } from '../guard.js';
 import { enemyShields, absorbProjectile } from '../shields.js';
 import { isDetected } from '../intel.js';
 import { getHeight } from '../terrain.js';
+import { ENEMY_ID } from '../constants.js';
+import { createTargetContext, chooseEnemyTarget, isRetargetTick } from '../enemyAi.js';
 
 /** Hur nära nedslagspunkten en entitets kant måste vara för att träffas. */
 const HIT_TOLERANCE = 0.3;
@@ -92,11 +94,13 @@ export function targetPriority(t) {
 /**
  * Varje entitet med vapen behåller sitt mål så länge det lever och är inom
  * räckvidd, annars väljs det viktigaste målet inom räckvidd (närmast vid lika).
- * Spelarens vapen väljer bara fiender som syns eller finns på radar (intel.js).
+ * Vapen väljer bara mål som syns eller finns på radar (intel.js).
+ * Fienden väljer mål med poäng och ser över sitt val med jämna mellanrum (enemyAi.js).
  */
 export function targetingSystem(world) {
   updateGuardEngagement(world);
   const { hash, maxRadius } = buildHash(world);
+  let ctx = null;
   for (const e of world.entities) {
     const weapon = activeWeapon(e);
     if (!weapon) continue;
@@ -113,7 +117,21 @@ export function targetingSystem(world) {
 
     const current = e.targetId ? getEntity(world, e.targetId) : null;
     // Ett mål som försvunnit i dimman släpps, som i FA.
-    if (current && current.hp > 0 && isDetected(e.owner, current) && canTarget(weapon, current, edgeDistance(e, current))) continue;
+    const keep = current && current.hp > 0 && isDetected(e.owner, current) && canTarget(weapon, current, edgeDistance(e, current));
+
+    if (e.owner === ENEMY_ID) {
+      if (keep && !isRetargetTick(world, e)) continue;
+      ctx ??= createTargetContext(world);
+      const candidates = [];
+      for (const t of hash.queryRadius(e.x, e.z, weapon.range + maxRadius)) {
+        if (!areEnemies(e, t) || t.hp <= 0 || !isDetected(e.owner, t) || getDef(t.type)?.benign) continue;
+        const d = edgeDistance(e, t);
+        if (canTarget(weapon, t, d)) candidates.push({ t, d });
+      }
+      e.targetId = chooseEnemyTarget(ctx, e, weapon, candidates, keep ? current : null)?.id ?? null;
+      continue;
+    }
+    if (keep) continue;
 
     let best = null;
     let bestPrio = Infinity;
@@ -211,6 +229,7 @@ export function weaponsSystem(world) {
         ...arc,
         owner: e.owner,
         sourceId: e.id,
+        targetId: target.id,
         /** Skyttens typ, så att renderingen kan rita rätt sorts skott. */
         source: e.type,
         x: e.x,

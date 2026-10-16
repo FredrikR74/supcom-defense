@@ -183,6 +183,7 @@ describe('sköldar', () => {
     const pd = addStructure(world, 'pointDefense', { x: 66.5, z: 84.5, owner: PLAYER_ID });
     // Rhino utom PD:ns räckvidd men med PD:n inom sin egen.
     const rhino = enemy(world, 'rhino', 66.5, 84.5 + 12);
+    pd.enemySeen = true; // fienden har redan sett PD:n (se intel.js)
     rhino.orders.push({ type: 'attack', targetId: pd.id });
     ticks(world, 2);
     expect(gen.shieldHp).toBe(structures.shieldGenerator.shield.maxHp);

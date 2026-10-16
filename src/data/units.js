@@ -34,6 +34,8 @@ const T2_STRUCTURES = [
  * - `upkeep`: förbrukning per sekund (MaintenanceConsumptionPerSecond*).
  * - `visionRadius`, `radarRadius`: FA:s Intel.VisionRadius och RadarRadius (eller
  *   OmniRadius), halverade som räckvidderna. Se sim/intel.js.
+ * - `targetBias`: fiendens målval (inte i FA), en faktor per `kind` av mål
+ *   (`unit`, `structure`). Se sim/enemyAi.js.
  */
 export default {
   /** UEF ACU (UEL0001). */
@@ -109,6 +111,8 @@ export default {
     speed: 2.8,
     radius: 0.6,
     cost: { mass: 36, energy: 180 },
+    /** Fiendens målval (se sim/enemyAi.js): långsamma artillerigranater träffar byggnader, inte enheter i rörelse. */
+    targetBias: { structure: 3, unit: 0.4 },
     weapon: { damage: 230, rateOfFire: 10 / 60, range: 15, projectileSpeed: 7, muzzleHeight: 1, ballistic: true },
   },
 
@@ -414,6 +418,7 @@ export default {
     speed: 3,
     radius: 0.75,
     cost: { mass: 180, energy: 1350 },
+    targetBias: { structure: 3, unit: 0.4 },
     weapon: {
       damage: 200, rateOfFire: 10 / 33, range: 32.5, minRange: 2, damageRadius: 0.5,
       projectileSpeed: 7, muzzleHeight: 1.1, ballistic: true,

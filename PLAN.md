@@ -58,6 +58,7 @@ Spelet är spelbart från start till förlust. Det har:
 - **Bas:** byggande, fabriker med kö, ekonomi med upkeep, reparation, återvinning och patrull.
 - **Strid:** FA-värden, veterancy och regen.
 - **Fiender och vägar:** fiender som hittar vägen runt murar, och A* för egna enheter.
+- **Smartare fiender:** egen sikt och minne av byggnader, poängsatt målval utan överdödning, belägring och fokuserat anfall mot försvar på vägen, räder mot radar och vägar som går runt kända dödszoner.
 - **Spelet:** startmeny med två kartor, paus och spelhastighet, minikarta och ljud.
 - **ACU-knapp och markeringspanel:** ACU-knappen uppe till vänster syns alltid, med hälsa, blinkar vid skada och visar nedräkningen när ACU:n är död. Vid flera markerade visar infopanelen en ruta per typ med antal och hälsa, och klick väljer bara den typen.
 - **Bygg- och fabriksmeny i FA-stil:** flikar (Build och ACU:ns uppgraderingsplatser), tech-nivåer T1–EXP, ikonrutnät med namn under varje ikon och en informationsruta med kostnad, byggtid och effekt.
@@ -82,10 +83,10 @@ Enheter: UEF ACU, Engineer, Snoop, Mech Marine, MA12 Striker, Lobo och Archer (T
 - [x] **4. Radar och fog of war.** Som i FA, i `sim/intel.js`. Varje egen enhet och färdig byggnad ser runt sig (Intel.VisionRadius, halverad), och radar (RadarRadius, ACU:ns OmniRadius och Snoopens radar) visar fiender längre bort. Värden från FAF:s blueprints; byggnader vars blueprint saknar Intel (T1 Mass Extractor, T1 Power Generator, Mass Fabricator, lagren och muren) ser ingenting.
   - **Inom sikt** syns fienden helt. **Bara på radar** syns den som FA:s generiska blipp (en tom röd romb, icon_land_generic) utan modell, hälsa, typ eller tech-nivå, på alla zoomnivåer. **Annars** är den dold, även på minikartan.
   - Dimman ritas som i FA:s "Explored": terrängen syns, men det som ligger utanför egen sikt är mörkare, även på minikartan. Skott, träffar och explosioner i dimman syns och hörs inte.
-  - Egna vapen väljer bara fiender som syns eller finns på radar, och släpper ett mål som försvinner i dimman. Lobo och Point Defense skjuter alltså längre än de ser, som i FA, och behöver radar eller andra enheter som ser målet. Fienden (datorn) ser allt.
+  - Egna vapen väljer bara fiender som syns eller finns på radar, och släpper ett mål som försvinner i dimman. Lobo och Point Defense skjuter alltså längre än de ser, som i FA, och behöver radar eller andra enheter som ser målet. Fienden har samma sorts intel (se steg 9).
   - **Radar System:** SA1-1000 (UEB3101, T1: radar 58, 20 energi/s) byggs av ACU:n och ingenjörer och uppgraderas till SA2-2000 (UEB3201, T2: radar 100, 150 energi/s), som T2-ingenjören också kan bygga. Radarn fungerar bara när dess energi räcker. Markerad radar visar sin räckvidd som en grön ring.
   - Radarblippar går att hovra ("Radar contact") och högerklicka för att anfalla, som i FA. Dolda fiender går inte att träffa med musen.
-  - Inte med än: Omni Sensor Array (T3), stealth och jamming, och minnet av fiendebyggnader man sett (fienden har inga byggnader).
+  - Inte med än: Omni Sensor Array (T3), stealth och jamming, och minnet av fiendebyggnader man sett (fienden har inga byggnader). Fienden minns däremot spelarens byggnader (steg 9).
   *Test (Vitest):* `tests/intel.test.js`. En fiende utanför sikt och radar är dold, inom radar en blipp, inom sikt syns den helt. Radar utan energi och ofärdig radar ger inget, egna vapen skjuter inte på dolda fiender men på dem på radar, och T1-radarn uppgraderas till T2.
 - [x] **5. T2.** Värden från FAF:s blueprints. Uppgradering ligger i `sim/upgrades.js` och sköldar i `sim/shields.js`.
   - **Uppgradering som i FA:** en färdig byggnad med `upgradesTo` bygger uppgraderingen med sin egen byggkraft (FA:s BuildRate) och kostnaden (den nya typens hela pris) dras löpande. Ingenjörer kan assistera, och Cancel upgrade ger tillbaka det som lagts ner. En fabrik bygger inga enheter under tiden men behåller kön. Land Factory (BuildRate 20) blir **Land Factory HQ** (UEB0201: 1410 mass, 11 200 energi, byggtid 2300, BuildRate 40).
@@ -107,6 +108,14 @@ Enheter: UEF ACU, Engineer, Snoop, Mech Marine, MA12 Striker, Lobo och Archer (T
 
   Senare: T2/T3 Engineering Suite, sköldarna (sköldsystemet finns nu, se steg 5), C-D1 Shoulder Drone (med steg 2), Tactical Missile Launcher och "Billy" (kräver missilvapen). Personal Teleporter tas inte med.
   *Test (Vitest):* `tests/enhancements.test.js`. Uppgraderingen tar `buildTime / byggkraft`, kostar rätt och ger rätt effekt. En ny uppgradering på samma plats ersätter den gamla. En flyttorder avbryter inte, men cancelEnhance gör det och ger tillbaka kostnaden. En assisterande ingenjör gör den snabbare, och den försvinner när ACU:n återuppstår.
+
+- [x] **9. Smartare fiender.** Logiken ligger i `sim/enemyAi.js` och `sim/threat.js`, och inställningarna i `gameConfig.enemyAi`. Spelarens enheter väljer fortfarande mål som i FA (`targetPriority`).
+  - **Fiendens intel** (`sim/intel.js`): fiendens enheter ser runt sig (VisionRadius) och Molens radar visar spelarens enheter längre bort. En byggnad som fienden har sett en gång kommer den ihåg, som FA:s ikoner i dimman. Medusa och Viper skjuter alltså längre än de ser, och behöver någon som spanar.
+  - **Målval med poäng:** (målets skada per sekund mot skytten + strategiskt värde) gånger typens `targetBias`, delat med de HP som är kvar när skotten på väg har slagit ner. Det som skjuter och dör snabbt går först. Radar, sköldgeneratorer, byggare och kärnan har ett strategiskt värde, och artilleri föredrar byggnader. Ett mål som redan dör av skotten på väg blir nästan värdelöst, så elden fördelas. Sköldens HP räknas till målen under skölden. Fienden ser över sitt mål var femte tick.
+  - **Truppens planering:** truppen ser 30 rutor framåt längs sin väg efter kända försvar. Når några i truppen längre än försvaret blir det **belägring**: de skjuter från sin maxräckvidd och resten står kvar i formationen utanför försvarets räckvidd. Annars blir det **anfall**: alla går mot försvaret samtidigt. En oskyddad radar nära vägen tas ut av en **räd** med två enheter.
+  - **Vägar runt dödszoner:** rutor som ett känt försvar når kostar mer i flödesfältet (efter försvarets DPS), så fienden går runt en dödszon om omvägen är kort men rakt igenom om den är lång.
+  - *Inte med än:* reträtt och sammanslagning av trupper som är för svaga, avståndshållning (kiting) mot enheter, och smygtaktik (stealth).
+  *Test (Vitest):* `tests/enemyAi.test.js` och `tests/intel.test.js`. Fienden skjuter på det som skjuter före ekonomi, tar radar före annat, låter artilleri skjuta på byggnader, fördelar elden och skjuter aldrig på murar. En känd PD flyttar vägen men en okänd gör det inte, och fienden kommer ändå fram till kärnan när försvar står intill den. En trupp belägrar en PD med Medusor utan att Mantisarna kommer inom räckhåll, anfaller tillsammans utan artilleri och tar ut en oskyddad radar men inte en skyddad.
 
 ## Arbetsflöde per steg
 
