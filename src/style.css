@@ -236,16 +236,17 @@ html, body {
  * Panelen längst ner (commandPanel.js), över hela bredden som i FA men låg:
  * ordermenyn till vänster (ca 30 %), byggmenyn till höger (ca 70 %).
  */
-:root { --bar-h: 136px; }
+:root { --bar-h: 100px; }
 #commands {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   height: var(--bar-h);
+  box-sizing: border-box;
   display: flex;
   gap: 6px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   background: linear-gradient(#1f2937f2, #0f172af2);
   border-top: 1px solid #3b4b63;
   box-shadow: 0 -2px 10px #0008;
@@ -258,7 +259,7 @@ html, body {
 .bar-orders {
   flex: 0 0 30%;
   min-width: 0;
-  padding: 4px;
+  padding: 3px;
   background: #0b1220aa;
   border: 1px solid #2a3a52;
   border-radius: 3px;
@@ -268,10 +269,10 @@ html, body {
 #commands.bar-narrow .cmd-collapse { left: auto; right: 8px; }
 .ord-grid {
   display: grid;
-  grid-template-rows: repeat(2, 56px);
+  grid-template-rows: repeat(2, 41px);
   grid-auto-flow: column;
-  grid-auto-columns: 66px;
-  gap: 4px;
+  grid-auto-columns: 64px;
+  gap: 3px;
 }
 .bar-build {
   position: relative;
@@ -313,11 +314,11 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 1px;
-  width: 66px;
-  height: 56px;
+  width: 64px;
+  height: 41px;
   padding: 2px;
   overflow: hidden;
-  font: 11px/1.15 system-ui, sans-serif;
+  font: 10px/1.1 system-ui, sans-serif;
   color: #e5e7eb;
   background: radial-gradient(circle at 50% 35%, #2b3f5c, #121b2a 75%);
   border: 1px solid #3b4b63;
@@ -330,16 +331,15 @@ html, body {
 .cmd-active { border-color: #4ade80; box-shadow: 0 0 0 1px #4ade80 inset, 0 0 8px #4ade8066; }
 .cmd-disabled { opacity: 0.4; cursor: default; }
 .cmd-disabled:hover { border-color: #3b4b63; background: radial-gradient(circle at 50% 35%, #2b3f5c, #121b2a 75%); }
-.cmd-icon { font: 700 18px/1 system-ui, sans-serif; color: #93c5fd; text-shadow: 0 1px 2px #000; }
-.cmd-label { font-weight: 600; white-space: nowrap; }
+.cmd-icon { font: 700 15px/1 system-ui, sans-serif; color: #93c5fd; text-shadow: 0 1px 2px #000; }
+.cmd-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-weight: 600; white-space: nowrap; }
+/* Kortkommandot i hörnet, som i FA. */
 .cmd-sub {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 9.5px;
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font: 600 9px/1 system-ui, sans-serif;
   color: #94a3b8;
-  font-variant-numeric: tabular-nums;
 }
 
 .cmd-badge {
@@ -529,17 +529,18 @@ html, body {
 /* Fabrikens kö och byggarens byggkö, överst i byggmenyn */
 .cmd-queue {
   display: flex;
+  flex: none;
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: 3px;
   overflow: hidden;
-  min-height: 21px;
 }
 
 .queue-chip {
   position: relative;
   overflow: hidden;
-  padding: 3px 8px;
-  font: 600 11px system-ui, sans-serif;
+  flex: none;
+  padding: 1px 7px;
+  font: 600 10px/1.4 system-ui, sans-serif;
   color: #e5e7eb;
   background: #1e293b;
   border: 1px solid #475569;
@@ -683,18 +684,24 @@ html, body {
 /* Byggmenyn (buildMenu.js), i FA:s stil: lodräta flikar till vänster, rutnätet till höger */
 .bm { display: flex; gap: 4px; width: 100%; min-width: 0; }
 
+/* Tech-nivåerna två och två, uppgraderingsplatserna under dem i hela bredden. */
 .bm-vtabs {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: min-content;
+  align-content: start;
   gap: 2px;
   flex: none;
-  width: 74px;
+  width: 78px;
   overflow-y: auto;
 }
 .bm-vtab {
-  flex: none;
-  padding: 3px 4px;
-  font: 600 10px/1.2 system-ui, sans-serif;
+  min-width: 0;
+  padding: 2px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 9.5px/1.25 system-ui, sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   text-align: left;
@@ -707,9 +714,10 @@ html, body {
 .bm-vtab:hover { color: #e5e7eb; }
 .bm-vtab.bm-disabled { opacity: 0.35; cursor: default; }
 .bm-tab-on { color: #f8fafc; background: linear-gradient(90deg, #3b5b85, #22344d); border-color: #60a5fa; }
-.bm-vsep { flex: none; height: 1px; margin: 2px 0; background: #3b4b63; }
+.bm-vtab-wide { grid-column: 1 / -1; }
+.bm-vsep { grid-column: 1 / -1; height: 1px; margin: 1px 0; background: #3b4b63; }
 
-.bm-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.bm-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; min-height: 0; }
 .bm-grid {
   display: flex;
   flex-wrap: wrap;
@@ -718,34 +726,40 @@ html, body {
   align-content: flex-start;
   min-height: 0;
   overflow-y: auto;
-  padding: 3px;
+  padding: 2px;
   background: #0b1220aa;
   border: 1px solid #2a3a52;
   border-radius: 3px;
 }
-.bm-gap { width: 7px; }
+.bm-gap { width: 6px; }
 
 .bm-tile {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 62px;
-  height: 56px;
-  padding: 3px 2px 2px;
+  flex: none;
+  width: 56px;
+  height: 50px;
+  padding: 2px 2px 1px;
+  overflow: hidden;
   background: radial-gradient(circle at 50% 35%, #2b3f5c, #121b2a 75%);
   border: 1px solid #3b4b63;
   border-radius: 3px;
   box-shadow: inset 0 1px 0 #ffffff14, inset 0 -2px 4px #00000066;
   cursor: pointer;
 }
-.bm-icon { display: block; width: 32px; height: 32px; flex: none; }
+.bm-icon { display: block; width: 26px; height: 26px; flex: none; }
 .bm-tile svg { display: block; width: 100%; height: 100%; }
 .bm-label {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  font: 600 9.5px/1.1 system-ui, sans-serif;
+  /* Högst två rader, alltid inuti rutan (även med större systemtypsnitt). */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 100%;
+  overflow: hidden;
+  margin-top: 1px;
+  font: 600 8.5px/1.1 system-ui, sans-serif;
   color: #cbd5e1;
   text-align: center;
   text-shadow: 0 1px 1px #000;
@@ -766,8 +780,8 @@ html, body {
 }
 .bm-count {
   position: absolute;
-  top: -5px;
-  right: -5px;
+  top: 1px;
+  right: 1px;
   min-width: 15px;
   padding: 1px 3px;
   font: 700 10px/1.2 system-ui, sans-serif;
@@ -796,7 +810,7 @@ html, body {
 .bm-rollover {
   position: absolute;
   bottom: calc(100% + 12px);
-  left: 78px;
+  left: 82px;
   min-width: 240px;
   max-width: 340px;
   padding: 7px 10px;

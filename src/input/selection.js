@@ -96,9 +96,10 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
       const target = world.entities.find((ent) => ent.id === view.pickEntityAtNdc(ndc.x, ndc.y));
       const enemy = target && target.owner !== PLAYER_ID && target.owner !== 0 ? target : null;
       if (ui.mode === 'move' || (ui.mode === 'attack' && !enemy)) {
-        // Attack på marken blir en flyttorder (det finns ingen attack-move än).
+        // Attack på marken är attack-move: gå dit och anfall det som syns på vägen.
         const ground = view.pickAtNdc(ndc.x, ndc.y);
-        if (ground) queueCommand(world, { type: 'move', owner: PLAYER_ID, ids, x: ground.x, z: ground.z, queue: e.shiftKey });
+        const type = ui.mode === 'move' ? 'move' : 'attackMove';
+        if (ground) queueCommand(world, { type, owner: PLAYER_ID, ids, x: ground.x, z: ground.z, queue: e.shiftKey });
       } else if (enemy) {
         queueCommand(world, { type: ui.mode, owner: PLAYER_ID, ids, targetId: enemy.id, queue: e.shiftKey });
       } else {

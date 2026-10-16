@@ -448,7 +448,8 @@ export function patrolEngageSystem(world) {
       if (!t || edgeDistance(e, t) > guardScanRadius(e.type) * PATROL_CHASE_MULT) e.orders.shift();
       continue;
     }
-    const onPatrol = first.type === 'patrol' || first.fromPatrol;
+    // Attack-move (som i FA) anfaller det den ser på vägen precis som en patrull.
+    const onPatrol = first.type === 'patrol' || first.type === 'attackMove' || first.fromPatrol;
     if (!onPatrol) continue;
     if (e.targetId) {
       // Fiende inom räckvidd: släpp återvinning/reparation och stå och skjut.

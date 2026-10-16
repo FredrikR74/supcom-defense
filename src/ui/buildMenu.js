@@ -237,7 +237,8 @@ function renderMenu(menu, handlers) {
       continue;
     }
     const b = document.createElement('button');
-    b.className = 'bm-vtab' + (t.on ? ' bm-tab-on' : '') + (t.disabled ? ' bm-disabled' : '');
+    b.className = 'bm-vtab' + (t.wide ? ' bm-vtab-wide' : '') + (t.on ? ' bm-tab-on' : '') + (t.disabled ? ' bm-disabled' : '');
+    b.title = t.label;
     b.textContent = t.label;
     b.disabled = Boolean(t.disabled);
     b.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -325,7 +326,9 @@ export function renderBuildMenu(state, handlers) {
   const slots = menuTabs(enhanceable).filter((t) => t.key !== 'build');
   if (slots.length) {
     vtabs.push({ separator: true });
-    for (const t of slots) vtabs.push({ key: t.key, label: t.label, on: tab === t.key, onClick: () => handlers.onTab(t.key) });
+    for (const t of slots) {
+      vtabs.push({ key: t.key, label: t.label, wide: true, on: tab === t.key, onClick: () => handlers.onTab(t.key) });
+    }
   }
   if (tab === 'build') return renderMenu({ vtabs, tech, items: buildItems, hovered, header }, handlers);
 

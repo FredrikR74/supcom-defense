@@ -46,7 +46,8 @@ function attackDestination(world, e, order) {
 /** Målpunkt och stoppavstånd för en order, eller null om ordern inte innebär förflyttning. */
 function destination(world, e, order) {
   switch (order.type) {
-    case 'move': return { x: order.x, z: order.z, reach: 0 };
+    case 'move':
+    case 'attackMove': return { x: order.x, z: order.z, reach: 0 };
     case 'build': return { x: order.x, z: order.z, reach: order.reach };
     case 'guard': return guardDestination(world, e, order);
     case 'attack':
@@ -106,7 +107,7 @@ export function movementSystem(world) {
       continue;
     }
     const retreating = first === 'squad' && e.orders[0].goal?.retreat;
-    if ((first === 'attackCore' || first === 'squad' || first === 'patrol') && e.targetId && !retreating) continue;
+    if ((first === 'attackCore' || first === 'squad' || first === 'patrol' || first === 'attackMove') && e.targetId && !retreating) continue;
 
     let budget = e.speed * TICK_SECONDS;
     let want = null;
@@ -124,7 +125,7 @@ export function movementSystem(world) {
       const goal = order.type === 'attackCore' || order.type === 'squad' ? dest : steer(world, e, order, dest);
       if (goal.wait) break;
       if (goal.stuck) {
-        if (order.type === 'move') e.orders.shift(); // så nära som det går
+        if (order.type === 'move' || order.type === 'attackMove') e.orders.shift(); // så nära som det går
         // En patrullpunkt som inte går att nå (t.ex. mitt i en byggnad som byggts
         // där): så nära som det går räcker, vänd mot nästa punkt.
         if (order.type === 'patrol') {
@@ -161,7 +162,7 @@ export function movementSystem(world) {
           order.path = null;
           continue;
         }
-        if (order.type !== 'move') break; // inom räckhåll, byggsystemet tar över
+        if (order.type !== 'move' && order.type !== 'attackMove') break; // inom räckhåll, byggsystemet tar över
         e.x = order.x;
         e.z = order.z;
         e.orders.shift();

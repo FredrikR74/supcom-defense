@@ -114,3 +114,36 @@ describe('Mass Storage och Energy Storage', () => {
     expect(economy.mass.stored).toBeLessThanOrEqual(base.mass);
   });
 });
+
+describe('attack-move', () => {
+  it('går mot punkten, anfaller en fiende den ser på vägen och fortsätter sedan dit', () => {
+    const { world } = setup();
+    const striker = addUnit(world, 'striker', { x: 40, z: 64, owner: PLAYER_ID });
+    // En Mantis bredvid vägen, utanför Strikerns räckvidd men inom GuardScanRadius när den går förbi.
+    const mantis = addUnit(world, 'mantis', { x: 30, z: 54, owner: ENEMY_ID });
+    cmd(world, { type: 'attackMove', ids: [striker.id], x: 20, z: 64 });
+    let engaged = false;
+    for (let i = 0; i < 10 * 40; i++) {
+      tickWorld(world);
+      if (striker.targetId === mantis.id) engaged = true;
+    }
+    expect(engaged).toBe(true);
+    expect(getEntity(world, mantis.id)).toBe(null);
+    expect(Math.hypot(striker.x - 20, striker.z - 64)).toBeLessThan(1);
+    expect(striker.orders).toHaveLength(0);
+  });
+
+  it('en vanlig flyttorder går förbi utan att anfalla', () => {
+    const { world } = setup();
+    const striker = addUnit(world, 'striker', { x: 40, z: 64, owner: PLAYER_ID });
+    const mantis = addUnit(world, 'mantis', { x: 30, z: 54, owner: ENEMY_ID });
+    mantis.orders.length = 0;
+    cmd(world, { type: 'move', ids: [striker.id], x: 20, z: 64 });
+    let chased = false;
+    for (let i = 0; i < 10 * 10; i++) {
+      tickWorld(world);
+      if (striker.orders[0]?.type === 'attack') chased = true;
+    }
+    expect(chased).toBe(false);
+  });
+});

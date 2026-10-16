@@ -16,6 +16,7 @@ export function queueCommand(world, command) {
 
 const HANDLERS = {
   move: applyMove,
+  attackMove: applyAttackMove,
   build: applyBuild,
   assist: applyAssist,
   sell: applySell,
@@ -69,6 +70,20 @@ function applyMove(world, { owner, ids, x, z, queue }) {
   const tz = Math.min(Math.max(z, 0), size);
   for (const e of ownUnits(world, ids, owner)) {
     giveOrder(e, { type: 'move', x: tx, z: tz }, queue);
+  }
+}
+
+/**
+ * `{ type: 'attackMove', owner, ids, x, z, queue }` (FA:s attack-move): enheterna
+ * går mot punkten och anfaller fiender de ser på vägen (inom GuardScanRadius,
+ * som en patrull, se patrolEngageSystem), och fortsätter sedan dit.
+ */
+function applyAttackMove(world, { owner, ids, x, z, queue }) {
+  const size = world.terrain?.size ?? Infinity;
+  const tx = Math.min(Math.max(x, 0), size);
+  const tz = Math.min(Math.max(z, 0), size);
+  for (const e of ownUnits(world, ids, owner)) {
+    giveOrder(e, { type: 'attackMove', x: tx, z: tz }, queue);
   }
 }
 

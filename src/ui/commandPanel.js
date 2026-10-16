@@ -296,11 +296,11 @@ export function createCommandPanel(el, {
       grid.className = 'ord-grid';
       orders.appendChild(grid);
       if (hasUnits) {
-        grid.appendChild(button('➜', 'Move', 'Right-click', () => onMode('move'), {
+        grid.appendChild(button('➜', 'Move', '', () => onMode('move'), {
           active: ui.mode === 'move', title: 'Move: click a point (Shift queues)',
         }));
         grid.appendChild(button('✛', 'Attack', '', () => onMode('attack'), {
-          active: ui.mode === 'attack', title: 'Attack: click an enemy (Shift queues)',
+          active: ui.mode === 'attack', title: 'Attack: click an enemy, or the ground to attack-move (Shift queues)',
         }));
         grid.appendChild(button('⟲', 'Patrol', 'P', () => onMode('patrol'), { active: ui.mode === 'patrol' }));
         grid.appendChild(button('■', 'Stop', 'H', () => onStop(), { title: 'Stop: clear all orders' }));
@@ -313,14 +313,14 @@ export function createCommandPanel(el, {
           title: `Overcharge: click an enemy. Needs ${overcharger.oc.energyRequired} stored energy; ` +
             `drains 6 energy per point of damage (${overcharger.oc.minDamage}–${overcharger.oc.maxDamage} damage).`,
         }));
-        grid.appendChild(button('ϟ', 'Auto OC', overcharger.unit.autoOvercharge ? 'On' : 'Off',
+        grid.appendChild(button('ϟ', 'Auto OC', '',
           () => onAutoOvercharge(!overcharger.unit.autoOvercharge), {
             active: Boolean(overcharger.unit.autoOvercharge),
             title: 'Auto-Overcharge: fire Overcharge at the cannon\'s target whenever there is enough energy',
           }));
       }
       if (enhanceOrders.length) {
-        const b = button('✕', 'Cancel', shortName(enhanceOrders[0].enhancement),
+        const b = button('✕', 'Cancel', '',
           () => onCancelEnhance(enhanceOrders[0].enhancement), { title: `Cancel ${enhancements[enhanceOrders[0].enhancement].name}` });
         enhanceButtonBar = document.createElement('span');
         enhanceButtonBar.className = 'cmd-progress';
@@ -328,27 +328,27 @@ export function createCommandPanel(el, {
         grid.appendChild(b);
       }
       if (factories.length) {
-        grid.appendChild(button('↻', 'Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
-        grid.appendChild(button('❚❚', 'Pause', paused ? 'Paused' : 'Running', () => onPause(!paused), { active: paused }));
+        grid.appendChild(button('↻', 'Repeat', '', () => onRepeat(!repeat), { active: repeat, title: `Repeat: ${repeat ? 'on' : 'off'}` }));
+        grid.appendChild(button('❚❚', 'Pause', '', () => onPause(!paused), { active: paused, title: paused ? 'Paused' : 'Running' }));
       }
       if (upgradable.length) {
         const def = structures[upgradeTo];
         const time = def.buildTime / structures[upgradable[0].type].buildPower;
-        grid.appendChild(button('⬆', 'Upgrade', shortName(upgradeTo), () => onUpgrade(upgradable.map((e) => e.id)), {
+        grid.appendChild(button('⬆', 'Upgrade', '', () => onUpgrade(upgradable.map((e) => e.id)), {
           title: `Upgrade to ${def.name} (Tech ${def.techCategory.slice(-1)}): ${def.cost.mass} mass, ` +
             `${def.cost.energy} energy, ${Math.round(time)} s` + (upgradable.length > 1 ? ` each (${upgradable.length})` : ''),
         }));
       }
       if (upgrading.length) {
-        const b = button('✕', 'Cancel', `→ ${shortName(upgrading[0].upgrade.to)}`,
-          () => onCancelUpgrade(upgrading.map((e) => e.id)), { title: 'Cancel the upgrade' });
+        const b = button('✕', 'Cancel', '',
+          () => onCancelUpgrade(upgrading.map((e) => e.id)), { title: `Cancel the upgrade to ${shortName(upgrading[0].upgrade.to)}` });
         upgradeBar = document.createElement('span');
         upgradeBar.className = 'cmd-progress';
         b.appendChild(upgradeBar);
         grid.appendChild(b);
       }
       if (sellable.length) {
-        grid.appendChild(button('$', 'Sell', 'Delete', () => onSell()));
+        grid.appendChild(button('$', 'Sell', 'Del', () => onSell(), { title: 'Sell (Delete)' }));
       }
 
       // Byggmenyn till höger, med fabrikens kö eller byggarens byggkö överst.
