@@ -6,15 +6,18 @@ import enhancements from '../data/enhancements.js';
 import { enhancementsFor } from '../sim/enhancements.js';
 import { upgradeTarget, queueableUnits } from '../sim/upgrades.js';
 import { techName } from './tech.js';
+import { overchargeOf } from '../sim/overcharge.js';
 import { renderBuildMenu, renderFactoryMenu, menuTabs, shortName, TECH_TABS } from './buildMenu.js';
 
 /**
- * Kommandopanel längst ner: byggmenyn för markerade byggare och en markerad
- * ACU:s uppgraderingar (se buildMenu.js), produktionsknappar
- * och repetering för markerade fabriker, Upgrade för byggnader som kan
- * uppgraderas till nästa tech-nivå, och Sell för markerade byggnader.
- * En markerad byggares byggkö visas som fabrikens kö. Bygg- och fabriksmenyn
- * kan fällas ihop med fliken överst, så att den inte är i vägen.
+ * Panelen längst ner, över hela skärmens bredd som i FA:
+ * - Till vänster (ordermenyn): Move, Attack, Patrol och Stop för enheter,
+ *   Overcharge och automatiskt Overcharge för ACU:n, Repeat och Pause för
+ *   fabriker, Upgrade/Cancel upgrade och Sell för byggnader.
+ * - Till höger (ca 70 %): byggmenyn för markerade byggare och en markerad
+ *   ACU:s uppgraderingar, eller fabriksmenyn (se buildMenu.js), med lodräta
+ *   flikar för tech-nivåer och uppgraderingsplatser. Fabrikens kö och
+ *   byggarens byggkö visas överst i den. Den kan fällas ihop med fliken överst.
  * Byggs bara om när innehållet ändras. All text i spelet är på engelska.
  */
 
@@ -37,7 +40,7 @@ function topTech(types) {
 }
 export function createCommandPanel(el, {
   onBuild, onProduce, onCancelProduce, onRepeat, onPause, onSell, onPatrol, onEnhance, onCancelEnhance,
-  onUpgrade, onCancelUpgrade, onCancelOrders,
+  onUpgrade, onCancelUpgrade, onCancelOrders, onMode, onStop, onAutoOvercharge,
 }) {
   let signature = '';
   /** Markeringen och den högsta tech-nivån förra gången, för att välja tech-flik. */
@@ -180,13 +183,14 @@ export function createCommandPanel(el, {
     return strip;
   }
 
-  function button(label, sub, onClick, { active = false, badge = '', title = '' } = {}) {
+  /** En knapp i ordermenyn: symbol, namn och kortkommando (eller en kort status). */
+  function button(icon, label, sub, onClick, { active = false, disabled = false, title = '' } = {}) {
     const b = document.createElement('button');
     if (title) b.title = title;
-    b.className = 'cmd' + (active ? ' cmd-active' : '');
-    b.innerHTML = `<span class="cmd-label">${label}</span><span class="cmd-sub">${sub}</span>` +
-      (badge ? `<span class="cmd-badge">${badge}</span>` : '');
-    b.addEventListener('click', onClick);
+    b.className = 'cmd' + (active ? ' cmd-active' : '') + (disabled ? ' cmd-disabled' : '');
+    b.innerHTML = `<span class="cmd-icon">${icon}</span><span class="cmd-label">${label}</span>` +
+      (sub ? `<span class="cmd-sub">${sub}</span>` : '');
+    b.addEventListener('click', (e) => { if (!disabled) onClick(e); });
     // Klick på panelen ska inte nå spelplanen.
     b.addEventListener('mousedown', (e) => e.stopPropagation());
     return b;
@@ -243,6 +247,10 @@ export function createCommandPanel(el, {
       };
 
       const hasUnits = selected.some((e) => e.kind === 'unit');
+      // ACU:n (den första markerade som kan skjuta Overcharge) och lagrad energi.
+      const ocUnit = selected.find((e) => overchargeOf(e)) ?? null;
+      const overcharger = ocUnit ? { unit: ocUnit, oc: overchargeOf(ocUnit) } : null;
+      const energy = world.players[PLAYER_ID].economy.energy.stored;
       if (!menuTabs(enhanceable).some((t) => t.key === tab)) tab = 'build';
       // Kön visas för en markerad fabrik (den första om flera är markerade).
       const queueFactory = factories[0] ?? null;
@@ -264,6 +272,7 @@ export function createCommandPanel(el, {
         enhanceOrders.map((o) => o.enhancement), tab, tech,
         upgradable.map((e) => e.id), upgrading.map((e) => [e.id, e.upgrade.to]),
         queueBuilder?.id, builderOrders, collapsed,
+        ocUnit?.id, ocUnit?.autoOvercharge, overcharger && energy >= overcharger.oc.energyRequired,
       ]);
       if (sig === signature) {
         updateProgress();
@@ -279,9 +288,122 @@ export function createCommandPanel(el, {
       upgradeBar = null;
       builderBar = null;
       enhanceButtonBar = null;
-      const buttons = document.createElement('div');
-      buttons.className = 'cmd-row';
-      // Fliken som fäller ihop eller fäller ut bygg- och fabriksmenyn.
+
+      // Ordermenyn till vänster.
+      const orders = document.createElement('div');
+      orders.className = 'bar-orders';
+      const grid = document.createElement('div');
+      grid.className = 'ord-grid';
+      orders.appendChild(grid);
+      if (hasUnits) {
+        grid.appendChild(button('➜', 'Move', 'Right-click', () => onMode('move'), {
+          active: ui.mode === 'move', title: 'Move: click a point (Shift queues)',
+        }));
+        grid.appendChild(button('✛', 'Attack', '', () => onMode('attack'), {
+          active: ui.mode === 'attack', title: 'Attack: click an enemy (Shift queues)',
+        }));
+        grid.appendChild(button('⟲', 'Patrol', 'P', () => onMode('patrol'), { active: ui.mode === 'patrol' }));
+        grid.appendChild(button('■', 'Stop', 'H', () => onStop(), { title: 'Stop: clear all orders' }));
+      }
+      if (overcharger) {
+        const ready = energy >= overcharger.oc.energyRequired;
+        grid.appendChild(button('ϟ', 'Overcharge', 'O', () => onMode('overcharge'), {
+          active: ui.mode === 'overcharge',
+          disabled: !ready,
+          title: `Overcharge: click an enemy. Needs ${overcharger.oc.energyRequired} stored energy; ` +
+            `drains 6 energy per point of damage (${overcharger.oc.minDamage}–${overcharger.oc.maxDamage} damage).`,
+        }));
+        grid.appendChild(button('ϟ', 'Auto OC', overcharger.unit.autoOvercharge ? 'On' : 'Off',
+          () => onAutoOvercharge(!overcharger.unit.autoOvercharge), {
+            active: Boolean(overcharger.unit.autoOvercharge),
+            title: 'Auto-Overcharge: fire Overcharge at the cannon\'s target whenever there is enough energy',
+          }));
+      }
+      if (enhanceOrders.length) {
+        const b = button('✕', 'Cancel', shortName(enhanceOrders[0].enhancement),
+          () => onCancelEnhance(enhanceOrders[0].enhancement), { title: `Cancel ${enhancements[enhanceOrders[0].enhancement].name}` });
+        enhanceButtonBar = document.createElement('span');
+        enhanceButtonBar.className = 'cmd-progress';
+        b.appendChild(enhanceButtonBar);
+        grid.appendChild(b);
+      }
+      if (factories.length) {
+        grid.appendChild(button('↻', 'Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
+        grid.appendChild(button('❚❚', 'Pause', paused ? 'Paused' : 'Running', () => onPause(!paused), { active: paused }));
+      }
+      if (upgradable.length) {
+        const def = structures[upgradeTo];
+        const time = def.buildTime / structures[upgradable[0].type].buildPower;
+        grid.appendChild(button('⬆', 'Upgrade', shortName(upgradeTo), () => onUpgrade(upgradable.map((e) => e.id)), {
+          title: `Upgrade to ${def.name} (Tech ${def.techCategory.slice(-1)}): ${def.cost.mass} mass, ` +
+            `${def.cost.energy} energy, ${Math.round(time)} s` + (upgradable.length > 1 ? ` each (${upgradable.length})` : ''),
+        }));
+      }
+      if (upgrading.length) {
+        const b = button('✕', 'Cancel', `→ ${shortName(upgrading[0].upgrade.to)}`,
+          () => onCancelUpgrade(upgrading.map((e) => e.id)), { title: 'Cancel the upgrade' });
+        upgradeBar = document.createElement('span');
+        upgradeBar.className = 'cmd-progress';
+        b.appendChild(upgradeBar);
+        grid.appendChild(b);
+      }
+      if (sellable.length) {
+        grid.appendChild(button('$', 'Sell', 'Delete', () => onSell()));
+      }
+
+      // Byggmenyn till höger, med fabrikens kö eller byggarens byggkö överst.
+      const header = queueFactory?.productionQueue.length ? queueStrip(queueFactory)
+        : queueBuilder ? builderStrip(queueBuilder) : null;
+      const build = document.createElement('div');
+      build.className = 'bar-build';
+      let menu = null;
+      if (!collapsed && builders.length) {
+        menu = renderBuildMenu({
+          buildable: [...buildable],
+          powerFor: (type) => builders.filter((e) => units[e.type].builds.includes(type))
+            .reduce((sum, e) => sum + units[e.type].buildPower, 0),
+          enhanceable,
+          enhanceOrders,
+          enhancePower: enhanceable ? units[enhanceable.type].buildPower : 0,
+          tab,
+          tech,
+          placing: ui.placing?.type,
+          hovered,
+          header,
+        }, {
+          onTab: (key) => { tab = key; signature = ''; },
+          onTech: (key) => { tech = key; signature = ''; },
+          onHover: (key) => { hovered = key; },
+          onBuild,
+          onEnhance,
+          onCancelEnhance,
+        });
+        enhanceBars = menu.bars;
+      } else if (!collapsed && factories.length) {
+        menu = renderFactoryMenu({
+          producible: [...producible],
+          queued,
+          power: structures[factories[0].type].buildPower,
+          tech,
+          hovered,
+          header,
+        }, {
+          // Som i FA: Ctrl- eller Shift-klick köar 5 åt gången, högerklick tar bort.
+          onProduce: (type, e) => onProduce(type, batch(e)),
+          onRemove: (type, e) => removeQueued(factories, type, batch(e)),
+          onTech: (key) => { tech = key; signature = ''; },
+          onHover: (key) => { hovered = key; },
+        });
+        progressBars = menu.bars;
+      }
+      if (menu) {
+        build.appendChild(menu.root);
+        refreshMenu = menu.refresh;
+      } else if (header) {
+        build.appendChild(header);
+      }
+
+      // Fliken som fäller ihop eller fäller ut byggmenyn.
       if (builders.length || factories.length) {
         const toggle = document.createElement('button');
         toggle.className = 'cmd-collapse';
@@ -295,90 +417,11 @@ export function createCommandPanel(el, {
         });
         el.appendChild(toggle);
       }
-      if (builders.length && !collapsed) {
-        const menu = renderBuildMenu({
-          buildable: [...buildable],
-          powerFor: (type) => builders.filter((e) => units[e.type].builds.includes(type))
-            .reduce((sum, e) => sum + units[e.type].buildPower, 0),
-          enhanceable,
-          enhanceOrders,
-          enhancePower: enhanceable ? units[enhanceable.type].buildPower : 0,
-          tab,
-          tech,
-          placing: ui.placing?.type,
-          hovered,
-        }, {
-          onTab: (key) => { tab = key; signature = ''; },
-          onTech: (key) => { tech = key; signature = ''; },
-          onHover: (key) => { hovered = key; },
-          onBuild,
-          onEnhance,
-          onCancelEnhance,
-        });
-        el.appendChild(menu.root);
-        enhanceBars = menu.bars;
-        refreshMenu = menu.refresh;
-      }
-      if (enhanceOrders.length) {
-        const b = button('Cancel upgrade', enhancements[enhanceOrders[0].enhancement].name,
-          () => onCancelEnhance(enhanceOrders[0].enhancement));
-        enhanceButtonBar = document.createElement('span');
-        enhanceButtonBar.className = 'cmd-progress';
-        b.appendChild(enhanceButtonBar);
-        buttons.appendChild(b);
-      }
-      let factoryMenu = null;
-      if (factories.length && !collapsed) {
-        factoryMenu = renderFactoryMenu({
-          producible: [...producible],
-          queued,
-          power: structures[factories[0].type].buildPower,
-          tech,
-          hovered,
-        }, {
-          // Som i FA: Ctrl- eller Shift-klick köar 5 åt gången, högerklick tar bort.
-          onProduce: (type, e) => onProduce(type, batch(e)),
-          onRemove: (type, e) => removeQueued(factories, type, batch(e)),
-          onTab: () => {},
-          onTech: (key) => { tech = key; signature = ''; },
-          onHover: (key) => { hovered = key; },
-        });
-        progressBars = factoryMenu.bars;
-        refreshMenu = factoryMenu.refresh;
-      }
-      if (factories.length) {
-        buttons.appendChild(button('Repeat', repeat ? 'On' : 'Off', () => onRepeat(!repeat), { active: repeat }));
-        buttons.appendChild(button('Pause', paused ? 'Paused' : 'Running', () => onPause(!paused), { active: paused }));
-      }
-      if (upgradable.length) {
-        const def = structures[upgradeTo];
-        const time = def.buildTime / structures[upgradable[0].type].buildPower;
-        buttons.appendChild(button('Upgrade', shortName(upgradeTo), () => onUpgrade(upgradable.map((e) => e.id)), {
-          title: `Upgrade to ${def.name} (Tech ${def.techCategory.slice(-1)}): ${def.cost.mass} mass, ` +
-            `${def.cost.energy} energy, ${Math.round(time)} s` + (upgradable.length > 1 ? ` each (${upgradable.length})` : ''),
-        }));
-      }
-      if (upgrading.length) {
-        const b = button('Cancel upgrade', `Upgrading to ${shortName(upgrading[0].upgrade.to)}`,
-          () => onCancelUpgrade(upgrading.map((e) => e.id)));
-        upgradeBar = document.createElement('span');
-        upgradeBar.className = 'cmd-progress';
-        b.appendChild(upgradeBar);
-        buttons.appendChild(b);
-      }
-      if (hasUnits) {
-        buttons.appendChild(button('Patrol', 'P', () => onPatrol(), { active: ui.mode === 'patrol' }));
-      }
-      if (sellable.length) {
-        buttons.appendChild(button('Sell', 'Delete', () => onSell()));
-      }
-      // Kön ligger ovanför knapparna: panelen sitter i skärmens nederkant, så när
-      // kön växer flyttar sig inte knapparna under muspekaren.
-      if (queueFactory?.productionQueue.length) el.appendChild(queueStrip(queueFactory));
-      if (queueBuilder) el.appendChild(builderStrip(queueBuilder));
-      if (factoryMenu) el.appendChild(factoryMenu.root);
-      if (buttons.childElementCount) el.appendChild(buttons);
-      el.hidden = el.childElementCount === 0;
+      if (grid.childElementCount) el.appendChild(orders);
+      if (build.childElementCount) el.appendChild(build);
+      el.classList.toggle('bar-narrow', !build.childElementCount);
+      el.hidden = !grid.childElementCount && !build.childElementCount;
+      document.body.classList.toggle('has-bar', !el.hidden);
       updateProgress();
     },
   };

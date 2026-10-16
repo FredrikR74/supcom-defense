@@ -17,6 +17,7 @@ import gameConfig from '../data/gameConfig.js';
 import { createDirector, directorSystem } from './director.js';
 import { squadSystem } from './squads.js';
 import { kiteSystem } from './enemyAi.js';
+import { overchargeSystem } from './overcharge.js';
 import { shieldSystem } from './shields.js';
 import { createIntel, intelSystem } from './intel.js';
 
@@ -182,6 +183,7 @@ export function tickWorld(world) {
   constructionDemand(world);
   economySystem(world);
   constructionProgress(world);
+  overchargeSystem(world);
   weaponsSystem(world);
   projectileSystem(world);
   retaliationSystem(world);

@@ -34,6 +34,9 @@ const HANDLERS = {
   upgrade: applyUpgrade,
   cancelOrders: applyCancelOrders,
   cancelUpgrade: applyCancelUpgrade,
+  overcharge: applyOvercharge,
+  setAutoOvercharge: applySetAutoOvercharge,
+  stop: applyStop,
 };
 
 export function applyCommands(world) {
@@ -77,6 +80,34 @@ function applyAttack(world, { owner, ids, targetId, queue }) {
   const canAttack = (u) => Boolean(weaponOf(u)) && Boolean(weaponOf(u).antiAir) === Boolean(getDef(target.type)?.air);
   for (const e of ownUnits(world, ids, owner, canAttack)) {
     giveOrder(e, { type: 'attack', targetId }, queue);
+  }
+}
+
+/**
+ * `{ type: 'overcharge', owner, ids, targetId, queue }`: de markerade som kan
+ * (ACU:n) går inom räckhåll och skjuter ett Overcharge mot målet (se overcharge.js).
+ */
+function applyOvercharge(world, { owner, ids, targetId, queue }) {
+  const target = getEntity(world, targetId);
+  if (!target || target.owner === owner || target.owner === 0) return;
+  for (const e of ownUnits(world, ids, owner, (u) => Boolean(units[u.type].overcharge))) {
+    giveOrder(e, { type: 'overcharge', targetId }, queue);
+  }
+}
+
+/** `{ type: 'setAutoOvercharge', owner, ids, value }`: automatiskt Overcharge på eller av. */
+function applySetAutoOvercharge(world, { owner, ids, value }) {
+  for (const e of ownUnits(world, ids, owner, (u) => Boolean(units[u.type].overcharge))) e.autoOvercharge = Boolean(value);
+}
+
+/**
+ * `{ type: 'stop', owner, ids }`: enheterna släpper alla order (som FA:s Stop),
+ * utom en ACU-uppgradering som pågår (den avbryts bara med Cancel upgrade).
+ */
+function applyStop(world, { owner, ids }) {
+  for (const e of ownUnits(world, ids, owner)) {
+    e.orders = e.orders.filter((o) => o.type === 'enhance');
+    e.targetId = null;
   }
 }
 
@@ -193,6 +224,19 @@ function applyBuild(world, { owner, ids, structure, x, z, queue }) {
 const isBuilder = (e) => (units[e.type].buildPower ?? 0) > 0;
 
 /**
+ * Går det att följa och hjälpa `target` (assist/guard)? Enheter, fabriker och
+ * färdiga byggnader som kan uppgraderas eller uppgraderas just nu (t.ex. Mass Extractors).
+ */
+export function isGuardable(target) {
+  if (target.kind === 'unit') return true;
+  const def = structures[target.type];
+  return target.kind === 'structure' && target.built && Boolean(def?.produces || def?.upgradesTo || target.upgrade);
+}
+
+/** Går det att högerklicka på `target` för att assistera (följa, eller hjälpa till att bygga)? */
+export const isAssistable = (target) => isGuardable(target) || (target.kind === 'structure' && !target.built);
+
+/**
  * `{ type: 'assist', owner, ids, targetId, queue }` (assist/guard som i FA):
  * - på en ofärdig byggnad: byggarna hjälper till att bygga den
  * - på en egen enhet, färdig fabrik eller byggnad som kan uppgraderas: alla
@@ -204,11 +248,7 @@ function applyAssist(world, { owner, ids, targetId, queue }) {
   const target = getEntity(world, targetId);
   if (!target || target.owner !== owner) return;
 
-  // Fabriker och byggnader som kan uppgraderas (t.ex. utvinnare) går att assistera.
-  const def0 = structures[target.type];
-  const guardable = target.kind === 'unit' ||
-    (target.built && Boolean(def0.produces || def0.upgradesTo || target.upgrade));
-  if (guardable) {
+  if (isGuardable(target)) {
     for (const e of ownUnits(world, ids, owner)) {
       if (e.id !== targetId) giveOrder(e, { type: 'guard', targetId }, queue);
     }

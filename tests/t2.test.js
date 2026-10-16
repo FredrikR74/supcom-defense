@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createWorld, tickWorld, PLAYER_ID, ENEMY_ID } from '../src/sim/world.js';
 import { addStructure, addUnit, getEntity, isIdleFactory } from '../src/sim/entities.js';
-import { queueCommand } from '../src/sim/commands.js';
+import { queueCommand, isAssistable } from '../src/sim/commands.js';
 import { createDirector, directorSystem } from '../src/sim/director.js';
 import structures from '../src/data/structures.js';
 import units from '../src/data/units.js';
@@ -124,6 +124,22 @@ describe('uppgradera Mass Extractor', () => {
     ticks(world, 2);
     expect(economy.mass.income).toBe(6);
     expect(economy.energy.requested).toBe(9);
+  });
+
+  it('assisterande ingenjörer gör uppgraderingen snabbare, och högerklick ger assist', () => {
+    const { world } = setup();
+    const mex = addStructure(world, 'massExtractor', { x: 56, z: 56, owner: PLAYER_ID });
+    const engs = [0, 1].map((k) => addUnit(world, 'engineer', { x: 58 + k, z: 60, owner: PLAYER_ID }));
+    // Högerklick: en färdig utvinnare (före och under uppgraderingen) går att assistera.
+    expect(isAssistable(mex)).toBe(true);
+    cmd(world, { type: 'upgrade', ids: [mex.id] });
+    ticks(world, 1);
+    expect(isAssistable(mex)).toBe(true);
+    cmd(world, { type: 'assist', ids: engs.map((e) => e.id), targetId: mex.id });
+    ticks(world, 100);
+    const alone = (structures.massExtractor.buildPower / structures.massExtractorT2.buildTime) * 10;
+    expect(mex.upgrade.progress).toBeGreaterThan(alone * 1.5); // 10 + 2 × 5 i byggkraft, minus gångtiden
+    for (const e of engs) expect(e.buildJob).toMatchObject({ kind: 'upgrade', targetId: mex.id });
   });
 
   it('T2 → T3 ger 18 mass och drar 54 energi', () => {

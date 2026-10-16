@@ -30,6 +30,14 @@ import structures from './data/structures.js';
 /** Spelhastigheter man stegar mellan med +/− (1× är normal). */
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
 
+/** Tipsraden överst för orderlägena (se startMode). */
+const MODE_HINTS = {
+  move: 'Move: click a point · Shift queues · Right-click or Esc cancels',
+  attack: 'Attack: click an enemy · Shift queues · Right-click or Esc cancels',
+  patrol: 'Patrol: click a point · Shift adds more · Esc cancels',
+  overcharge: 'Overcharge: click an enemy · Right-click or Esc cancels',
+};
+
 const $ = (id) => document.getElementById(id);
 const sound = createSound();
 
@@ -69,11 +77,21 @@ function startGame({ map, difficulty }) {
   const buildInput = createBuildInput(canvas, view, world, selection, ui);
   const selectionInput = createSelectionInput(canvas, $('selection-box'), view, world, selection, ui);
 
-  /** Patrullläge: nästa klick på marken blir en patrullpunkt (som P i FA). */
-  const startPatrol = () => {
+  /**
+   * Orderlägen från ordermenyn (som i FA): nästa klick blir en order.
+   * 'move' (en punkt), 'attack' (en fiende), 'patrol' (patrullpunkter, P) och
+   * 'overcharge' (en fiende, O; bara ACU:n).
+   */
+  const startMode = (mode) => {
     if (selection.size === 0) return;
-    ui.mode = 'patrol';
+    ui.placing = null;
+    ui.mode = ui.mode === mode ? null : mode;
     ui.patrolPlaced = false;
+  };
+  const startPatrol = () => startMode('patrol');
+  const stopSelected = () => {
+    ui.mode = null;
+    queueCommand(world, { type: 'stop', owner: PLAYER_ID, ids: selectedIds() });
   };
 
   const selectedIds = () => [...selection];
@@ -92,7 +110,9 @@ function startGame({ map, difficulty }) {
       queueCommand(world, { type: 'enhance', owner: PLAYER_ID, ids: selectedIds(), enhancement, queue }),
     onCancelEnhance: (enhancement) =>
       queueCommand(world, { type: 'cancelEnhance', owner: PLAYER_ID, ids: selectedIds(), enhancement }),
-    onPatrol: startPatrol,
+    onMode: startMode,
+    onStop: stopSelected,
+    onAutoOvercharge: (value) => queueCommand(world, { type: 'setAutoOvercharge', owner: PLAYER_ID, ids: selectedIds(), value }),
     onSell: sellSelected,
     onUpgrade: (ids) => queueCommand(world, { type: 'upgrade', owner: PLAYER_ID, ids }),
     onCancelUpgrade: (ids) => queueCommand(world, { type: 'cancelUpgrade', owner: PLAYER_ID, ids }),
@@ -170,6 +190,8 @@ function startGame({ map, difficulty }) {
     }
     if (e.code === 'Delete') sellSelected();
     if (e.code === 'KeyP') startPatrol();
+    if (e.code === 'KeyO' && [...selection].some((id) => getEntity(world, id)?.type === 'acu')) startMode('overcharge');
+    if (e.code === 'KeyH') stopSelected();
     if (e.code === 'Escape') ui.mode = null;
     if (e.code === 'Space' || e.code === 'Pause') {
       e.preventDefault();
@@ -255,7 +277,8 @@ function startGame({ map, difficulty }) {
     hoverInfo.update(hovered, hovered && view.entityLabelScreenPos(hovered));
     resources.update(world.players[PLAYER_ID].economy, ownCounts(world));
     measure('command panel', () => commandPanel.update(world, selection, ui));
-    modeHint.hidden = ui.mode !== 'patrol';
+    modeHint.hidden = !MODE_HINTS[ui.mode];
+    if (MODE_HINTS[ui.mode]) modeHint.textContent = MODE_HINTS[ui.mode];
     measure('threat panel', () => threatPanel.update(world, { respawnIn: acuRespawnIn(world) }));
     measure('selection info', () => selectionInfo.update(world, selection, ui));
     measure('idle panel', () => idlePanel.update(world));

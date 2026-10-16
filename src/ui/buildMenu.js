@@ -6,10 +6,11 @@ import { buildIcon } from './buildIcons.js';
 import { techName } from './tech.js';
 
 /**
- * Bygg- och fabriksmenyn i FA:s stil: flikar överst (Build och, för ACU:n,
- * en flik per uppgraderingsplats), tech-nivåer T1–EXP till vänster, ett
- * rutnät med ikoner och kortnamn, och en informationsruta (FA:s rollover) med
- * kostnad, byggtid och vad saken gör när man håller musen över en ruta.
+ * Bygg- och fabriksmenyn i FA:s stil (högra delen av panelen längst ner):
+ * lodräta flikar till vänster (tech-nivåer T1–EXP och, för ACU:n, en flik per
+ * uppgraderingsplats), ett rutnät med ikoner och kortnamn, och en
+ * informationsruta (FA:s rollover) ovanför panelen med kostnad, byggtid och
+ * vad saken gör när man håller musen över en ruta.
  * All text i spelet är på engelska.
  */
 
@@ -199,14 +200,18 @@ function tile(item) {
 }
 
 /**
- * Ritar en meny. `menu`: { tabs, tab, techs (visa tech-nivåer), tech, items, hovered }.
+ * Ritar en meny. `menu`: { vtabs, tech, items, hovered, header }.
+ * - `vtabs`: lodräta flikar till vänster (tech-nivåer och ACU:ns uppgraderingsplatser),
+ *   varje { key, label, on, disabled, onClick } eller { separator: true }
+ * - `tech`: visa bara items med den tech-nivån (null = alla)
+ * - `header`: element ovanför rutnätet (t.ex. kön), eller null
  * Varje item: { key, tech, rollover(), onClick, onContext, count, active, done, progress }.
- * `handlers`: { onTab, onTech, onHover }.
+ * `handlers`: { onHover }.
  * Returnerar { root, bars, refresh }: `bars` är key -> framstegsstapel för items
  * med `progress`, och `refresh()` ritar om informationsrutan (t.ex. procent).
  */
 function renderMenu(menu, handlers) {
-  const { tabs, tab, techs, tech, items, hovered } = menu;
+  const { vtabs, tech, items, hovered, header } = menu;
   const root = document.createElement('div');
   root.className = 'bm';
   const bars = new Map();
@@ -223,42 +228,31 @@ function renderMenu(menu, handlers) {
     rollover.hidden = false;
   };
 
-  const tabRow = document.createElement('div');
-  tabRow.className = 'bm-tabs' + (techs ? ' bm-tabs-indent' : '');
-  for (const t of tabs) {
+  // Lodräta flikar till vänster, som i FA: tech-nivåer och uppgraderingsplatser.
+  const col = document.createElement('div');
+  col.className = 'bm-vtabs';
+  for (const t of vtabs) {
+    if (t.separator) {
+      col.appendChild(Object.assign(document.createElement('span'), { className: 'bm-vsep' }));
+      continue;
+    }
     const b = document.createElement('button');
-    b.className = 'bm-tab' + (t.key === tab ? ' bm-tab-on' : '');
+    b.className = 'bm-vtab' + (t.on ? ' bm-tab-on' : '') + (t.disabled ? ' bm-disabled' : '');
     b.textContent = t.label;
+    b.disabled = Boolean(t.disabled);
     b.addEventListener('mousedown', (e) => e.stopPropagation());
-    b.addEventListener('click', () => handlers.onTab(t.key));
-    tabRow.appendChild(b);
+    b.addEventListener('click', t.onClick);
+    col.appendChild(b);
   }
-  root.appendChild(tabRow);
+  root.appendChild(col);
 
-  const body = document.createElement('div');
-  body.className = 'bm-body';
+  const main = document.createElement('div');
+  main.className = 'bm-main';
+  if (header) main.appendChild(header);
   const grid = document.createElement('div');
   grid.className = 'bm-grid';
 
-  let shown = items;
-  if (techs) {
-    // Tech-nivåer till vänster, som i FA; nivåer utan något att bygga är gråa.
-    const col = document.createElement('div');
-    col.className = 'bm-techs';
-    for (const t of TECH_TABS) {
-      const has = items.some((i) => i.tech === t.key);
-      const b = document.createElement('button');
-      b.className = 'bm-techtab' + (t.key === tech ? ' bm-tab-on' : '') + (has ? '' : ' bm-disabled');
-      b.textContent = t.label;
-      b.disabled = !has;
-      b.addEventListener('mousedown', (e) => e.stopPropagation());
-      b.addEventListener('click', () => handlers.onTech(t.key));
-      col.appendChild(b);
-    }
-    body.appendChild(col);
-    shown = items.filter((i) => i.tech === tech);
-  }
-
+  let shown = tech ? items.filter((i) => i.tech === tech) : items;
   const order = GROUPS.flat();
   const groupOf = (key) => GROUPS.findIndex((g) => g.includes(key));
   shown = [...shown].sort((a, b) => (order.indexOf(a.key) + 1 || 99) - (order.indexOf(b.key) + 1 || 99));
@@ -285,14 +279,25 @@ function renderMenu(menu, handlers) {
     if (hovered === item.key) show(item);
     grid.appendChild(b);
   }
-  body.appendChild(grid);
-  root.appendChild(body);
+  main.appendChild(grid);
+  root.appendChild(main);
   root.appendChild(rollover);
 
   const refresh = () => {
     if (current) rollover.innerHTML = current();
   };
   return { root, bars, refresh };
+}
+
+/** Lodräta tech-flikar; nivåer utan något att bygga är gråa. */
+function techTabs(items, on, onTech) {
+  return TECH_TABS.map((t) => ({
+    key: t.key,
+    label: t.label,
+    on: on === t.key,
+    disabled: !items.some((i) => i.tech === t.key),
+    onClick: () => onTech(t.key),
+  }));
 }
 
 /**
@@ -304,32 +309,40 @@ function renderMenu(menu, handlers) {
  * - `tab`, `tech`, `placing`, `hovered`: vald flik, tech-nivå, byggläge och ruta under musen
  */
 export function renderBuildMenu(state, handlers) {
-  const { buildable, powerFor, enhanceable, enhanceOrders, enhancePower, tab, tech, placing, hovered } = state;
-  let items;
-  if (tab === 'build') {
-    items = buildable.map((type) => ({
-      key: type,
-      tech: structures[type].techCategory ?? 'TECH1',
-      active: placing === type,
-      rollover: () => defRollover(type, structures[type], powerFor(type)),
-      onClick: () => handlers.onBuild(type),
-    }));
-  } else {
-    items = enhancementsFor(enhanceable.type).filter((k) => enhancements[k].slot === tab).map((key) => {
-      const installed = hasEnhancement(enhanceable, key);
-      const queuedAt = enhanceOrders.findIndex((o) => o.enhancement === key);
-      return {
-        key,
-        done: installed,
-        count: queuedAt > 0 ? `${queuedAt + 1}` : '',
-        progress: true,
-        rollover: () => enhancementRollover(key, enhanceable, enhanceOrders.find((o) => o.enhancement === key), enhancePower),
-        onClick: (e) => { if (!installed) handlers.onEnhance(key, e.shiftKey); },
-        onContext: () => { if (queuedAt >= 0) handlers.onCancelEnhance(key); },
-      };
-    });
+  const { buildable, powerFor, enhanceable, enhanceOrders, enhancePower, tab, tech, placing, hovered, header } = state;
+  const buildItems = buildable.map((type) => ({
+    key: type,
+    tech: structures[type].techCategory ?? 'TECH1',
+    active: placing === type,
+    rollover: () => defRollover(type, structures[type], powerFor(type)),
+    onClick: () => handlers.onBuild(type),
+  }));
+  // Tech-nivåerna, sedan en flik per uppgraderingsplats (ACU:n).
+  const vtabs = techTabs(buildItems, tab === 'build' ? tech : null, (key) => {
+    handlers.onTab('build');
+    handlers.onTech(key);
+  });
+  const slots = menuTabs(enhanceable).filter((t) => t.key !== 'build');
+  if (slots.length) {
+    vtabs.push({ separator: true });
+    for (const t of slots) vtabs.push({ key: t.key, label: t.label, on: tab === t.key, onClick: () => handlers.onTab(t.key) });
   }
-  return renderMenu({ tabs: menuTabs(enhanceable), tab, techs: tab === 'build', tech, items, hovered }, handlers);
+  if (tab === 'build') return renderMenu({ vtabs, tech, items: buildItems, hovered, header }, handlers);
+
+  const items = enhancementsFor(enhanceable.type).filter((k) => enhancements[k].slot === tab).map((key) => {
+    const installed = hasEnhancement(enhanceable, key);
+    const queuedAt = enhanceOrders.findIndex((o) => o.enhancement === key);
+    return {
+      key,
+      done: installed,
+      count: queuedAt > 0 ? `${queuedAt + 1}` : '',
+      progress: true,
+      rollover: () => enhancementRollover(key, enhanceable, enhanceOrders.find((o) => o.enhancement === key), enhancePower),
+      onClick: (e) => { if (!installed) handlers.onEnhance(key, e.shiftKey); },
+      onContext: () => { if (queuedAt >= 0) handlers.onCancelEnhance(key); },
+    };
+  });
+  return renderMenu({ vtabs, tech: null, items, hovered, header }, handlers);
 }
 
 /**
@@ -341,7 +354,7 @@ export function renderBuildMenu(state, handlers) {
  * `handlers`: { onProduce(type, e), onRemove(type, e), onTab, onTech, onHover }.
  */
 export function renderFactoryMenu(state, handlers) {
-  const { producible, queued, power, tech, hovered } = state;
+  const { producible, queued, power, tech, hovered, header } = state;
   const items = producible.map((type) => ({
     key: type,
     tech: units[type].techCategory ?? 'TECH1',
@@ -352,5 +365,5 @@ export function renderFactoryMenu(state, handlers) {
     onClick: (e) => handlers.onProduce(type, e),
     onContext: (e) => handlers.onRemove(type, e),
   }));
-  return renderMenu({ tabs: [{ key: 'build', label: 'Build' }], tab: 'build', techs: true, tech, items, hovered }, handlers);
+  return renderMenu({ vtabs: techTabs(items, tech, handlers.onTech), tech, items, hovered, header }, handlers);
 }

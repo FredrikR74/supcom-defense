@@ -4,6 +4,7 @@ import { addUnit, addStructure } from '../src/sim/entities.js';
 import { queueCommand } from '../src/sim/commands.js';
 import units from '../src/data/units.js';
 import firstDefense from '../src/data/maps/firstDefense.js';
+import { BODY_TURN_RATE } from '../src/sim/systems/movement.js';
 
 const SPEED = units.acu.speed;
 
@@ -37,10 +38,13 @@ describe('flyttorder', () => {
     expect(unit.orders).toEqual([]);
   });
 
-  it('vänder sig mot målet', () => {
+  it('vänder sig mot målet, högst BODY_TURN_RATE per sekund', () => {
     const { world, unit } = setup();
+    const start = unit.heading;
     move(world, [unit.id], 20, 10); // österut = +x
     ticks(world, 1);
+    expect(Math.abs(unit.heading - start)).toBeCloseTo(BODY_TURN_RATE / 10);
+    ticks(world, 9);
     expect(unit.heading).toBeCloseTo(Math.PI / 2);
   });
 

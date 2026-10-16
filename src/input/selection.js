@@ -1,4 +1,4 @@
-import { queueCommand } from '../sim/commands.js';
+import { queueCommand, isAssistable } from '../sim/commands.js';
 import { PLAYER_ID } from '../sim/constants.js';
 import { needsRepair, getDef } from '../sim/entities.js';
 
@@ -84,6 +84,29 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
 
   canvas.addEventListener('mousedown', (e) => {
     const p = local(e);
+    // Orderlägen från ordermenyn: vänsterklick ger ordern, högerklick avbryter.
+    if (ui.mode === 'move' || ui.mode === 'attack' || ui.mode === 'overcharge') {
+      if (e.button === 2) {
+        ui.mode = null;
+        return;
+      }
+      if (e.button !== 0) return;
+      const ndc = toNdc(p);
+      const ids = [...selection];
+      const target = world.entities.find((ent) => ent.id === view.pickEntityAtNdc(ndc.x, ndc.y));
+      const enemy = target && target.owner !== PLAYER_ID && target.owner !== 0 ? target : null;
+      if (ui.mode === 'move' || (ui.mode === 'attack' && !enemy)) {
+        // Attack på marken blir en flyttorder (det finns ingen attack-move än).
+        const ground = view.pickAtNdc(ndc.x, ndc.y);
+        if (ground) queueCommand(world, { type: 'move', owner: PLAYER_ID, ids, x: ground.x, z: ground.z, queue: e.shiftKey });
+      } else if (enemy) {
+        queueCommand(world, { type: ui.mode, owner: PLAYER_ID, ids, targetId: enemy.id, queue: e.shiftKey });
+      } else {
+        return; // Overcharge kräver ett mål: läget ligger kvar
+      }
+      if (!e.shiftKey) ui.mode = null;
+      return;
+    }
     // Patrullläge (P): nästa klick på marken blir en patrullpunkt.
     if (ui.mode === 'patrol' && (e.button === 0 || e.button === 2)) {
       const ndc = toNdc(p);
@@ -104,12 +127,11 @@ export function createSelectionInput(canvas, boxEl, view, world, selection, ui =
       if (ids.length === 0) return;
       const ndc = toNdc(p);
       // Högerklick på något eget som går att assistera: en ofärdig byggnad,
-      // en annan enhet eller en fabrik. Simuleringen avgör vilka som kan hjälpa.
+      // en annan enhet, en fabrik eller en byggnad som kan uppgraderas (t.ex.
+      // en Mass Extractor). Simuleringen avgör vilka som kan hjälpa.
       const targetId = view.pickEntityAtNdc(ndc.x, ndc.y);
       const target = world.entities.find((ent) => ent.id === targetId);
-      const assistable = target?.owner === PLAYER_ID && (
-        target.kind === 'unit' ||
-        (target.kind === 'structure' && (!target.built || target.rallyPoints)));
+      const assistable = target?.owner === PLAYER_ID && isAssistable(target);
       // Högerklick på en fiende: anfall.
       if (target && target.owner !== PLAYER_ID && target.owner !== 0) {
         queueCommand(world, { type: 'attack', owner: PLAYER_ID, ids, targetId, queue: e.shiftKey });

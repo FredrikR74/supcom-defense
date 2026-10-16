@@ -4,6 +4,18 @@ import { flowTarget } from '../pathing.js';
 import { steer, PATH_BUDGET_PER_TICK } from '../unitPath.js';
 import { getEntity, needsRepair, weaponOf } from '../entities.js';
 import units from '../../data/units.js';
+import { orderLineOfFire } from './combat.js';
+
+/** Kroppen vrider sig högst så här fort (radianer per sekund), så att enheter inte rycker. */
+export const BODY_TURN_RATE = Math.PI;
+/** En trupmedlem närmare sin plats än så här pekar åt truppens håll, inte åt sitt lilla korrigeringssteg. */
+const FACING_NEAR = 1;
+
+/** Vrider `heading` mot `want`, högst `max` radianer. */
+function turnToward(heading, want, max) {
+  const diff = Math.atan2(Math.sin(want - heading), Math.cos(want - heading));
+  return heading + Math.max(-max, Math.min(max, diff));
+}
 
 /** Gå till inom byggräckvidd för att reparera/återvinna; null när det inte behövs längre. */
 function workDestination(world, e, order) {
@@ -14,12 +26,21 @@ function workDestination(world, e, order) {
   return { x: target.x, z: target.z, reach: (units[e.type].buildRange ?? 0) + target.radius };
 }
 
-/** Gå mot målet tills det är inom vapnets räckvidd; null om målet är borta. */
+/**
+ * Gå mot målet tills det är inom vapnets räckvidd; null om målet är borta.
+ * En fiende som står inom räckvidd men där skottet skulle slå i en kulle går
+ * närmare tills det når fram (se hasLineOfFire).
+ */
 function attackDestination(world, e, order) {
   const target = getEntity(world, order.targetId);
-  const range = weaponOf(e)?.range;
+  const weapon = weaponOf(e);
+  const range = weapon?.range;
   if (!target || target.hp <= 0 || !range) return null;
-  return { x: target.x, z: target.z, reach: Math.max(0.5, range + target.radius - 0.5) };
+  const reach = Math.max(0.5, range + target.radius - 0.5);
+  if (Math.hypot(target.x - e.x, target.z - e.z) <= reach + 1e-6 && !orderLineOfFire(world, e, order, target, weapon)) {
+    return { x: target.x, z: target.z, reach: target.radius + 1 };
+  }
+  return { x: target.x, z: target.z, reach };
 }
 
 /** Målpunkt och stoppavstånd för en order, eller null om ordern inte innebär förflyttning. */
@@ -28,7 +49,8 @@ function destination(world, e, order) {
     case 'move': return { x: order.x, z: order.z, reach: 0 };
     case 'build': return { x: order.x, z: order.z, reach: order.reach };
     case 'guard': return guardDestination(world, e, order);
-    case 'attack': return attackDestination(world, e, order);
+    case 'attack':
+    case 'overcharge': return attackDestination(world, e, order);
     case 'repair':
     case 'reclaim': return workDestination(world, e, order);
     case 'patrol': {
@@ -47,7 +69,7 @@ function destination(world, e, order) {
         const p = flowTarget(world, e.x, e.z);
         return p && { x: p.x, z: p.z, reach: 0, flow: true };
       }
-      return { x: g.x, z: g.z, reach: g.reach };
+      return { x: g.x, z: g.z, reach: g.reach, facing: g.facing };
     }
     default: return null;
   }
@@ -69,7 +91,8 @@ export function movementSystem(world) {
     e.prevZ = e.z;
     // Fiender på väg mot kärnan och beväpnade patrullerare stannar och skjuter.
     const first = e.orders[0]?.type;
-    // Fiender som backar (se enemyAi.js) går undan även när de skjuter.
+    const maxTurn = BODY_TURN_RATE * TICK_SECONDS;
+    // Fiender som backar (se enemyAi.js) går undan även när de skjuter, med fronten mot målet.
     if (e.kite) {
       const dx = e.kite.x - e.x;
       const dz = e.kite.z - e.z;
@@ -78,20 +101,21 @@ export function movementSystem(world) {
       if (dist > 1e-9) {
         e.x += (dx / dist) * step;
         e.z += (dz / dist) * step;
-        e.heading = Math.atan2(dx, dz);
       }
+      e.heading = turnToward(e.heading ?? 0, e.kite.facing, maxTurn);
       continue;
     }
     const retreating = first === 'squad' && e.orders[0].goal?.retreat;
     if ((first === 'attackCore' || first === 'squad' || first === 'patrol') && e.targetId && !retreating) continue;
 
     let budget = e.speed * TICK_SECONDS;
+    let want = null;
     for (let steps = 0; budget > 0 && e.orders.length > 0 && steps < 8; steps++) {
       const order = e.orders[0];
       const dest = destination(world, e, order);
       if (!dest) {
         // Den assisterade eller målet är borta: nästa order (t.ex. tillbaka mot kärnan).
-        if (['guard', 'attack', 'repair', 'reclaim'].includes(order.type)) {
+        if (['guard', 'attack', 'overcharge', 'repair', 'reclaim'].includes(order.type)) {
           e.orders.shift();
           continue;
         }
@@ -115,7 +139,8 @@ export function movementSystem(world) {
       const dist = Math.hypot(dx, dz);
       const remaining = dist - goal.reach;
       if (remaining <= 1e-9) break; // framme (bygg/guard: inom räckhåll)
-      e.heading = Math.atan2(dx, dz);
+      // I formationen pekar man åt truppens håll; annars dit man går.
+      want = goal.facing !== undefined && dist < FACING_NEAR ? goal.facing : Math.atan2(dx, dz);
 
       const step = Math.min(remaining, budget);
       e.x += (dx / dist) * step;
@@ -142,5 +167,6 @@ export function movementSystem(world) {
         e.orders.shift();
       }
     }
+    if (want !== null) e.heading = turnToward(e.heading ?? want, want, maxTurn);
   }
 }

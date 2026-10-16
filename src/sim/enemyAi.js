@@ -426,7 +426,7 @@ export function kiteSystem(world) {
       const z = t.z + Math.cos(base + off) * want;
       if (!standable(world, x, z) || !clearLine(world, e.x, e.z, x, z)) continue;
       if (defenses.some((d) => covers(d, x, z))) continue;
-      e.kite = { x, z };
+      e.kite = { x, z, facing: Math.atan2(t.x - e.x, t.z - e.z) };
       break;
     }
   }

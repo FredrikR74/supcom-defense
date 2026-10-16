@@ -1,4 +1,5 @@
-import { addUnit, getEntity, getDef } from './entities.js';
+import { addUnit, getEntity, getDef, weaponOf } from './entities.js';
+import { hasLineOfFire } from './systems/combat.js';
 import { cellIndex, flowTarget, standable, clearLine } from './pathing.js';
 import { TICK_SECONDS, TICKS_PER_SECOND, ENEMY_ID } from './constants.js';
 import { planSquad, hasPlanOrder } from './enemyAi.js';
@@ -38,6 +39,8 @@ const LAG_DISTANCE = 4;
 const DISENGAGE_SECONDS = 2;
 /** Sidledsförskjutningen prövas i de här andelarna när platsen är blockerad. */
 const SQUEEZE = [1, 0.6, 0.3, 0];
+/** En medlem breddar sin plats igen först när den bredare platsen varit fri så här många tick i rad. */
+const WIDEN_TICKS = 10;
 /** Avstånd mellan punkterna i ankarets spår, och högst så många punkter. */
 const TRAIL_STEP = 2;
 const TRAIL_MAX = 80;
@@ -144,14 +147,43 @@ export function spawnSquad(world, types, spawnIndex) {
 const squadOrder = (e) => e.orders.find((o) => o.type === 'squad');
 const isEngaged = (e) => Boolean(e.targetId) || e.orders[0]?.type === 'attack';
 
-/** Målpunkt för en medlem på väg till sin plats: platsen, ihoptryckt om den är blockerad. */
-function slotGoal(world, squad, e, slot) {
-  for (const squeeze of SQUEEZE) {
-    const p = slotPosition(squad, slot, squeeze);
-    if (standable(world, p.x, p.z) && clearLine(world, e.x, e.z, p.x, p.z)) {
-      return { mode: 'slot', x: p.x, z: p.z, reach: 0 };
+/**
+ * Målpunkt för en medlem på väg till sin plats: platsen, ihoptryckt om den är
+ * blockerad. Medlemmen håller sin ihoptryckning (`m.squeeze`, index i SQUEEZE)
+ * och breddar först när den bredare platsen varit fri i WIDEN_TICKS tick i rad,
+ * så att den inte växlar fram och tillbaka (och vrider sig) i ett pass.
+ */
+function slotGoal(world, squad, e, m) {
+  const ok = (k) => {
+    const p = slotPosition(squad, m.slot, SQUEEZE[k]);
+    return standable(world, p.x, p.z) && clearLine(world, e.x, e.z, p.x, p.z) ? p : null;
+  };
+  let k = m.squeeze ?? 0;
+  if (k > 0 && ok(k - 1)) {
+    m.widen = (m.widen ?? 0) + 1;
+    if (m.widen >= WIDEN_TICKS) {
+      k--;
+      m.widen = 0;
+    }
+  } else {
+    m.widen = 0;
+  }
+  for (; k < SQUEEZE.length; k++) {
+    const p = ok(k);
+    if (p) {
+      m.squeeze = k;
+      return { mode: 'slot', x: p.x, z: p.z, reach: 0, facing: squad.heading };
     }
   }
+  // Ingen plats går att nå direkt (inte ens bredare): börja om från full bredd nästa gång.
+  for (k = (m.squeeze ?? 0) - 1; k >= 0; k--) {
+    const p = ok(k);
+    if (p) {
+      m.squeeze = k;
+      return { mode: 'slot', x: p.x, z: p.z, reach: 0, facing: squad.heading };
+    }
+  }
+  m.squeeze = 0;
   // Ingen plats går att nå direkt: följ flödesfältet, men gå inte före ankaret.
   const { dist } = world.flow;
   if (dist[cellIndex(world, e.x, e.z)] < dist[cellIndex(world, squad.x, squad.z)] - 1) return { mode: 'hold' };
@@ -224,10 +256,10 @@ function stepRetreat(world, squad, members) {
   }
   squad.members.forEach((m, k) => {
     const e = members[k];
-    const g = slotGoal(world, squad, e, m.slot);
+    const g = slotGoal(world, squad, e, m);
     let goal = { mode: 'hold' };
     if (g.mode === 'slot') goal = g;
-    else if (clearLine(world, e.x, e.z, squad.x, squad.z)) goal = { mode: 'slot', x: squad.x, z: squad.z, reach: 1 };
+    else if (clearLine(world, e.x, e.z, squad.x, squad.z)) goal = { mode: 'slot', x: squad.x, z: squad.z, reach: 1, facing: squad.heading };
     // `retreat`: medlemmen går till sin plats även om den har ett mål (se movement.js).
     squadOrder(e).goal = { ...goal, retreat: true };
   });
@@ -337,7 +369,7 @@ function stepSquad(world, squad) {
         return;
       }
     }
-    order.goal = slotGoal(world, squad, e, m.slot);
+    order.goal = slotGoal(world, squad, e, m);
     // Den som väntar framför ankaret ('hold') är inte efter; räknades den som
     // det kunde ankaret och de främsta vänta på varandra för evigt i ett pass.
     const { mode } = order.goal;
@@ -377,9 +409,13 @@ function engageGoal(world, e, engaged) {
   if (!best) return { mode: 'hold' };
   const targetId = best.targetId ?? best.orders[0]?.targetId;
   const t = targetId != null ? getEntity(world, targetId) : null;
-  const range = getDef(e.type)?.weapon?.range;
-  const reach = Math.max(0.5, (range ?? 0) + (t?.radius ?? 0) - 0.5);
+  const weapon = weaponOf(e);
+  const range = weapon?.range;
+  let reach = Math.max(0.5, (range ?? 0) + (t?.radius ?? 0) - 0.5);
   if (t && range && clearLine(world, e.x, e.z, t.x, t.z, reach)) {
+    // Inom räckvidd men skottet skulle slå i en kulle: gå närmare.
+    const near = Math.hypot(t.x - e.x, t.z - e.z) <= reach + 0.5;
+    if (near && !hasLineOfFire(world, e, weapon, t.x, t.z)) reach = t.radius + 1;
     return { mode: 'slot', x: t.x, z: t.z, reach };
   }
   return { mode: 'flow' };

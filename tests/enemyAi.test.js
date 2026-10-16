@@ -287,3 +287,40 @@ describe('reträtt och sammanslagning', () => {
     expect(advanced).toBe(true);
   }, 30000);
 });
+
+describe('skottlinje', () => {
+  /** Höjer terrängen i en ås tvärs över x = x0..x0+1 (rutornas hörn) runt z. */
+  function ridge(w, x0, z, height = 6) {
+    const m = w.terrain.size + 1;
+    for (let gz = Math.floor(z) - 4; gz <= Math.floor(z) + 5; gz++) {
+      for (let gx = x0; gx <= x0 + 1; gx++) w.terrain.heights[gz * m + gx] += height;
+    }
+  }
+
+  it('fienden skjuter inte rakt in i en kulle, men gör det när vägen är fri', () => {
+    const w = setup();
+    const spot = alongPath(w, 0, 25);
+    const m = enemy(w, 'mantis', spot.x, spot.z);
+    const striker = addUnit(w, 'striker', { x: spot.x + 7, z: spot.z, owner: PLAYER_ID });
+    ticks(w, 2);
+    expect(m.targetId).toBe(striker.id);
+    ridge(w, Math.floor(spot.x) + 3, spot.z);
+    ticks(w, 6);
+    expect(m.targetId).toBe(null);
+  });
+
+  it('med en attackorder går den närmare tills skottet når fram', () => {
+    const w = setup();
+    const spot = alongPath(w, 0, 25);
+    const pd = known(w, 'pointDefense', spot.x + 8, spot.z);
+    pd.hp = pd.maxHp = 1e6; // ska inte dö under testet
+    const m = enemy(w, 'mantis', spot.x, spot.z);
+    m.hp = m.maxHp = 1e6;
+    m.orders.push({ type: 'attack', targetId: pd.id });
+    ridge(w, Math.floor(spot.x) + 3, spot.z);
+    let fired = false;
+    ticks(w, 10 * 10, () => { if (m.targetId === pd.id) fired = true; });
+    expect(fired).toBe(true);
+    expect(Math.hypot(m.x - pd.x, m.z - pd.z)).toBeLessThan(8);
+  });
+});

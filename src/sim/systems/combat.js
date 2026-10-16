@@ -8,6 +8,7 @@ import { isDetected } from '../intel.js';
 import { getHeight } from '../terrain.js';
 import { ENEMY_ID } from '../constants.js';
 import { createTargetContext, chooseEnemyTarget, isRetargetTick } from '../enemyAi.js';
+import { resolveOvercharge } from '../overcharge.js';
 
 /** Hur nära nedslagspunkten en entitets kant måste vara för att träffas. */
 const HIT_TOLERANCE = 0.3;
@@ -31,6 +32,49 @@ export function projectileHeight(p, x, z) {
   const t = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / total);
   const line = p.y0 + (p.y1 - p.y0) * t;
   return p.ballistic ? line + 4 * ARC_HEIGHT * total * t * (1 - t) : line;
+}
+
+/** Avstånd mellan provpunkterna när skottlinjen mot ett mål kontrolleras. */
+const LINE_OF_FIRE_STEP = 0.5;
+/** Så här många tick gäller en kontroll av skottlinjen för en attackorder. */
+const LINE_OF_FIRE_TICKS = 5;
+
+/**
+ * Når ett skott från `e` med vapnet `weapon` fram till (tx, tz), eller slår det
+ * i terrängen på vägen? Samma bana (rak eller båge) och samma regel som
+ * projectileSystem använder. Fienden skjuter bara när skottet når fram (spelarens
+ * enheter skjuter som i FA, även in i en kulle).
+ */
+export function hasLineOfFire(world, e, weapon, tx, tz) {
+  const terrain = world.terrain;
+  if (!terrain) return true;
+  const p = {
+    sx: e.x, sz: e.z, tx, tz,
+    y0: getHeight(terrain, e.x, e.z) + (weapon.muzzleHeight ?? 1),
+    y1: getHeight(terrain, tx, tz) + (weapon.ballistic ? 0 : TARGET_HEIGHT),
+    ballistic: Boolean(weapon.ballistic),
+  };
+  const total = Math.hypot(tx - e.x, tz - e.z);
+  // Sista biten (målets egen ruta) räknas inte: där slår skottet ner ändå.
+  for (let d = LINE_OF_FIRE_STEP; d < total - LINE_OF_FIRE_STEP; d += LINE_OF_FIRE_STEP) {
+    const x = e.x + ((tx - e.x) * d) / total;
+    const z = e.z + ((tz - e.z) * d) / total;
+    if (getHeight(terrain, x, z) > projectileHeight(p, x, z) + TERRAIN_CLEARANCE) return false;
+  }
+  return true;
+}
+
+/**
+ * Skottlinjen från fienden `e` mot målet för dess attackorder, sparad på ordern
+ * i LINE_OF_FIRE_TICKS tick. Spelarens enheter har alltid fri skottlinje (FA).
+ */
+export function orderLineOfFire(world, e, order, t, weapon) {
+  if (e.owner !== ENEMY_ID || !world.terrain) return true;
+  const c = order.lineOfFire;
+  if (c && c.targetId === t.id && world.tick - c.tick < LINE_OF_FIRE_TICKS) return c.ok;
+  const ok = hasLineOfFire(world, e, weapon, t.x, t.z);
+  order.lineOfFire = { targetId: t.id, tick: world.tick, ok };
+  return ok;
 }
 
 /** Max antal händelser som sparas om ingen läser dem (t.ex. i tester). */
@@ -107,9 +151,10 @@ export function targetingSystem(world) {
 
     // En attackorder bestämmer målet så fort det är inom räckvidd.
     const order = e.orders?.[0];
-    if (order?.type === 'attack') {
+    if (order?.type === 'attack' || order?.type === 'overcharge') {
       const t = getEntity(world, order.targetId);
-      if (t && t.hp > 0 && isDetected(e.owner, t) && canTarget(weapon, t, edgeDistance(e, t))) {
+      if (t && t.hp > 0 && isDetected(e.owner, t) && canTarget(weapon, t, edgeDistance(e, t)) &&
+          orderLineOfFire(world, e, order, t, weapon)) {
         e.targetId = t.id;
         continue;
       }
@@ -126,9 +171,11 @@ export function targetingSystem(world) {
       for (const t of hash.queryRadius(e.x, e.z, weapon.range + maxRadius)) {
         if (!areEnemies(e, t) || t.hp <= 0 || !isDetected(e.owner, t) || getDef(t.type)?.benign) continue;
         const d = edgeDistance(e, t);
-        if (canTarget(weapon, t, d)) candidates.push({ t, d });
+        // Bara mål som skottet når fram till, inte genom en kulle.
+        if (canTarget(weapon, t, d) && hasLineOfFire(world, e, weapon, t.x, t.z)) candidates.push({ t, d });
       }
-      e.targetId = chooseEnemyTarget(ctx, e, weapon, candidates, keep ? current : null)?.id ?? null;
+      const still = keep && candidates.some((c) => c.t === current);
+      e.targetId = chooseEnemyTarget(ctx, e, weapon, candidates, still ? current : null)?.id ?? null;
       continue;
     }
     if (keep) continue;
@@ -218,37 +265,49 @@ export function weaponsSystem(world) {
     }
     if (e.weaponCooldown > 1e-9) continue;
     e.weaponCooldown += 1 / weapon.rateOfFire;
-    // Skotten flyger i en absolut bana (rak eller båge) och kan slå i terrängen.
-    const arc = world.terrain ? {
-      y0: getHeight(world.terrain, e.x, e.z) + (weapon.muzzleHeight ?? 1),
-      y1: getHeight(world.terrain, aim.x, aim.z) + (weapon.ballistic ? 0 : TARGET_HEIGHT),
-    } : {};
-    // En salva kan vara flera projektiler (FA:s ProjectilesPerOnFire).
-    for (let k = 0; k < (weapon.projectiles ?? 1); k++) {
-      world.projectiles.push({
-        ...arc,
-        owner: e.owner,
-        sourceId: e.id,
-        targetId: target.id,
-        /** Skyttens typ, så att renderingen kan rita rätt sorts skott. */
-        source: e.type,
-        x: e.x,
-        z: e.z,
-        prevX: e.x,
-        prevZ: e.z,
-        tx: aim.x,
-        tz: aim.z,
-        sx: e.x,
-        sz: e.z,
-        ballistic: Boolean(weapon.ballistic),
-        y: weapon.muzzleHeight ?? 1,
-        speed: weapon.projectileSpeed,
-        damage: weapon.damage,
-        damageRadius: weapon.damageRadius ?? 0,
-      });
-    }
-    emit(world, { type: 'fire', owner: e.owner, source: e.type, x: e.x, z: e.z, y: weapon.muzzleHeight ?? 1 });
+    fireProjectiles(world, e, weapon, target, aim);
   }
+}
+
+/**
+ * Skjuter en salva från `e` mot `aim` (siktpunkten för `target`). `extra`
+ * läggs på varje projektil (t.ex. Overcharge, se overcharge.js).
+ */
+export function fireProjectiles(world, e, weapon, target, aim, extra = {}) {
+  // Skotten flyger i en absolut bana (rak eller båge) och kan slå i terrängen.
+  const arc = world.terrain ? {
+    y0: getHeight(world.terrain, e.x, e.z) + (weapon.muzzleHeight ?? 1),
+    y1: getHeight(world.terrain, aim.x, aim.z) + (weapon.ballistic ? 0 : TARGET_HEIGHT),
+  } : {};
+  // En salva kan vara flera projektiler (FA:s ProjectilesPerOnFire).
+  for (let k = 0; k < (weapon.projectiles ?? 1); k++) {
+    world.projectiles.push({
+      ...arc,
+      owner: e.owner,
+      sourceId: e.id,
+      targetId: target.id,
+      /** Skyttens typ, så att renderingen kan rita rätt sorts skott. */
+      source: e.type,
+      x: e.x,
+      z: e.z,
+      prevX: e.x,
+      prevZ: e.z,
+      tx: aim.x,
+      tz: aim.z,
+      sx: e.x,
+      sz: e.z,
+      ballistic: Boolean(weapon.ballistic),
+      y: weapon.muzzleHeight ?? 1,
+      speed: weapon.projectileSpeed,
+      damage: weapon.damage,
+      damageRadius: weapon.damageRadius ?? 0,
+      ...extra,
+    });
+  }
+  emit(world, {
+    type: 'fire', owner: e.owner, source: e.type, x: e.x, z: e.z, y: weapon.muzzleHeight ?? 1,
+    overcharge: Boolean(extra.overcharge),
+  });
 }
 
 /**
@@ -283,6 +342,9 @@ export function projectileSystem(world) {
       p.z = p.tz;
     }
 
+    // Overcharge: skadan (och energin det kostar) räknas ut vid nedslaget.
+    if (p.overcharge) resolveOvercharge(world, p, hash, maxRadius);
+
     // En sköld tar hela skottet, även splash (se shields.js).
     if (!shieldsBy.has(p.owner)) shieldsBy.set(p.owner, enemyShields(world, p.owner));
     const shield = absorbProjectile(world, shieldsBy.get(p.owner), p);
@@ -311,14 +373,18 @@ export function projectileSystem(world) {
       // Spawnskölden tar all skada (se squads.js).
       if (t.shieldUntil > world.tick) continue;
       const wasAlive = t.hp > 0;
-      t.hp -= p.damage;
-      recordDamage(t, p.sourceId, p.damage);
+      // Overcharge gör en fast skada på byggnader (FAF:s structureDamage).
+      const damage = p.overcharge && t.kind === 'structure' ? p.structureDamage : p.damage;
+      t.hp -= damage;
+      recordDamage(t, p.sourceId, damage);
       t.lastAttackerId = p.sourceId;
       // Dödande skott: skytten får en kill.
       const shooter = wasAlive && t.hp <= 0 ? getEntity(world, p.sourceId) : null;
       if (shooter) shooter.kills = (shooter.kills ?? 0) + 1;
     }
-    emit(world, { type: hit ? 'hit' : 'miss', owner: p.owner, x: p.x, z: p.z, y: p.y, ballistic: p.ballistic });
+    emit(world, {
+      type: hit ? 'hit' : 'miss', owner: p.owner, x: p.x, z: p.z, y: p.y, ballistic: p.ballistic, overcharge: Boolean(p.overcharge),
+    });
   }
   world.projectiles = remaining;
 }

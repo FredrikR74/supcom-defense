@@ -63,6 +63,18 @@ export default {
     guardScanRadius: 15.75,
     /** Zephyr Anti Matter Cannon: 100 skada, 1 skott/s, räckvidd 22. */
     weapon: { damage: 100, rateOfFire: 1, range: 11, projectileSpeed: 25, muzzleHeight: 1.3 },
+    /**
+     * Overcharge som i FAF (UEL0001_unit.bp, OverchargeProjectile.lua): kräver
+     * 7500 lagrad energi, skadan är 90 % av lagret / 6 men högst vad målet
+     * behöver (HP för den tåligaste mobila enheten inom 2,7, halverat 1,35),
+     * mellan 1250 och 15000. Kostar skadan × 6 i energi vid nedslaget. 800 skada
+     * på byggnader och sköldar. Ett skott per 3,3 s, DamageRadius 2,5 (halverad).
+     * Räckvidden är kanonens (följer Zephyr Amplifier, som i FAF).
+     */
+    overcharge: {
+      energyRequired: 7500, energyMult: 0.9, energyRatio: 6, minDamage: 1250, maxDamage: 15000,
+      structureDamage: 800, reload: 3.3, damageRadius: 1.25, idealRadius: 1.35, projectileSpeed: 12.5,
+    },
   },
 
   /** Cybran T1 Assault Bot (URL0107). */

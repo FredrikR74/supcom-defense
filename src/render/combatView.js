@@ -16,6 +16,9 @@ const SHIELD_FLASH = new THREE.Color(0x93c5fd);
  * - orb: UEF:s plasma, ett glödande klot med en kort svans (`scale` = storlek)
  * - beam: Cybrans lasrar, en tunn ljus stråle
  */
+/** ACU:ns Overcharge (se sim/overcharge.js). */
+const OVERCHARGE_STYLE = { kind: 'orb', scale: 3.2 };
+
 const PROJECTILE_STYLES = {
   striker: { kind: 'orb', scale: 1 },
   pointDefense: { kind: 'orb', scale: 1.25 },
@@ -399,6 +402,8 @@ export function createCombatView(terrain, capacity = 2048) {
           fire.spawn({ x: ev.x, y: y + ev.y, z: ev.z, color: tint.copy(color).lerp(WHITE, 0.5).clone(), from: 0.7, to: 1.1, life: 0.08 });
         } else if ((ev.type === 'hit' || ev.type === 'miss') && ev.ballistic) {
           explode(ev.x, ev.z, 0.55, { dusty: true });
+        } else if ((ev.type === 'hit' || ev.type === 'miss') && ev.overcharge) {
+          explode(ev.x, ev.z, 1.2);
         } else if (ev.type === 'hit') {
           // Gnistor i lagfärg där skottet träffar.
           fire.spawn({ x: ev.x, y: y + ev.y, z: ev.z, color, from: 0.5, to: 1.2, life: 0.16 });
@@ -450,11 +455,13 @@ export function createCombatView(terrain, capacity = 2048) {
           }
           continue;
         }
-        const style = PROJECTILE_STYLES[p.source] ?? defaultStyle(p.owner);
+        const style = p.overcharge ? OVERCHARGE_STYLE : PROJECTILE_STYLES[p.source] ?? defaultStyle(p.owner);
         pos.set(x, y, z);
+        // Overcharge: en stor, ljus kula med en svans av gnistor.
+        if (p.overcharge && emitTrail) fire.spawn({ x, y, z, color: tint.copy(color).lerp(WHITE, 0.4).clone(), from: 0.9, to: 0.3, life: 0.3 });
         if (style.kind === 'orb' && counts.orb < capacity) {
           const i = counts.orb++;
-          place(orbCore, i, style.scale, tint.copy(color).lerp(WHITE, 0.65));
+          place(orbCore, i, style.scale, tint.copy(color).lerp(WHITE, p.overcharge ? 0.85 : 0.65));
           place(orbHalo, i, style.scale, color);
           place(orbTail, i, style.scale, color);
         } else if (style.kind === 'beam' && counts.beam < capacity) {

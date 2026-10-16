@@ -628,8 +628,8 @@ export function createSound() {
         if (ev.x === undefined) continue;
         if (ev.type === 'fire') {
           if (take('shot')) shot(ev, listener);
-        } else if ((ev.type === 'hit' || ev.type === 'miss') && ev.ballistic) {
-          // Bara artillerigranater som slår ner hörs; direktträffar har inget ljud.
+        } else if ((ev.type === 'hit' || ev.type === 'miss') && (ev.ballistic || ev.overcharge)) {
+          // Bara artillerigranater och Overcharge som slår ner hörs; direktträffar har inget ljud.
           if (take('explosion')) impact(ev, listener);
         } else if (ev.type === 'death') {
           if (take('explosion')) explosion(ev, listener);

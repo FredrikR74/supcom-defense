@@ -77,7 +77,7 @@ export function absorbProjectile(world, shields, p) {
     const { radius, regenStartTime } = getDef(e.type).shield;
     if (Math.hypot(p.x - e.x, p.z - e.z) > radius) continue;
     if (Math.hypot(p.sx - e.x, p.sz - e.z) <= radius) continue;
-    e.shieldHp -= p.damage;
+    e.shieldHp -= p.shieldDamage ?? p.damage; // Overcharge gör en fast skada på sköldar
     e.shieldRegenDelay = regenStartTime;
     if (e.shieldHp <= 0) {
       collapse(e, getDef(e.type).shield);
