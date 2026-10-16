@@ -101,11 +101,12 @@ export function createTerrainProps(map, terrain) {
     return false;
   };
 
-  // Fria områden: basplatån, spawnpunkter och fyndigheter.
+  // Fria områden: basplatån, spawnpunkter, fyndigheter och vrak från start.
   const keepClear = [
     { x: map.core.x, z: map.core.z, r: map.terrain.plateau.radius + 3 },
     ...map.spawns.map((s) => ({ ...s, r: 5 })),
     ...map.massDeposits.map((d) => ({ ...d, r: 2.5 })),
+    ...(map.wrecks ?? []).map((w) => ({ ...w, r: 2 })),
   ];
   const clear = (x, z, extra = 0) => keepClear.every((k) => Math.hypot(x - k.x, z - k.z) > k.r + extra);
   // Skogsdungar där detta brus är högt.

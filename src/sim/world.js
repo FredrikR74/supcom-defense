@@ -1,7 +1,7 @@
 import { createRng } from './rng.js';
 import { generateTerrain } from './terrain.js';
 import { createEconomy, stepEconomy } from './economy.js';
-import { addStructure, addUnit, getDef } from './entities.js';
+import { addStructure, addUnit, addWreck, getDef } from './entities.js';
 import { applyCommands } from './commands.js';
 import { movementSystem } from './systems/movement.js';
 import { constructionDemand, constructionProgress } from './systems/construction.js';
@@ -75,10 +75,26 @@ export function createWorld({ seed = 1, map = null, config = {} } = {}) {
     world.coreId = addStructure(world, 'core', { ...map.core, owner: PLAYER_ID }).id;
     // ACU:n startar strax söder om kärnan, vänd mot söder (mot kameran).
     spawnAcu(world);
+    addMapWrecks(world, map.wrecks ?? []);
     if (map.scenario) applyScenario(world, map.scenario);
     updatePathing(world);
   }
   return world;
+}
+
+/**
+ * Vrak som ligger på kartan från start (gamla slagfält). Varje vrak ({type, x, z})
+ * får samma mass som om enheten hade dött där, och en riktning från kartans
+ * egen slump så att samma karta alltid ser likadan ut.
+ */
+function addMapWrecks(world, wrecks) {
+  const rng = createRng((world.map.seed ?? 1) * 17 + 3);
+  for (const w of wrecks) {
+    const def = getDef(w.type);
+    const techMult = world.config.wreckTechMult[def.techCategory] ?? 0.9;
+    const mass = (def.cost?.mass ?? 0) * world.config.wreckMassMult * techMult;
+    addWreck(world, { type: w.type, x: w.x, z: w.z, heading: rng.next() * Math.PI * 2, radius: def.radius, mass });
+  }
 }
 
 /**
@@ -106,7 +122,9 @@ export function createTerrainForMap(map) {
     hillHeight: map.terrain.hillHeight,
     plateau: { ...map.terrain.plateau, x: map.core.x, z: map.core.z },
     ring: map.terrain.ring ? { ...map.terrain.ring, x: map.core.x, z: map.core.z } : null,
+    rings: map.terrain.rings ?? null,
     peaks: map.terrain.peaks ?? null,
+    ridges: map.terrain.ridges ?? null,
     mountainHeight: map.terrain.mountainHeight,
   });
 }

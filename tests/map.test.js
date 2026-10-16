@@ -100,3 +100,50 @@ describe('Mountain Pass (Test)', () => {
     expect(w.director.spentMass).toBeGreaterThanOrEqual(500);
   });
 });
+
+describe('Highlands', () => {
+  const map = maps.find((m) => m.id === 'highlands');
+
+  it('sidodalarna är täta: utan öppningen når ingen väg in i dalen', () => {
+    const closed = {
+      ...map,
+      terrain: { ...map.terrain, rings: map.terrain.rings.map((r) => ({ ...r, gaps: [] })) },
+    };
+    const w = createWorld({ map: closed });
+    for (const r of map.terrain.rings) expect(Number.isFinite(w.flow.dist[cellIndex(w, r.x, r.z)])).toBe(false);
+  });
+
+  it('varje sidodal har sin öppning mot norr', () => {
+    const w = createWorld({ map });
+    for (const r of map.terrain.rings) {
+      const gate = cellIndex(w, r.x, r.z - r.radius);
+      expect(isBlockedCell(w, gate)).toBe(false);
+      expect(Number.isFinite(w.flow.dist[cellIndex(w, r.x, r.z)])).toBe(true);
+      // Mot söder är det berg.
+      const south = Array.from({ length: 12 }, (_, k) => cellIndex(w, r.x, r.z + r.radius - 6 + k));
+      expect(south.some((i) => isBlockedCell(w, i))).toBe(true);
+    }
+  });
+
+  it('bergsryggen delar det norra fältet', () => {
+    const w = createWorld({ map });
+    const [ridge] = map.terrain.ridges;
+    expect(isBlockedCell(w, cellIndex(w, ridge.x1, (ridge.z1 + ridge.z2) / 2))).toBe(true);
+  });
+
+  it('har massa ute på fältet, utanför alla dalar', () => {
+    const valleys = [{ ...map.core, radius: map.terrain.ring.radius }, ...map.terrain.rings];
+    const outside = map.massDeposits.filter((d) => valleys.every((v) => Math.hypot(d.x - v.x, d.z - v.z) > v.radius));
+    expect(outside.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('vraken från start ligger på körbar mark och har mass att återvinna', () => {
+    const w = createWorld({ map });
+    const wrecks = w.entities.filter((e) => e.kind === 'wreck');
+    expect(wrecks).toHaveLength(map.wrecks.length);
+    for (const e of wrecks) {
+      expect(e.mass).toBeGreaterThan(0);
+      expect(isBlockedCell(w, cellIndex(w, e.x, e.z))).toBe(false);
+    }
+  });
+});

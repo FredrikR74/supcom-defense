@@ -58,29 +58,45 @@ const SKIRT = 10;
 const SKIRT_HEIGHT = 0.15;
 
 /**
- * Hur mycket berg som står i (x, z): { m } 0..1 för själva berget och { skirt }
- * 0..1 för förbergen runt det. `ring` ({x, z, radius, width, gaps}) är en
- * bergsring runt basen; varje öppning ({angle, width}) är en passage där
- * vinkeln är i grader från +z (söder) mot +x (öster). `peaks` ({x, z, radius})
- * är fristående berg. `inside` är hur långt in i berget punkten ligger.
+ * Hur långt in i en bergsring ({x, z, radius, width, gaps}) punkten ligger;
+ * varje öppning ({angle, width}) är en passage där vinkeln är i grader från
+ * +z (söder) mot +x (öster).
  */
-function mountainMask(x, z, ring, peaks) {
-  let inside = -Infinity;
-  if (ring) {
-    const dx = x - ring.x;
-    const dz = z - ring.z;
-    const d = Math.hypot(dx, dz);
-    let r = ring.width / 2 - Math.abs(d - ring.radius);
-    const angle = Math.atan2(dx, dz);
-    for (const gap of ring.gaps ?? []) {
-      const a = gap.angle * Math.PI / 180;
-      const diff = Math.abs(Math.atan2(Math.sin(angle - a), Math.cos(angle - a)));
-      // Avstånd (längs ringen) in i bergväggen från passagens kant.
-      r = Math.min(r, diff * d - gap.width / 2);
-    }
-    inside = Math.max(inside, r);
+function insideRing(x, z, ring) {
+  const dx = x - ring.x;
+  const dz = z - ring.z;
+  const d = Math.hypot(dx, dz);
+  let r = ring.width / 2 - Math.abs(d - ring.radius);
+  const angle = Math.atan2(dx, dz);
+  for (const gap of ring.gaps ?? []) {
+    const a = gap.angle * Math.PI / 180;
+    const diff = Math.abs(Math.atan2(Math.sin(angle - a), Math.cos(angle - a)));
+    // Avstånd (längs ringen) in i bergväggen från passagens kant.
+    r = Math.min(r, diff * d - gap.width / 2);
   }
-  for (const p of peaks ?? []) inside = Math.max(inside, p.radius - Math.hypot(x - p.x, z - p.z));
+  return r;
+}
+
+/** Hur långt in i en rak bergsrygg ({x1, z1, x2, z2, width}) punkten ligger. */
+function insideRidge(x, z, ridge) {
+  const vx = ridge.x2 - ridge.x1;
+  const vz = ridge.z2 - ridge.z1;
+  const len2 = vx * vx + vz * vz;
+  const t = len2 > 0 ? clamp01(((x - ridge.x1) * vx + (z - ridge.z1) * vz) / len2) : 0;
+  return ridge.width / 2 - Math.hypot(x - (ridge.x1 + vx * t), z - (ridge.z1 + vz * t));
+}
+
+/**
+ * Hur mycket berg som står i (x, z): { m } 0..1 för själva berget och { skirt }
+ * 0..1 för förbergen runt det. `rings` är bergsringar (se insideRing),
+ * `peaks` ({x, z, radius}) fristående berg och `ridges` raka bergsryggar
+ * (se insideRidge). `inside` är hur långt in i berget punkten ligger.
+ */
+function mountainMask(x, z, { rings, peaks, ridges }) {
+  let inside = -Infinity;
+  for (const ring of rings) inside = Math.max(inside, insideRing(x, z, ring));
+  for (const p of peaks) inside = Math.max(inside, p.radius - Math.hypot(x - p.x, z - p.z));
+  for (const r of ridges) inside = Math.max(inside, insideRidge(x, z, r));
   return {
     m: smoothstep(clamp01(inside / SLOPE)),
     skirt: smoothstep(clamp01((inside + SKIRT) / SKIRT)),
@@ -90,14 +106,19 @@ function mountainMask(x, z, ring, peaks) {
 /**
  * Genererar kullig terräng. `plateau` ({x, z, radius, blend, height}) plattar till
  * en cirkel för basen och tonar över till kullarna inom `blend` enheter.
- * `ring` och `peaks` lägger till berg (se mountainMask) med höjden `mountainHeight`;
- * deras branta sidor gör dem oframkomliga.
+ * `ring` (en bergsring), `rings`, `peaks` och `ridges` lägger till berg (se
+ * mountainMask) med höjden `mountainHeight`; deras branta sidor gör dem oframkomliga.
  */
-export function generateTerrain({ size, seed, hillHeight = 8, plateau = null, ring = null, peaks = null, mountainHeight = 16 }) {
+export function generateTerrain({
+  size, seed, hillHeight = 8, plateau = null, ring = null, rings = null, peaks = null, ridges = null,
+  mountainHeight = 16,
+}) {
   const rng = createRng(seed);
   const octaves = OCTAVES.map((o) => ({ ...o, sample: createValueNoise(size, o.cell, rng) }));
   const totalAmp = OCTAVES.reduce((sum, o) => sum + o.amp, 0);
-  const ridged = ring || peaks ? createRidgedNoise(size, rng) : null;
+  const mountains = { rings: [...(ring ? [ring] : []), ...(rings ?? [])], peaks: peaks ?? [], ridges: ridges ?? [] };
+  const hasMountains = mountains.rings.length + mountains.peaks.length + mountains.ridges.length > 0;
+  const ridged = hasMountains ? createRidgedNoise(size, rng) : null;
 
   const n = size + 1;
   const heights = new Float32Array(n * n);
@@ -117,7 +138,7 @@ export function generateTerrain({ size, seed, hillHeight = 8, plateau = null, ri
         }
       }
       if (ridged) {
-        const { m, skirt } = mountainMask(x, z, ring, peaks);
+        const { m, skirt } = mountainMask(x, z, mountains);
         h += mountainHeight * (m * (0.7 + 0.55 * ridged(x, z)) + skirt * SKIRT_HEIGHT);
       }
       heights[z * n + x] = h;

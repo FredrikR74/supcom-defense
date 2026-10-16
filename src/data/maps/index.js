@@ -1,6 +1,7 @@
 import firstDefense from './firstDefense.js';
 import crossroads from './crossroads.js';
 import mountainPass from './mountainPass.js';
+import highlands from './highlands.js';
 import mountainPassTest from './mountainPassTest.js';
 
 /**
@@ -8,4 +9,4 @@ import mountainPassTest from './mountainPassTest.js';
  * utvecklingsläget (Vite dev-servern på localhost och i testerna), inte i
  * den publicerade versionen.
  */
-export default [firstDefense, crossroads, mountainPass, ...(import.meta.env.DEV ? [mountainPassTest] : [])];
+export default [firstDefense, crossroads, mountainPass, highlands, ...(import.meta.env.DEV ? [mountainPassTest] : [])];
