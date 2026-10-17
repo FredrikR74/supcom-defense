@@ -5,6 +5,7 @@ import { canPlace } from '../src/sim/placement.js';
 import { computeSteepCells, cellIndex, isBlockedCell, updatePathing, MAX_UNIT_SLOPE } from '../src/sim/pathing.js';
 import { spawnEnemy } from '../src/sim/enemies.js';
 import { createSpatialHash } from '../src/sim/spatialHash.js';
+import { queueCommand } from '../src/sim/commands.js';
 import firstDefense from '../src/data/maps/firstDefense.js';
 import units from '../src/data/units.js';
 
@@ -163,6 +164,41 @@ describe('separation', () => {
     const b = addUnit(w, 'mantis', { x: 40, z: 40, owner: ENEMY_ID });
     ticks(w, 20);
     expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan((a.radius + b.radius) * 0.7);
+  });
+
+  it('två som möts rakt mot varandra väjer och kör inte igenom varandra', () => {
+    const w = world();
+    const a = addUnit(w, 'striker', { x: 30, z: 40, owner: PLAYER_ID });
+    const b = addUnit(w, 'striker', { x: 50, z: 40, owner: PLAYER_ID });
+    queueCommand(w, { type: 'move', owner: PLAYER_ID, ids: [a.id], x: 50, z: 40 });
+    queueCommand(w, { type: 'move', owner: PLAYER_ID, ids: [b.id], x: 30, z: 40 });
+    let closest = Infinity;
+    for (let i = 0; i < 300; i++) {
+      tickWorld(w);
+      closest = Math.min(closest, Math.hypot(a.x - b.x, a.z - b.z));
+    }
+    expect(closest).toBeGreaterThan((a.radius + b.radius) * 0.9);
+    expect(Math.hypot(a.x - 50, a.z - 40)).toBeLessThan(0.5);
+    expect(Math.hypot(b.x - 30, b.z - 40)).toBeLessThan(0.5);
+  });
+
+  it('en grupp med flyttorder går i formation och kör inte ovanpå varandra', () => {
+    const w = world();
+    const tanks = [];
+    for (let i = 0; i < 12; i++) tanks.push(addUnit(w, 'striker', { x: 30 + (i % 4) * 1.6, z: 36 + Math.floor(i / 4) * 1.6, owner: PLAYER_ID }));
+    queueCommand(w, { type: 'move', owner: PLAYER_ID, ids: tanks.map((t) => t.id), x: 45, z: 45 });
+    let closest = Infinity;
+    for (let i = 0; i < 200; i++) {
+      tickWorld(w);
+      if (i < 5) continue;
+      for (const t of tanks) for (const o of tanks) if (t !== o) closest = Math.min(closest, Math.hypot(t.x - o.x, t.z - o.z));
+    }
+    expect(closest).toBeGreaterThan(tanks[0].radius * 2 * 0.75);
+    // Alla kommer fram till var sin plats runt punkten.
+    for (const t of tanks) {
+      expect(t.orders).toEqual([]);
+      expect(Math.hypot(t.x - 45, t.z - 45)).toBeLessThan(6);
+    }
   });
 
   it('knuffar aldrig in en enhet i en byggnad', () => {

@@ -3,6 +3,8 @@ import { cellIndex, isBlockedCell } from '../pathing.js';
 
 /** Hur stor del av överlappet som rättas per tick (mjuk knuff i stället för hopp). */
 const PUSH = 0.25;
+/** En stillastående enhet som någon kör förbi glider undan fortare. */
+const YIELD = 0.6;
 /** Enheter får överlappa lite innan de knuffas. */
 const SPACING = 0.9;
 
@@ -42,7 +44,7 @@ export function separationSystem(world) {
       if (aMoving && bMoving) continue;
       // Andel av knuffen som a respektive b tar.
       const shareA = aMoving ? 0 : bMoving ? 1 : 0.5;
-      const amount = (min - Math.hypot(b.x - a.x, b.z - a.z)) * PUSH;
+      const amount = (min - Math.hypot(b.x - a.x, b.z - a.z)) * (aMoving || bMoving ? YIELD : PUSH);
       const px = (dx / d) * amount;
       const pz = (dz / d) * amount;
       const pa = push.get(a) ?? { x: 0, z: 0 };

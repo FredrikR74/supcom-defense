@@ -63,13 +63,69 @@ function giveOrder(unit, order, queue) {
 
 const canBuild = (type) => (e) => units[e.type].builds?.includes(type) ?? false;
 
+/** Mellanrum mellan enheterna i en formation, utöver deras storlek. */
+const FORMATION_GAP = 0.8;
+
+/**
+ * Som i FA går en grupp som får en flyttorder i formation: var och en får en
+ * egen plats i ett rutnät runt (x, z), vänt åt det håll gruppen går, i stället
+ * för att alla trängs på samma punkt. Var och en tar den plats som ligger
+ * närmast dess plats i gruppen, så att ingen behöver korsa de andras väg.
+ * Returnerar en Map från enhet till { x, z }.
+ */
+function formation(world, list, x, z) {
+  const size = world.terrain?.size ?? Infinity;
+  const clamp = (v) => Math.min(Math.max(v, 0), size);
+  const spots = new Map();
+  if (list.length === 1) {
+    spots.set(list[0], { x: clamp(x), z: clamp(z) });
+    return spots;
+  }
+  const cx = list.reduce((s, e) => s + e.x, 0) / list.length;
+  const cz = list.reduce((s, e) => s + e.z, 0) / list.length;
+  const d = Math.hypot(x - cx, z - cz);
+  // Framåt (fx, fz) och åt höger (rx, rz) i gruppens färdriktning.
+  const fx = d > 1e-6 ? (x - cx) / d : 0;
+  const fz = d > 1e-6 ? (z - cz) / d : 1;
+  const rx = fz;
+  const rz = -fx;
+  const spacing = 2 * Math.max(...list.map((e) => e.radius)) + FORMATION_GAP;
+  const cols = Math.ceil(Math.sqrt(list.length * 2));
+  const rows = Math.ceil(list.length / cols);
+  const offsets = [];
+  for (let i = 0; i < list.length; i++) {
+    const row = Math.floor(i / cols);
+    const inRow = row === rows - 1 ? list.length - row * cols : cols;
+    const side = ((i % cols) - (inRow - 1) / 2) * spacing;
+    const back = (row - (rows - 1) / 2) * spacing;
+    offsets.push({ side, back });
+  }
+  // Varje enhets plats i gruppen, i samma koordinater (åt sidan, bakåt).
+  const rel = (e) => ({ side: (e.x - cx) * rx + (e.z - cz) * rz, back: -((e.x - cx) * fx + (e.z - cz) * fz) });
+  const scale = Math.max(1e-6, ...list.map((e) => Math.hypot(rel(e).side, rel(e).back))) /
+    Math.max(1e-6, ...offsets.map((o) => Math.hypot(o.side, o.back)));
+  const free = [...list];
+  for (const o of offsets) {
+    let best = 0;
+    let bestDist = Infinity;
+    free.forEach((e, i) => {
+      const r = rel(e);
+      const dist = Math.hypot(r.side / scale - o.side, r.back / scale - o.back);
+      if (dist < bestDist) {
+        best = i;
+        bestDist = dist;
+      }
+    });
+    spots.set(free[best], { x: clamp(x + rx * o.side - fx * o.back), z: clamp(z + rz * o.side - fz * o.back) });
+    free.splice(best, 1);
+  }
+  return spots;
+}
+
 /** `{ type: 'move', owner, ids, x, z, queue }`: utan `queue` ersätts tidigare order. */
 function applyMove(world, { owner, ids, x, z, queue }) {
-  const size = world.terrain?.size ?? Infinity;
-  const tx = Math.min(Math.max(x, 0), size);
-  const tz = Math.min(Math.max(z, 0), size);
-  for (const e of ownUnits(world, ids, owner)) {
-    giveOrder(e, { type: 'move', x: tx, z: tz }, queue);
+  for (const [e, p] of formation(world, ownUnits(world, ids, owner), x, z)) {
+    giveOrder(e, { type: 'move', x: p.x, z: p.z }, queue);
   }
 }
 
@@ -79,11 +135,8 @@ function applyMove(world, { owner, ids, x, z, queue }) {
  * som en patrull, se patrolEngageSystem), och fortsätter sedan dit.
  */
 function applyAttackMove(world, { owner, ids, x, z, queue }) {
-  const size = world.terrain?.size ?? Infinity;
-  const tx = Math.min(Math.max(x, 0), size);
-  const tz = Math.min(Math.max(z, 0), size);
-  for (const e of ownUnits(world, ids, owner)) {
-    giveOrder(e, { type: 'attackMove', x: tx, z: tz }, queue);
+  for (const [e, p] of formation(world, ownUnits(world, ids, owner), x, z)) {
+    giveOrder(e, { type: 'attackMove', x: p.x, z: p.z }, queue);
   }
 }
 

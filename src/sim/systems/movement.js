@@ -1,15 +1,80 @@
 import { TICK_SECONDS } from '../constants.js';
 import { guardDestination } from '../guard.js';
-import { flowTarget } from '../pathing.js';
+import { flowTarget, cellIndex, isBlockedCell } from '../pathing.js';
 import { steer, PATH_BUDGET_PER_TICK } from '../unitPath.js';
 import { getEntity, needsRepair, weaponOf } from '../entities.js';
 import units from '../../data/units.js';
 import { orderLineOfFire } from './combat.js';
+import { createSpatialHash } from '../spatialHash.js';
 
 /** Kroppen vrider sig högst så här fort (radianer per sekund), så att enheter inte rycker. */
 export const BODY_TURN_RATE = Math.PI;
 /** En trupmedlem närmare sin plats än så här pekar åt truppens håll, inte åt sitt lilla korrigeringssteg. */
 const FACING_NEAR = 1;
+
+/** Två enheter i rörelse kommer inte närmare varandra än så här (andel av summan av radierna). */
+const COLLIDE = 0.95;
+/** Under så här stor andel av steget i sidled räknas ett möte som rakt mot varandra. */
+const HEAD_ON = 0.3;
+/** Så många gånger provar en enhet att väja innan den står kvar detta tick. */
+const AVOID_TRIES = 3;
+/** Har en enhet inte kommit förbi på så här många tick kör den igenom ändå, så att inget låser sig. */
+const MAX_BLOCKED_TICKS = 10;
+
+/** Den enhet i vägen som ett steg till (nx, nz) tar en för nära, eller null. */
+function blocker(hash, maxRadius, e, nx, nz, step) {
+  for (const o of hash.queryRadius(nx, nz, e.radius + maxRadius + step)) {
+    if (o === e || !o.moving) continue;
+    const min = (e.radius + o.radius) * COLLIDE;
+    const before = Math.hypot(e.x - o.x, e.z - o.z);
+    const after = Math.hypot(nx - o.x, nz - o.z);
+    // Bara steg som tar en närmare än tillåtet; den som redan överlappar får glida isär.
+    if (after < min && after < before && before > 1e-6) return { o, min, before };
+  }
+  return null;
+}
+
+/**
+ * Som i FA kör enheter inte igenom varandra: ett steg från (e.x, e.z) mot
+ * (nx, nz) som skulle ta enheten in i en annan som också är på väg någonstans
+ * glider i stället runt den, åt det håll steget redan lutar. Möts två rakt mot
+ * varandra väjer båda åt höger. Stillastående enheter går man förbi; de glider
+ * undan (se separation.js), så att egna ingenjörer inte står i vägen för ACU:n.
+ * Returnerar null om steget är fritt, den nya punkten om enheten väjer, eller
+ * { blocked: true } om det inte går att komma förbi just nu.
+ */
+function avoid(world, hash, maxRadius, e, nx, nz) {
+  const step = Math.hypot(nx - e.x, nz - e.z);
+  if (step < 1e-9) return null;
+  const fx = (nx - e.x) / step;
+  const fz = (nz - e.z) / step;
+  let hit = blocker(hash, maxRadius, e, nx, nz, step);
+  if (!hit) return null;
+  for (let tries = 0; hit && tries < AVOID_TRIES; tries++) {
+    const { o, min, before } = hit;
+    // Glid längs cirkeln runt den andra, åt det håll steget lutar (annars åt höger).
+    const ux = (e.x - o.x) / before;
+    const uz = (e.z - o.z) / before;
+    let tx = -uz;
+    let tz = ux;
+    const lean = tx * fx + tz * fz;
+    if (Math.abs(lean) < HEAD_ON ? tx * fz - tz * fx < 0 : lean < 0) {
+      tx = -tx;
+      tz = -tz;
+    }
+    const r = Math.max(min, before);
+    const px = e.x + tx * step;
+    const pz = e.z + tz * step;
+    const d = Math.hypot(px - o.x, pz - o.z);
+    nx = o.x + ((px - o.x) / d) * r;
+    nz = o.z + ((pz - o.z) / d) * r;
+    hit = blocker(hash, maxRadius, e, nx, nz, step);
+  }
+  const size = world.terrain?.size ?? Infinity;
+  const open = nx >= 0 && nz >= 0 && nx < size && nz < size &&
+    !(world.terrain && isBlockedCell(world, cellIndex(world, nx, nz)));
+  return hit || !open ? { blocked: true } : { x: nx, z: nz };
+}
 
 /** Vrider `heading` mot `want`, högst `max` radianer. */
 function turnToward(heading, want, max) {
@@ -86,10 +151,17 @@ function destination(world, e, order) {
  */
 export function movementSystem(world) {
   world.pathBudget = PATH_BUDGET_PER_TICK;
+  const movers = world.entities.filter((u) => u.kind === 'unit');
+  const maxRadius = Math.max(0, ...movers.map((u) => u.radius));
+  // Positionerna i rutnätet är från början av ticket; frågan tar med en marginal för det.
+  const hash = createSpatialHash(2);
+  for (const u of movers) hash.insert(u);
   for (const e of world.entities) {
     if (e.kind !== 'unit') continue;
     e.prevX = e.x;
     e.prevZ = e.z;
+    // Rör sig enheten av egen kraft detta tick (inte bara knuffad)? Se avoid.
+    e.moving = false;
     // Fiender på väg mot kärnan och beväpnade patrullerare stannar och skjuter.
     const first = e.orders[0]?.type;
     const maxTurn = BODY_TURN_RATE * TICK_SECONDS;
@@ -104,6 +176,7 @@ export function movementSystem(world) {
         e.z += (dz / dist) * step;
       }
       e.heading = turnToward(e.heading ?? 0, e.kite.facing, maxTurn);
+      e.moving = true;
       continue;
     }
     const retreating = first === 'squad' && e.orders[0].goal?.retreat;
@@ -144,6 +217,22 @@ export function movementSystem(world) {
       want = goal.facing !== undefined && dist < FACING_NEAR ? goal.facing : Math.atan2(dx, dz);
 
       const step = Math.min(remaining, budget);
+      const slid = (e.blockedTicks ?? 0) < MAX_BLOCKED_TICKS &&
+        avoid(world, hash, maxRadius + 1, e, e.x + (dx / dist) * step, e.z + (dz / dist) * step);
+      if (slid) {
+        // Väjer runt någon, eller väntar på att komma förbi: resten av ticket står enheten där.
+        e.moving = true;
+        if (slid.blocked) {
+          e.blockedTicks = (e.blockedTicks ?? 0) + 1;
+          break;
+        }
+        e.blockedTicks = 0;
+        want = Math.atan2(slid.x - e.x, slid.z - e.z);
+        e.x = slid.x;
+        e.z = slid.z;
+        break;
+      }
+      e.blockedTicks = 0;
       e.x += (dx / dist) * step;
       e.z += (dz / dist) * step;
       budget -= step;
@@ -169,5 +258,6 @@ export function movementSystem(world) {
       }
     }
     if (want !== null) e.heading = turnToward(e.heading ?? want, want, maxTurn);
+    e.moving ||= e.x !== e.prevX || e.z !== e.prevZ;
   }
 }
