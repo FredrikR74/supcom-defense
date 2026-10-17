@@ -2,9 +2,16 @@ import { getEntity, needsRepair, weaponOf } from './entities.js';
 import structures from '../data/structures.js';
 import units from '../data/units.js';
 import { isDetected } from './intel.js';
+import { cellIndex, isBlockedCell } from './pathing.js';
 
-/** Hur nära en assisterande enhet håller sig till den den följer, utöver räckvidden. */
-const FOLLOW_SLACK = 1;
+/** Hur långt utanför den assisterades kant den innersta ringen av eskorter står. */
+const SLOT_GAP = 1.5;
+/** Mellanrum mellan två eskorter i ringarna, utöver deras storlek. */
+const SLOT_SPACING = 0.8;
+/** Hur nära sin plats i ringen en eskort behöver komma. */
+const SLOT_REACH = 0.3;
+/** Fler ringar än så letas inte (t.ex. inträngd mellan byggnader). */
+const MAX_RINGS = 12;
 /**
  * Som FA:s GuardScanRadius: fiender så här nära den assisterade (utöver den
  * assisterandes räckvidd) anfalls. Som GuardReturnRadius: längre bort än så
@@ -57,7 +64,103 @@ export function guardDestination(world, unit, order) {
   if (enemy && weapon) {
     return { x: enemy.x, z: enemy.z, reach: weapon.range * 0.9 + enemy.radius, target, site: null, mode: 'engage' };
   }
-  return { x: target.x, z: target.z, reach: range + target.radius + FOLLOW_SLACK, target, site: null, mode: 'follow' };
+  const slot = guardSlot(world, unit, target);
+  return { x: target.x + slot.dx, z: target.z + slot.dz, reach: SLOT_REACH, target, site: null, mode: 'follow' };
+}
+
+/**
+ * Var runt den assisterade `unit` ska stå: som i FA sprider sig eskorterna i
+ * ringar runt den i stället för att trängas intill den. Platserna delas ut på
+ * nytt bara när gruppen av eskorter ändras (en tillkommer, går eller dör) eller
+ * när den assisterade flyttat sig så att en plats hamnat i en byggnad eller
+ * brant terräng, och då får var och en den lediga plats som ligger närmast.
+ */
+function guardSlot(world, unit, target) {
+  if (world.guardSlots?.tick !== world.tick) updateGuardSlots(world);
+  return world.guardSlots.groups.get(target.id)?.slots.get(unit.id) ?? { dx: 0, dz: 0 };
+}
+
+function updateGuardSlots(world) {
+  const previous = world.guardSlots?.groups ?? new Map();
+  const members = new Map();
+  for (const e of world.entities) {
+    const order = e.kind === 'unit' ? e.orders[0] : null;
+    if (order?.type !== 'guard') continue;
+    if (!members.has(order.targetId)) members.set(order.targetId, []);
+    members.get(order.targetId).push(e);
+  }
+  const groups = new Map();
+  for (const [targetId, guards] of members) {
+    const target = getEntity(world, targetId);
+    if (!target) continue;
+    const key = guards.map((g) => g.id).join(',');
+    const old = previous.get(targetId);
+    groups.set(targetId, old?.key === key && slotsStillOpen(world, target, old) ? old : assignSlots(world, target, guards, key));
+  }
+  world.guardSlots = { tick: world.tick, groups };
+}
+
+/** Står alla platser i `group` fortfarande fritt där den assisterade är nu? */
+function slotsStillOpen(world, target, group) {
+  if (Math.hypot(target.x - group.x, target.z - group.z) < 0.25) return true;
+  group.x = target.x;
+  group.z = target.z;
+  for (const o of group.slots.values()) {
+    if (!openSpot(world, target.x + o.dx, target.z + o.dz, group.r)) return false;
+  }
+  return true;
+}
+
+/** Får en eskort med radien `r` plats där (inte i en byggnad, brant terräng eller utanför kartan)? */
+function openSpot(world, x, z, r) {
+  if (!world.terrain) return true;
+  const n = world.terrain.size;
+  return [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].every(([ox, oz]) => {
+    const px = x + ox;
+    const pz = z + oz;
+    return px >= 0 && pz >= 0 && px < n && pz < n && !isBlockedCell(world, cellIndex(world, px, pz));
+  });
+}
+
+/**
+ * Ringar av platser runt `target`, den innersta först, och närmaste eskort till
+ * varje plats. Platser i en byggnad eller i brant terräng hoppas över.
+ */
+function assignSlots(world, target, guards, key) {
+  const spacing = 2 * Math.max(...guards.map((g) => g.radius)) + SLOT_SPACING;
+  const fit = spacing / 2;
+  const offsets = [];
+  for (let ring = 0; offsets.length < guards.length && ring < MAX_RINGS; ring++) {
+    const r = target.radius + SLOT_GAP + spacing / 2 + ring * spacing;
+    const fits = Math.max(1, Math.floor((2 * Math.PI * r) / spacing));
+    // Den yttersta ringen fylls jämnt runt om, inte bara på ena sidan.
+    const count = Math.min(fits, guards.length - offsets.length);
+    // Varannan ring förskjuten, så att den yttre ringens enheter ser mellan den inres.
+    const start = ring % 2 ? Math.PI / count : 0;
+    for (let i = 0; i < count; i++) {
+      const a = start + (i / count) * Math.PI * 2;
+      const dx = Math.sin(a) * r;
+      const dz = Math.cos(a) * r;
+      if (openSpot(world, target.x + dx, target.z + dz, fit)) offsets.push({ dx, dz });
+    }
+  }
+  while (offsets.length < guards.length) offsets.push({ dx: 0, dz: 0 }); // allt runt om blockerat
+  const free = [...guards];
+  const slots = new Map();
+  for (const o of offsets) {
+    let best = 0;
+    let bestDist = Infinity;
+    free.forEach((g, i) => {
+      const d = Math.hypot(target.x + o.dx - g.x, target.z + o.dz - g.z);
+      if (d < bestDist) {
+        best = i;
+        bestDist = d;
+      }
+    });
+    slots.set(free[best].id, o);
+    free.splice(best, 1);
+  }
+  return { key, x: target.x, z: target.z, r: fit, slots };
 }
 
 /**

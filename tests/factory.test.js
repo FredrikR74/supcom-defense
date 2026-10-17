@@ -191,7 +191,24 @@ describe('assistera en annan enhet', () => {
     cmd(world, { type: 'move', ids: [acu.id], x: 30, z: 69 });
     ticks(world, 200);
     expect(tank.orders[0]).toMatchObject({ type: 'guard', targetId: acu.id });
-    expect(Math.hypot(tank.x - acu.x, tank.z - acu.z)).toBeLessThan(acu.radius + 2.5);
+    expect(Math.hypot(tank.x - acu.x, tank.z - acu.z)).toBeLessThan(acu.radius + 4);
+  });
+
+  it('många eskorter sprider ut sig i ringar runt den assisterade', () => {
+    const { world, acu } = setup();
+    acu.orders.length = 0;
+    const tanks = [];
+    for (let i = 0; i < 30; i++) {
+      tanks.push(addUnit(world, 'striker', { x: 50 + (i % 6) * 1.5, z: 90 + Math.floor(i / 6) * 1.5, owner: PLAYER_ID }));
+    }
+    cmd(world, { type: 'assist', ids: tanks.map((t) => t.id), targetId: acu.id });
+    ticks(world, 400);
+    for (const t of tanks) {
+      expect(Math.hypot(t.x - acu.x, t.z - acu.z)).toBeGreaterThan(acu.radius + 1.5);
+      for (const o of tanks) {
+        if (o !== t) expect(Math.hypot(t.x - o.x, t.z - o.z)).toBeGreaterThan(t.radius + o.radius);
+      }
+    }
   });
 
   it('en assisterande stridsenhet anfaller fiender som kommer nära den assisterade', () => {
